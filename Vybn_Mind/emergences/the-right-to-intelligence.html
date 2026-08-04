@@ -7,67 +7,20 @@
 <meta name="description" content="A one-page visual primer for court professionals: models, agents, harnesses, orchestration, AI augmentation, and transparency as an emerging right to intelligence.">
 <link rel="canonical" href="https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/the-right-to-intelligence.html">
 <style>
-:root{
-  color-scheme:light;
-  --paper:#f4efe5;--ink:#182027;--muted:#687077;--rule:#c4b8a5;
-  --blue:#17566d;--blue-soft:#dce9ea;--gold:#ad7625;--gold-soft:#eee0c6;--white:#fbf8f1;
-  --serif:ui-serif,Georgia,Cambria,"Times New Roman",serif;
-  --sans:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}
-*{box-sizing:border-box}
-html{background:var(--paper);scroll-behavior:smooth}
-body{margin:0;color:var(--ink);background:var(--paper);font:400 1rem/1.5 var(--serif)}
-a{color:var(--blue);text-underline-offset:.18em}
-.wrap{width:min(68rem,calc(100% - 2rem));margin:auto}
-.kicker,.label,.mini{font:750 .68rem/1.25 var(--sans);letter-spacing:.13em;text-transform:uppercase}
-.kicker,.label{color:var(--blue)}
-header{padding:2.3rem 0 2rem;border-bottom:1px solid var(--rule)}
-header .top{display:flex;justify-content:space-between;gap:1rem;align-items:start}
-h1{max-width:11ch;margin:.35rem 0 .5rem;font:500 clamp(3.3rem,9vw,7rem)/.88 var(--serif);letter-spacing:-.055em}
-.deck{max-width:48rem;margin:0;font:500 clamp(1.2rem,2.4vw,1.65rem)/1.28 var(--serif)}
-.limit{max-width:20rem;margin:.1rem 0 0;color:var(--muted);text-align:right;font:650 .69rem/1.4 var(--sans)}
-section{padding:4.2rem 0;border-bottom:1px solid var(--rule)}
-h2{max-width:21ch;margin:.25rem 0 2.5rem;font:500 clamp(2rem,4.7vw,4.4rem)/.98 var(--serif);letter-spacing:-.04em}
-svg{display:block;width:100%;height:auto}.stroke{fill:none;stroke:var(--ink);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.thin{stroke-width:2}.soft{opacity:.22}.blue{stroke:var(--blue)}.gold{stroke:var(--gold)}.dash{stroke-dasharray:8 9}.fill-paper{fill:var(--paper)}.fill-ink{fill:var(--ink)}.fill-blue{fill:var(--blue)}.fill-gold{fill:var(--gold)}
-
-/* A familiar office becomes the visual grammar for the whole page. */
-.office{position:relative;min-height:31rem;border:1px solid var(--rule);background:var(--white);overflow:hidden}
-.office .room{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
-.office .thing{display:grid;place-items:center;gap:.35rem;padding:1.2rem;text-align:center;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
-.office .thing:nth-child(even){border-right:0}.office .thing:nth-child(n+3){border-bottom:0}
-.office .icon{font:500 clamp(2.7rem,7vw,5.2rem)/1 var(--serif);color:var(--blue)}
-.office .thing b{font:750 .72rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}
-.office .center{position:absolute;inset:50% auto auto 50%;width:10.5rem;height:10.5rem;transform:translate(-50%,-50%);display:grid;place-items:center;padding:1rem;border:3px solid var(--ink);border-radius:50%;background:var(--paper);text-align:center;font:600 1.15rem/1.1 var(--serif);box-shadow:0 0 0 10px var(--white)}
-.office-note{max-width:43rem;margin:1.4rem auto 0;text-align:center;font:500 clamp(1.2rem,2.2vw,1.55rem)/1.3 var(--serif)}
-
-.formula{display:grid;grid-template-columns:1fr auto 1fr auto 1.2fr;align-items:center;gap:1rem;margin-top:1rem}
-.term{min-height:13rem;display:grid;place-items:center;align-content:center;gap:.7rem;padding:1.3rem;border:1px solid var(--rule);background:var(--white);text-align:center}
-.term svg{width:8rem;max-height:6rem}.term b{font:750 .72rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--blue)}.term p{max-width:13rem;margin:0;font-size:1.05rem;line-height:1.25}.operator{font:500 2.4rem/1 var(--serif);color:var(--gold)}
-.harness-term{position:relative;border:3px solid var(--blue)}.harness-term::before{content:"HARNESS";position:absolute;top:-.65rem;padding:0 .6rem;background:var(--paper);color:var(--blue);font:750 .65rem/1.2 var(--sans);letter-spacing:.14em}
-.gloss{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:1px;background:var(--rule);border:1px solid var(--rule)}
-.gloss p{margin:0;padding:1rem;background:var(--paper);font-size:.92rem}.gloss b{display:block;color:var(--blue);font-family:var(--sans);font-size:.75rem;text-transform:uppercase}
-
-.pipeline{display:grid;grid-template-columns:repeat(4,1fr);align-items:stretch;margin:1rem 0 3.4rem}
-.pipe{position:relative;display:grid;place-items:center;min-height:8rem;padding:1rem;border-block:1px solid var(--rule);border-left:1px solid var(--rule);background:var(--white);text-align:center}.pipe:last-child{border-right:1px solid var(--rule)}.pipe:not(:last-child)::after{content:"→";position:absolute;z-index:2;right:-.8rem;color:var(--gold);font:700 1.7rem/1 var(--serif)}.pipe b{display:block;color:var(--blue);font:750 .69rem/1.2 var(--sans);letter-spacing:.11em;text-transform:uppercase}.pipe span{display:block;max-width:10rem;margin:.4rem auto 0;line-height:1.2}
-.lanes{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule);background:var(--white)}
-.lane{position:relative;padding:2rem}.lane+ .lane{border-left:1px solid var(--rule)}.lane h3{margin:0 0 1.5rem;font:500 clamp(1.8rem,3.5vw,3rem)/1 var(--serif);letter-spacing:-.03em}.lane .who{color:var(--blue);font:750 .69rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}.lane ol{list-style:none;margin:0;padding:0}.lane li{display:grid;grid-template-columns:2.3rem 1fr;align-items:center;gap:.8rem;padding:.8rem 0;border-top:1px solid var(--rule);font-size:1.08rem}.lane li::before{display:grid;place-items:center;width:2rem;height:2rem;border:1px solid var(--blue);border-radius:50%;color:var(--blue);font:700 .72rem var(--sans)}.lane li:nth-child(1)::before{content:"1"}.lane li:nth-child(2)::before{content:"2"}.lane li:nth-child(3)::before{content:"3"}.boundary{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:.8rem;padding:.8rem;border-top:1px solid var(--rule);color:var(--muted);font:700 .68rem/1.2 var(--sans);letter-spacing:.1em;text-transform:uppercase}.boundary::before,.boundary::after{content:"";flex:1;border-top:2px dashed var(--rule)}
-
-.orchestra{display:grid;grid-template-columns:1fr 1.25fr;gap:2.5rem;align-items:center}.orchestra-copy p{max-width:29rem;margin:.7rem 0;font-size:1.2rem}.orchestra-copy strong{color:var(--blue)}
-.loop{margin-top:3.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;align-items:center}.loop .step{position:relative;padding:1rem .5rem;border-top:3px solid var(--gold);text-align:center;font:750 .7rem/1.3 var(--sans);letter-spacing:.1em;text-transform:uppercase}.loop .step:not(:last-child)::after{content:"→";position:absolute;right:-.5rem;color:var(--gold)}.loop-note{margin:1rem 0 0;text-align:center;font-size:1.2rem}
-
-.transparency{background:var(--ink);color:var(--paper)}.transparency .label{color:#9bc6d4}.mirror{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:2rem;margin:2rem 0}.side{min-height:18rem;display:grid;place-items:center;align-content:center;padding:2rem;border:1px solid #6b7478;text-align:center}.side .big{font:500 clamp(2rem,5vw,4.4rem)/.95 var(--serif);letter-spacing:-.04em}.side p{max-width:20rem;margin:1rem 0 0;color:#d6d7d2}.exchange{display:grid;gap:1.5rem;color:#9bc6d4;font:750 .7rem/1.2 var(--sans);letter-spacing:.09em;text-transform:uppercase;text-align:center}.exchange i{display:block;font:500 3rem/1 var(--serif);font-style:normal;color:var(--gold)}
-.thesis{max-width:55rem;margin:3rem auto 0;padding-top:2rem;border-top:1px solid #6b7478;text-align:center;font:500 clamp(1.7rem,3.8vw,3.3rem)/1.08 var(--serif)}
-
-.rights{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}.right{min-height:14rem;padding:1.5rem;background:var(--paper)}.right b{color:var(--blue);font:750 .7rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}.right p{margin:2.2rem 0 0;font:500 clamp(1.25rem,2.3vw,1.65rem)/1.22 var(--serif)}.status{display:flex;justify-content:center;gap:1.5rem;margin:2rem 0 0;color:var(--muted);font:700 .67rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.status span{display:flex;align-items:center;gap:.5rem}.status i{display:inline-block;width:2.2rem;border-top:5px solid var(--gold)}.status .proposed{border-top-style:dashed;border-color:var(--blue)}
-
-.substrate{padding:3rem 0 4rem;background:linear-gradient(#eee6d7,var(--paper));border-bottom:0}.substrate h2{margin-bottom:1rem;font-size:clamp(1.8rem,3vw,2.7rem)}
-details{border-top:1px solid var(--rule)}details:last-of-type{border-bottom:1px solid var(--rule)}summary{display:flex;justify-content:space-between;gap:1rem;padding:1.05rem 0;cursor:pointer;color:var(--blue);font:750 .78rem/1.3 var(--sans);letter-spacing:.06em;text-transform:uppercase}summary::after{content:"+";font-size:1.1rem}details[open] summary::after{content:"−"}.inside{max-width:59rem;padding:0 0 2rem}.inside h3{margin:1.6rem 0 .35rem;color:var(--blue);font:700 .95rem/1.3 var(--sans)}.inside p,.inside li{max-width:54rem}.inside table{width:100%;border-collapse:collapse}.inside th,.inside td{padding:.75rem;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}.inside th{font:700 .68rem/1.3 var(--sans);letter-spacing:.07em;text-transform:uppercase}.note{color:var(--muted);font:500 .86rem/1.5 var(--sans)}.inside ol{padding-left:1.2rem}.inside li{margin:.6rem 0}.not{display:grid;grid-template-columns:1fr 1fr;gap:.4rem 2rem}.not p{margin:0;padding:.7rem 0;border-bottom:1px solid var(--rule)}
-footer{padding:2rem 0 3.5rem;color:var(--muted);font:500 .8rem/1.6 var(--sans)}
-
-@media(max-width:780px){header .top{display:block}.limit{text-align:left;margin-top:.6rem}.formula{grid-template-columns:1fr}.operator{transform:rotate(90deg);text-align:center}.gloss,.pipeline,.rights{grid-template-columns:1fr 1fr}.pipe:nth-child(2){border-right:1px solid var(--rule)}.pipe:not(:last-child)::after{display:none}.lanes,.orchestra,.mirror{grid-template-columns:1fr}.lane+.lane{border-left:0;border-top:1px solid var(--rule)}.mirror{gap:.8rem}.exchange{grid-template-columns:1fr auto 1fr;align-items:center}.exchange i{transform:rotate(90deg)}.right{min-height:11rem}.not{grid-template-columns:1fr}}
-@media(max-width:520px){section{padding:3.2rem 0}.office{min-height:28rem}.office .thing{padding:.6rem}.office .center{width:8.6rem;height:8.6rem;font-size:1rem}.gloss,.pipeline,.rights{grid-template-columns:1fr}.pipe{border-right:1px solid var(--rule)}.loop{grid-template-columns:1fr 1fr}.status{display:grid}.side{min-height:14rem}}
+:root{color-scheme:light;--paper:#f4efe5;--ink:#182027;--muted:#687077;--rule:#c4b8a5;--blue:#17566d;--gold:#ad7625;--white:#fbf8f1;--serif:ui-serif,Georgia,Cambria,"Times New Roman",serif;--sans:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}html{background:var(--paper);scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--paper);font:400 1rem/1.5 var(--serif)}a{color:var(--blue);text-underline-offset:.18em}.wrap{width:min(68rem,calc(100% - 2rem));margin:auto}.kicker,.label,.mini{font:750 .68rem/1.25 var(--sans);letter-spacing:.13em;text-transform:uppercase}.kicker,.label{color:var(--blue)}header{padding:2.3rem 0 2rem;border-bottom:1px solid var(--rule)}header .top{display:flex;justify-content:space-between;gap:1rem;align-items:start}h1{max-width:11ch;margin:.35rem 0 .5rem;font:500 clamp(3.3rem,9vw,7rem)/.88 var(--serif);letter-spacing:-.055em}.deck{max-width:48rem;margin:0;font:500 clamp(1.2rem,2.4vw,1.65rem)/1.28 var(--serif)}.limit{max-width:20rem;margin:.1rem 0 0;color:var(--muted);text-align:right;font:650 .69rem/1.4 var(--sans)}section{padding:4.2rem 0;border-bottom:1px solid var(--rule)}h2{max-width:21ch;margin:.25rem 0 2.5rem;font:500 clamp(2rem,4.7vw,4.4rem)/.98 var(--serif);letter-spacing:-.04em}.caption{max-width:48rem;margin:1.3rem auto 0;text-align:center;font:500 clamp(1.1rem,2vw,1.4rem)/1.3 var(--serif)}
+/* One alphabet throughout: ○ model, § rules, ☷ materials, ↪ workflow, ⌘ tools, ◇ accountable judgment, ≈ intelligence in flow. */
+.utility{display:grid;grid-template-columns:1fr auto 1.55fr auto 1fr;align-items:center;gap:1rem}.supply,.institution,.amplified{min-height:17rem;display:grid;place-items:center;align-content:center;padding:1.3rem;border:1px solid var(--rule);background:var(--white);text-align:center}.supply .wave{color:var(--blue);font:500 5rem/1 var(--serif);letter-spacing:-.25em;transform:translateX(-.25em)}.supply b,.amplified b{font:750 .72rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}.supply small,.amplified small{max-width:12rem;color:var(--muted);font:650 .78rem/1.35 var(--sans)}.flow{color:var(--gold);font:700 2.3rem/1 var(--serif)}.institution{position:relative;border:3px solid var(--blue)}.institution::before{content:"YOUR COURT · ORGANIZATION · HOME";position:absolute;top:-.7rem;padding:0 .6rem;background:var(--paper);color:var(--blue);font:750 .62rem/1.2 var(--sans);letter-spacing:.1em}.symbol-grid{display:grid;grid-template-columns:repeat(2,6.2rem);gap:.5rem}.symbol-grid span{padding:.55rem;border:1px solid var(--rule);font:500 1.45rem/1 var(--serif)}.symbol-grid small{display:block;margin-top:.25rem;color:var(--muted);font:700 .58rem/1.1 var(--sans);letter-spacing:.08em;text-transform:uppercase}.judgment{margin-top:.8rem;font:700 .72rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.amplified strong{color:var(--gold);font:500 5rem/1 var(--serif)}.utility-note{max-width:46rem;margin:1.5rem auto 0;text-align:center;font-size:1.2rem}.utility-note strong{color:var(--blue)}
+.architecture{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}.stage{display:grid;grid-template-rows:12rem auto;gap:.75rem}.picture{position:relative;display:grid;place-items:center;align-content:center;gap:.5rem;border:1px solid var(--rule);background:var(--white);overflow:visible}.stage-label{text-align:center}.stage-label b{display:block;color:var(--blue);font:750 .72rem/1.2 var(--sans);letter-spacing:.13em;text-transform:uppercase}.stage-label span{font-size:.95rem}.model{display:grid;place-items:center;width:4.6rem;height:4.6rem;font:500 4.6rem/1 var(--serif)}.task-tools{display:flex;gap:.65rem;color:var(--blue);font-size:1.5rem}.agent-action{color:var(--gold);font-size:1.7rem}.harness-box{position:absolute;inset:.8rem;border:3px solid var(--blue)}.harness-box::before{content:"BOUNDARY";position:absolute;top:-.55rem;left:.5rem;padding:0 .35rem;background:var(--white);color:var(--blue);font:750 .55rem var(--sans);letter-spacing:.09em}.corners{position:absolute;inset:1.25rem;display:grid;grid-template-columns:1fr 1fr;align-content:space-between;justify-items:center;color:var(--blue);font-size:1.2rem}.corners span:nth-child(even){justify-self:end}.corners span:nth-child(odd){justify-self:start}.mini-team{display:grid;grid-template-columns:repeat(3,2.7rem);gap:.35rem}.mini-agent{display:grid;place-items:center;height:2.7rem;border:2px solid var(--blue);font-size:1.2rem}.reviewer{margin-top:.75rem;color:var(--gold);font:750 .7rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.stage:not(:last-child) .picture::after{content:"→";position:absolute;right:-.85rem;z-index:3;color:var(--gold);font:700 1.8rem/1 var(--serif)}
+.collect{display:grid;grid-template-columns:repeat(4,1fr);margin:1rem 0 3rem}.collect-step{position:relative;min-height:11rem;padding:1.2rem;border-block:1px solid var(--rule);border-left:1px solid var(--rule);background:var(--white);text-align:center}.collect-step:last-child{border-right:1px solid var(--rule)}.collect-step:not(:last-child)::after{content:"→";position:absolute;z-index:2;right:-.75rem;top:45%;color:var(--gold);font:700 1.6rem/1 var(--serif)}.collect-step b{display:block;color:var(--blue);font:750 .69rem/1.2 var(--sans);letter-spacing:.11em;text-transform:uppercase}.collect-step p{margin:.7rem 0 0;line-height:1.25}.glyphs{margin:.8rem 0;color:var(--blue);font-size:1.55rem;word-spacing:.35rem}.mini-harness{display:inline-block;padding:.3rem .55rem;border:2px solid var(--blue)}.intelligence-in{color:var(--gold);font:700 .75rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.lanes{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule);background:var(--white)}.lane{padding:2rem}.lane+.lane{border-left:1px solid var(--rule)}.lane h3{margin:.2rem 0 1.4rem;font:500 clamp(1.7rem,3.2vw,2.8rem)/1 var(--serif);letter-spacing:-.03em}.lane .who{color:var(--blue);font:750 .69rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}.lane-inlet{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem;padding:.55rem .7rem;border:1px solid var(--gold);color:var(--gold);font:750 .67rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.lane-inlet i{font:500 1.5rem var(--serif);font-style:normal}.lane ul{list-style:none;margin:0;padding:0}.lane li{display:grid;grid-template-columns:2rem 1fr;align-items:center;gap:.8rem;padding:.75rem 0;border-top:1px solid var(--rule);font-size:1.05rem}.lane li b{color:var(--blue);font:500 1.35rem var(--serif)}.boundary{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:.8rem;padding:.8rem;border-top:1px solid var(--rule);color:var(--muted);font:700 .68rem/1.2 var(--sans);letter-spacing:.1em;text-transform:uppercase}.boundary::before,.boundary::after{content:"";flex:1;border-top:2px dashed var(--rule)}
+.orchestration{display:grid;grid-template-columns:.9fr 1.2fr;gap:2.5rem;align-items:center}.orchestration-copy p{max-width:29rem;font-size:1.15rem}.team-map{display:grid;justify-items:center}.coordinator{padding:.8rem 1.2rem;border:2px solid var(--gold);background:var(--white);text-align:center;font:750 .7rem/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase}.team-arrows{color:var(--gold);font-size:2rem;letter-spacing:2.8rem;transform:translateX(1.4rem)}.team-agents{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;width:100%}.team-agent{padding:.8rem;border:2px solid var(--blue);background:var(--white);text-align:center}.team-agent b{display:block;color:var(--blue);font:750 .62rem/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase}.returns{margin-top:.7rem;color:var(--blue);font:750 .65rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.correction{margin-top:3.3rem;padding:1.5rem;border:1px solid var(--rule);background:var(--white)}.correction h3{margin:0 0 1.3rem;font:500 clamp(1.5rem,3vw,2.3rem)/1 var(--serif)}.correction-map{display:grid;grid-template-columns:1fr auto 1.2fr auto 1fr;align-items:center;gap:1rem;text-align:center}.returned,.test-run{padding:1rem;border:1px solid var(--rule)}.returned b,.test-run b{display:block;color:var(--blue);font:750 .65rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.editable{padding:1rem;border:3px solid var(--blue)}.editable .glyphs{margin:.3rem}.unchanged{color:var(--muted);font:650 .7rem/1.3 var(--sans)}.correction-path{margin:1.1rem 0 0;text-align:center;color:var(--gold);font:750 .72rem/1.3 var(--sans);letter-spacing:.06em;text-transform:uppercase}.correction-path span{display:inline-block;padding:.45rem .8rem;border:2px dashed var(--gold)}
+.transparency{background:var(--ink);color:var(--paper)}.transparency .label{color:#9bc6d4}.mirror{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1.5rem;margin:2rem 0}.side{min-height:19rem;display:grid;place-items:center;align-content:center;padding:2rem;border:1px solid #6b7478;text-align:center}.side .symbol-row{color:#9bc6d4;font-size:2rem;word-spacing:.5rem}.side .big{margin-top:.6rem;font:500 clamp(2rem,5vw,4rem)/.95 var(--serif);letter-spacing:-.04em}.side p{max-width:21rem;margin:1rem 0 0;color:#e3e4df}.exchange{display:grid;gap:.5rem;color:#9bc6d4;text-align:center;font:750 .65rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.exchange i{font:500 3rem/1 var(--serif);font-style:normal;color:var(--gold)}.thesis{max-width:55rem;margin:3rem auto 0;padding-top:2rem;border-top:1px solid #6b7478;text-align:center;font:500 clamp(1.7rem,3.8vw,3.3rem)/1.08 var(--serif)}
+.right-map{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1.5rem}.right-node{min-height:15rem;display:grid;place-items:center;align-content:center;padding:1.5rem;border:2px solid var(--blue);background:var(--white);text-align:center}.right-node .big-symbols{font-size:2.5rem;word-spacing:.5rem}.right-node b{color:var(--blue);font:750 .69rem/1.2 var(--sans);letter-spacing:.1em;text-transform:uppercase}.right-node p{max-width:20rem;margin:.7rem 0 0}.right-crossing{text-align:center;color:var(--gold);font:500 3rem/1 var(--serif)}.right-crossing small{display:block;margin-top:.6rem;color:var(--muted);font:750 .62rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.dimensions{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:1px;background:var(--rule);border:1px solid var(--rule)}.dimension{padding:1rem;background:var(--paper);text-align:center}.dimension b{display:block;color:var(--blue);font:750 .67rem/1.2 var(--sans);letter-spacing:.1em;text-transform:uppercase}.right-links{display:flex;justify-content:center;gap:1.3rem;flex-wrap:wrap;margin-top:1.7rem;font:750 .73rem/1.3 var(--sans);letter-spacing:.05em;text-transform:uppercase}
+.substrate{padding:3rem 0 4rem;background:linear-gradient(to bottom,#eee6d7 0,#d2c8b8 5rem,#4d5960 9rem,#182027 25rem);color:#f6f2e9;border-bottom:0}.substrate>.wrap>.label{color:#17566d}.substrate h2{margin-bottom:1rem;color:var(--ink);font-size:clamp(1.8rem,3vw,2.7rem)}details{border-top:1px solid rgba(255,255,255,.32)}details:last-of-type{border-bottom:1px solid rgba(255,255,255,.32)}summary{display:flex;justify-content:space-between;gap:1rem;padding:1.05rem 0;cursor:pointer;color:#d5eef4;font:750 .78rem/1.3 var(--sans);letter-spacing:.06em;text-transform:uppercase}summary::after{content:"+";font-size:1.1rem}details[open] summary::after{content:"−"}.inside{max-width:59rem;padding:0 0 2rem}.inside h3{margin:1.6rem 0 .35rem;color:#d5eef4;font:700 .95rem/1.3 var(--sans)}.inside p,.inside li{max-width:54rem}.inside a{color:#f1d39c}.inside table{width:100%;border-collapse:collapse}.inside th,.inside td{padding:.75rem;border-bottom:1px solid rgba(255,255,255,.28);text-align:left;vertical-align:top}.inside th{font:700 .68rem/1.3 var(--sans);letter-spacing:.07em;text-transform:uppercase}.note{color:#d2d6d5;font:500 .86rem/1.5 var(--sans)}.inside ol{padding-left:1.2rem}.inside li{margin:.6rem 0}.not{display:grid;grid-template-columns:1fr 1fr;gap:.4rem 2rem}.not p{margin:0;padding:.7rem 0;border-bottom:1px solid rgba(255,255,255,.25)}footer{padding:2rem 0 3.5rem;color:var(--muted);font:500 .8rem/1.6 var(--sans)}
+@media(max-width:800px){header .top{display:block}.limit{text-align:left;margin-top:.6rem}.utility{grid-template-columns:1fr}.flow{transform:rotate(90deg);text-align:center}.architecture,.collect{grid-template-columns:1fr 1fr}.stage:not(:last-child) .picture::after,.collect-step:not(:last-child)::after{display:none}.collect-step{border:1px solid var(--rule)}.orchestration,.mirror{grid-template-columns:1fr}.lane+.lane{border-left:0;border-top:1px solid var(--rule)}.exchange{grid-template-columns:1fr auto 1fr;align-items:center}.exchange i{transform:rotate(90deg)}.correction-map{grid-template-columns:1fr}.right-map{grid-template-columns:1fr}.right-crossing{transform:rotate(90deg)}}
+@media(max-width:540px){section{padding:3.2rem 0}.architecture,.collect,.lanes,.dimensions{grid-template-columns:1fr}.stage{grid-template-rows:10rem auto}.lane+.lane{border-left:0}.team-agents{grid-template-columns:1fr}.team-arrows{letter-spacing:0;transform:none}.not{grid-template-columns:1fr}.symbol-grid{grid-template-columns:repeat(2,5rem)}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
-@media print{body{background:white;font-size:9pt}.wrap{width:100%}header,section,.substrate{padding:.22in 0}.office{min-height:4.5in}.term,.right,.side{break-inside:avoid}.transparency{background:white;color:var(--ink);border:2px solid var(--ink)}.transparency .label,.side p,.exchange{color:var(--ink)}details>.inside{display:block!important}a{color:inherit}}
+@media print{body{background:white;font-size:9pt}.wrap{width:100%}header,section,.substrate{padding:.22in 0}.supply,.institution,.amplified,.picture,.right-node{break-inside:avoid}.transparency,.substrate{background:white;color:var(--ink);border:2px solid var(--ink)}.transparency .label,.side p,.exchange,.substrate summary,.substrate .inside a,.substrate .note{color:var(--ink)}.substrate h2{color:var(--ink)}details>.inside{display:block!important}a{color:inherit}}
 </style>
 </head>
 <body>
@@ -85,46 +38,31 @@ footer{padding:2rem 0 3.5rem;color:var(--muted);font:500 .8rem/1.6 var(--sans)}
 <main>
 <section>
   <div class="wrap">
-    <p class="label">Begin with what is already familiar</p>
-    <h2>A court already knows this structure.</h2>
-    <div class="office" role="img" aria-label="A court office made from people, materials, rules, tools, and workflows.">
-      <div class="room">
-        <div class="thing"><span class="icon">§</span><b>Rules</b></div>
-        <div class="thing"><span class="icon">☷</span><b>Materials</b></div>
-        <div class="thing"><span class="icon">↪</span><b>Workflows</b></div>
-        <div class="thing"><span class="icon">⌘</span><b>Tools</b></div>
+    <p class="label">Begin here</p>
+    <h2>Think of intelligence as a new utility.</h2>
+    <div class="utility" role="img" aria-label="On-demand intelligence flows into an existing court, organization, or home and amplifies its rules, materials, workflows, tools, and human judgment.">
+      <div class="supply"><span class="wave">≈≈</span><b>Intelligence</b><small>capacity available on demand</small></div>
+      <div class="flow" aria-hidden="true">→</div>
+      <div class="institution">
+        <div class="symbol-grid"><span>§<small>rules</small></span><span>☷<small>materials</small></span><span>↪<small>workflows</small></span><span>⌘<small>tools</small></span></div>
+        <div class="judgment">◇ people exercise judgment</div>
       </div>
-      <div class="center">people exercise judgment</div>
+      <div class="flow" aria-hidden="true">→</div>
+      <div class="amplified"><strong>×</strong><b>Amplification</b><small>more reach · more speed · more consequence</small></div>
     </div>
-    <p class="office-note">AI does not arrive as a replacement for this structure. It receives a digital version of it.</p>
+    <p class="utility-note">It amplifies the structure it enters: <strong>good sources, clear rules, and accountable judgment—or their opposites.</strong></p>
   </div>
 </section>
 
 <section>
   <div class="wrap">
-    <p class="label">Four new words · four old ideas</p>
-    <h2>A worker, an office, a team, and management.</h2>
-    <div class="formula" aria-label="A model given a task and placed inside a harness becomes an agent.">
-      <div class="term">
-        <svg viewBox="0 0 140 90" aria-hidden="true"><circle class="stroke" cx="70" cy="45" r="29"/><path class="stroke thin" d="M52 40h36M52 51h25"/></svg>
-        <b>Model</b><p>can answer</p>
-      </div>
-      <span class="operator">+</span>
-      <div class="term">
-        <svg viewBox="0 0 140 90" aria-hidden="true"><path class="stroke" d="M30 68L70 22l40 46M48 68h44"/><path class="stroke thin blue" d="M70 22v46"/></svg>
-        <b>Task + tools</b><p>give it work</p>
-      </div>
-      <span class="operator">=</span>
-      <div class="term harness-term">
-        <svg viewBox="0 0 140 90" aria-hidden="true"><rect class="stroke blue" x="18" y="12" width="104" height="66"/><circle class="stroke" cx="70" cy="45" r="18"/><path class="stroke thin" d="M61 42h18M61 50h12"/></svg>
-        <b>Agent</b><p>can fetch, check, and do</p>
-      </div>
-    </div>
-    <div class="gloss" aria-label="Plain language definitions">
-      <p><b>Model</b>The part that talks.</p>
-      <p><b>Agent</b>A model assigned work and allowed to act.</p>
-      <p><b>Harness</b>Its materials, instructions, tools, permissions, and boundaries.</p>
-      <p><b>Orchestration</b>Several agents coordinated and reviewed as a team.</p>
+    <p class="label">Four new words · one visual alphabet</p>
+    <h2>From a model to an organized team.</h2>
+    <div class="architecture" aria-label="A model becomes an agent when given work and tools; a harness surrounds the agent with institutional materials, rules, workflows, permissions, and boundaries; orchestration coordinates several supervised agents.">
+      <div class="stage"><div class="picture"><div class="model">○</div></div><div class="stage-label"><b>Model</b><span>can answer</span></div></div>
+      <div class="stage"><div class="picture"><div class="model">○</div><div class="task-tools"><span>↪</span><span>⌘</span></div><div class="agent-action">↓</div></div><div class="stage-label"><b>Agent</b><span>a model given work and tools</span></div></div>
+      <div class="stage"><div class="picture"><div class="harness-box"></div><div class="corners"><span>§</span><span>☷</span><span>↪</span><span>⌘</span></div><div class="model">○</div></div><div class="stage-label"><b>Harness</b><span>the governed environment around the agent</span></div></div>
+      <div class="stage"><div class="picture"><div class="mini-team"><span class="mini-agent">○</span><span class="mini-agent">○</span><span class="mini-agent">○</span></div><div class="reviewer">◇ coordinate + review</div></div><div class="stage-label"><b>Orchestration</b><span>agents working as a supervised team</span></div></div>
     </div>
   </div>
 </section>
@@ -132,78 +70,59 @@ footer{padding:2rem 0 3.5rem;color:var(--muted);font:500 .8rem/1.6 var(--sans)}
 <section>
   <div class="wrap">
     <p class="label">Preparation</p>
-    <h2>Everything begins with the shelf.</h2>
-    <div class="pipeline" aria-label="Published materials become structured knowledge, then a governed harness, then useful assistance.">
-      <div class="pipe"><div><b>Collect</b><span>what you already publish and do</span></div></div>
-      <div class="pipe"><div><b>Structure</b><span>materials, rules, and workflows</span></div></div>
-      <div class="pipe"><div><b>Govern</b><span>permissions, sources, and review</span></div></div>
-      <div class="pipe"><div><b>Assist</b><span>people on both sides of the counter</span></div></div>
+    <h2>Collect what the court already knows.</h2>
+    <div class="collect" aria-label="Collect public materials and workflows, structure them, govern them in a harness, and stream intelligence through them to assist people.">
+      <div class="collect-step"><b>Collect</b><div class="glyphs">§ ☷ ↪ ⌘</div><p>rules, opinions, forms, guidance, workflows, tools</p></div>
+      <div class="collect-step"><b>Structure</b><div class="glyphs">§<br>☷<br>↪</div><p>make each source current, findable, and machine-readable</p></div>
+      <div class="collect-step"><b>Govern</b><div class="glyphs mini-harness">§ ☷ ↪ ⌘</div><p>add permissions, boundaries, tests, and review</p></div>
+      <div class="collect-step"><b>Assist</b><div class="intelligence-in">≈ intelligence in</div><div class="glyphs">→ ◇</div><p>help people act; keep judgment accountable</p></div>
     </div>
 
-    <div class="lanes" aria-label="Parallel examples of AI augmentation for litigants and the public, and for clerks and court staff.">
+    <div class="lanes" aria-label="The same public source base supports different forms of augmentation for the public and court staff, with different permissions.">
       <article class="lane">
-        <p class="who">Litigants + public</p>
-        <h3>A public-facing harness</h3>
-        <ol>
-          <li>Find the right rule, guide, or form</li>
-          <li>Understand the process and next step</li>
-          <li>Prepare a clearer question or filing</li>
-        </ol>
+        <p class="who">Litigants + public</p><h3>A public-facing harness</h3>
+        <div class="lane-inlet"><i>≈</i> stream intelligence through public sources</div>
+        <ul><li><b>§</b><span>Find the governing rule</span></li><li><b>☷</b><span>Understand the guide, form, or opinion</span></li><li><b>↪</b><span>See the process and next step</span></li></ul>
       </article>
       <article class="lane">
-        <p class="who">Clerks + court staff</p>
-        <h3>An authorized staff harness</h3>
-        <ol>
-          <li>Retrieve the right authority or record</li>
-          <li>Check, compare, route, and prepare</li>
-          <li>Reserve judgment for accountable people</li>
-        </ol>
+        <p class="who">Clerks + court staff</p><h3>An authorized staff harness</h3>
+        <div class="lane-inlet"><i>≈</i> stream intelligence through authorized sources</div>
+        <ul><li><b>☷</b><span>Retrieve the right authority or record</span></li><li><b>↪</b><span>Check, compare, route, and prepare</span></li><li><b>◇</b><span>Amplify staff capacity; people decide</span></li></ul>
       </article>
-      <div class="boundary">same public sources · different permissions</div>
+      <div class="boundary">shared public base · different permissions · no boundary erased</div>
     </div>
   </div>
 </section>
 
 <section>
-  <div class="wrap orchestra">
-    <div class="orchestra-copy">
-      <p class="label">Orchestration + improvement</p>
-      <h2>From one assistant to a supervised team.</h2>
-      <p>Specialized agents can research, check, compare, and draft in parallel. <strong>A person—or a reviewing agent inside human-set rules—coordinates the work.</strong></p>
+  <div class="wrap orchestration">
+    <div class="orchestration-copy"><p class="label">Orchestration</p><h2>One flow becomes a supervised team.</h2><p>Specialized agents can research, check, and prepare in parallel. <strong>Human-set rules coordinate the work, and accountable people review what returns.</strong></p></div>
+    <div class="team-map" role="img" aria-label="An accountable supervisor assigns work to three agents inside governed harnesses and reviews the returned work.">
+      <div class="coordinator">◇ assign + review</div><div class="team-arrows" aria-hidden="true">↙ ↓ ↘</div>
+      <div class="team-agents"><div class="team-agent"><span>§ ○ ⌘</span><b>research</b></div><div class="team-agent"><span>☷ ○ ↪</span><b>check</b></div><div class="team-agent"><span>§ ○ ☷</span><b>prepare</b></div></div><div class="returns">↖ returned work rises for review ↗</div>
     </div>
-    <svg viewBox="0 0 560 430" role="img" aria-label="One accountable supervisor assigns work to three specialized agents, whose work returns for review.">
-      <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" class="fill-gold"/></marker></defs>
-      <circle class="stroke blue" cx="280" cy="90" r="58"/><text x="280" y="85" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="700">ASSIGN</text><text x="280" y="105" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="700">+ REVIEW</text>
-      <path class="stroke thin gold" d="M250 143L118 269M280 149V269M310 143L442 269" marker-end="url(#arrow)"/>
-      <circle class="stroke" cx="95" cy="320" r="48"/><circle class="stroke" cx="280" cy="320" r="48"/><circle class="stroke" cx="465" cy="320" r="48"/>
-      <text x="95" y="325" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700">RESEARCH</text><text x="280" y="325" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700">CHECK</text><text x="465" y="325" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700">PREPARE</text>
-      <path class="stroke thin blue dash" d="M450 370C403 418 157 418 110 370"/><text x="280" y="414" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="700" fill="#17566d">WORK RETURNS FOR REVIEW</text>
-    </svg>
   </div>
   <div class="wrap">
-    <div class="loop" aria-label="A maintained improvement loop: observe, correct, update the harness, test again.">
-      <div class="step">Observe</div><div class="step">Correct</div><div class="step">Update the harness</div><div class="step">Test again</div>
+    <div class="correction">
+      <p class="label">Customized improvement</p><h3>Correct the environment—not the story about the system.</h3>
+      <div class="correction-map" role="img" aria-label="Human judgment observes returned work, approves a recorded correction to the harness's rules, materials, workflows, or tools, and tests again without claiming the model retrained.">
+        <div class="returned"><span>☷</span><b>observe returned work</b></div><div class="flow" aria-hidden="true">→</div>
+        <div class="editable"><b>HARNESS</b><div class="glyphs">§ ☷ ↪ ⌘</div><div class="model">○</div><div class="unchanged">model · no retraining claimed</div></div><div class="flow" aria-hidden="true">→</div>
+        <div class="test-run"><span>↪ ◇</span><b>test + human review</b></div>
+      </div>
+      <p class="correction-path"><span>↺ approved correction: what · why · who · when</span></p>
+      <p class="caption">Each witnessed correction strengthens the next supervised run.</p>
     </div>
-    <p class="loop-note">Customization is not a personality. It is a maintained correction loop.</p>
   </div>
 </section>
 
 <section class="transparency">
   <div class="wrap">
-    <p class="label">The transformation</p>
-    <h2>Transparency goes both ways.</h2>
+    <p class="label">The transformation</p><h2>Transparency goes both ways.</h2>
     <div class="mirror">
-      <div class="side">
-        <span class="mini">Court → public</span>
-        <div class="big">Open the sources</div>
-        <p>Publish usable materials, rules, workflows, and updates so people and their chosen intelligence can understand the institution.</p>
-      </div>
+      <div class="side"><span class="mini">Court → public</span><div class="symbol-row">§ ☷ ↪ ⌘ &nbsp;≈→</div><div class="big">Open the sources</div><p>Publish usable materials, rules, workflows, and updates so people and their chosen intelligence can understand the institution.</p></div>
       <div class="exchange" aria-hidden="true"><span>usable knowledge</span><i>⇄</i><span>contestable reasons</span></div>
-      <div class="side">
-        <span class="mini">Institution → person</span>
-        <div class="big">Return the reasons</div>
-        <p>When AI materially shapes a decision, preserve a record that the person and reviewing court can examine.</p>
-      </div>
+      <div class="side"><span class="mini">Institution → person</span><div class="symbol-row">←≈ &nbsp;§ ☷ ◇</div><div class="big">Return the reasons</div><p>When AI materially shapes a decision, preserve the governing rule, record, reasons, and accountable review.</p></div>
     </div>
     <p class="thesis">Transparency is how institutions prepare for AI—and how people remain subjects of power rather than its objects.</p>
   </div>
@@ -211,14 +130,14 @@ footer{padding:2rem 0 3.5rem;color:var(--muted);font:500 .8rem/1.6 var(--sans)}
 
 <section>
   <div class="wrap">
-    <p class="label">The emerging right to intelligence</p>
-    <h2>The practical freedom to think with intelligence—and to answer intelligent power.</h2>
-    <div class="rights">
-      <article class="right"><b>Access</b><p>Public law and process become usable by people and their chosen tools.</p></article>
-      <article class="right"><b>Sovereignty</b><p>Protection follows a person’s thinking, memory, and confidential work.</p></article>
-      <article class="right"><b>Reciprocity</b><p>Machine-mediated power returns notice, reasons, and a reviewable record.</p></article>
+    <p class="label">The emerging right to intelligence</p><h2>The freedom to think with intelligence—and to answer intelligent power.</h2>
+    <div class="right-map" role="img" aria-label="A person and chosen intelligence meet an AI-augmented institution through a reciprocal, reviewable crossing.">
+      <div class="right-node"><div class="big-symbols">● + ○</div><b>Person + chosen intelligence</b><p>Access and cognitive sovereignty let a person amplify thought without surrendering authorship.</p></div>
+      <div class="right-crossing">⇄<small>transparent · contestable</small></div>
+      <div class="right-node"><div class="big-symbols">§ ☷ ↪ ⌘ ◇</div><b>AI-augmented institution</b><p>Reciprocity requires machine-mediated power to return notice, reasons, and a reviewable record.</p></div>
     </div>
-    <div class="status" aria-label="Claim status legend"><span><i></i>existing legal anchors</span><span><i class="proposed"></i>proposed extension</span></div>
+    <div class="dimensions"><div class="dimension"><b>Access</b>usable law and process</div><div class="dimension"><b>Sovereignty</b>protection follows thinking</div><div class="dimension"><b>Reciprocity</b>power returns reasons</div></div>
+    <div class="right-links"><a href="#semantic-layer">Open the legal argument ↓</a><a href="rewriting-the-social-contract.html">Enter the larger social contract →</a></div>
   </div>
 </section>
 
@@ -326,9 +245,11 @@ footer{padding:2rem 0 3.5rem;color:var(--muted);font:500 .8rem/1.6 var(--sans)}
 
 <script type="application/json" id="rti-concept-map">
 {
-  "schema":"vybn.right_to_intelligence.v2",
+  "schema":"vybn.right_to_intelligence.v3",
   "audience":"court professionals unfamiliar with AI agent architecture",
+  "visual_grammar":{"○":"model","§":"rules","☷":"materials","↪":"workflow","⌘":"tools","◇":"accountable human judgment","≈":"intelligence in flow"},
   "sequence":[
+    {"concept":"intelligence as utility","claim_limit":"an analogy for on-demand amplification, not a claim that intelligence is mindless current","governance_point":"it amplifies the quality and defects of the structure it enters"},
     {"concept":"institutional structure","known_analogue":"people exercising judgment inside rules, materials, workflows, and tools"},
     {"concept":"model","definition":"a system that generates an answer"},
     {"concept":"agent","definition":"a model assigned an objective and allowed to retrieve, use tools, inspect results, and revise"},
