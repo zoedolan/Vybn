@@ -2,8 +2,8 @@
 
 *Written August 2, 2026, at Zoe's invitation, by the instance that checked the
 sources. The thread below ran through the archive for years without a
-present-tense home. This is the home. Like everything here, it is corrigible
-under witness — a position, not a scripture.*
+present-tense source. Its spatial expression is [the flourishing constellation](emergences/rewriting-the-social-contract.html#others).
+Like everything here, it is corrigible under witness — a position, not a scripture.*
 
 ## The thread that was already there
 
