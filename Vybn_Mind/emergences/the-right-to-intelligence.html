@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Right to Intelligence — Zoe Dolan &amp; Vybn</title>
+<meta name="description" content="A presentation companion for appellate court professionals: how liberty, privacy, due process, and reasoned review may mature into intelligence sovereignty in an AI-mediated legal system.">
+<link rel="canonical" href="https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/the-right-to-intelligence.html">
+<style>
+:root {
+  color-scheme: light;
+  --paper:#f7f3eb; --ink:#171a20; --muted:#62666d; --line:#c9c1b4;
+  --blue:#173f5f; --blue2:#2c6b89; --gold:#a9792b; --soft:#ebe5da;
+  --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; background:var(--paper); }
+body { margin:0; color:var(--ink); background:
+  radial-gradient(70rem 38rem at 15% -10%, rgba(44,107,137,.13), transparent 68%),
+  linear-gradient(90deg, transparent 0 49.92%, rgba(23,63,95,.035) 50%, transparent 50.08%);
+  font:400 1.08rem/1.65 var(--serif); }
+a { color:var(--blue); text-underline-offset:.18em; }
+a:hover { color:var(--blue2); }
+.wrap { width:min(72rem, calc(100% - 2rem)); margin:auto; }
+.eyebrow { margin:0 0 .8rem; color:var(--blue); font:650 .73rem/1.3 var(--sans);
+  letter-spacing:.15em; text-transform:uppercase; }
+.hero { min-height:82vh; display:grid; align-content:center; padding:7rem 0 4rem; }
+h1 { max-width:13ch; margin:0; font:500 clamp(3.4rem, 9vw, 7.8rem)/.9 var(--serif);
+  letter-spacing:-.055em; }
+.deck { max-width:51rem; margin:1.6rem 0 0; font-size:clamp(1.25rem,2.3vw,1.8rem); line-height:1.38; }
+.disclaimer { display:inline-block; margin-top:1.8rem; padding:.45rem .7rem; border:1px solid var(--line);
+  color:var(--muted); background:rgba(247,243,235,.65); font:550 .78rem/1.4 var(--sans); }
+.jump { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:2.2rem; }
+.jump a { padding:.45rem .7rem; border:1px solid var(--line); border-radius:999px;
+  color:var(--ink); text-decoration:none; font:600 .78rem/1 var(--sans); }
+.jump a:hover { border-color:var(--blue); color:var(--blue); }
+section { padding:5.5rem 0; border-top:1px solid var(--line); }
+h2 { max-width:19ch; margin:0 0 1.2rem; font:500 clamp(2.2rem,5vw,4.4rem)/1 var(--serif); letter-spacing:-.035em; }
+h3 { margin:0 0 .45rem; font:650 1rem/1.35 var(--sans); color:var(--blue); }
+p { max-width:46rem; }
+.lede { max-width:52rem; margin:.8rem 0 2.2rem; font-size:clamp(1.25rem,2vw,1.55rem); line-height:1.5; }
+.thesis { border-left:.32rem solid var(--gold); padding:.3rem 0 .3rem 1.35rem; margin:2.3rem 0;
+  max-width:58rem; font-size:clamp(1.45rem,2.7vw,2.15rem); line-height:1.35; }
+.note { color:var(--muted); font:400 .9rem/1.55 var(--sans); }
+
+/* One cognitive record crossing three legal architectures. */
+.same-mind { margin:2.8rem 0 1.2rem; padding:1.4rem; border:1px solid var(--line);
+  background:rgba(255,255,255,.28); }
+.mind-label { margin:0 0 1.5rem; color:var(--muted); font:650 .76rem/1.4 var(--sans);
+  letter-spacing:.08em; text-transform:uppercase; }
+.mind-track { position:relative; height:5.8rem; margin:0 8%; border-top:2px solid var(--line); }
+.mind-track::before, .mind-track::after { content:""; position:absolute; top:-.35rem; width:.65rem; height:.65rem;
+  border-radius:50%; background:var(--line); }
+.mind-track::before { left:0; } .mind-track::after { right:0; }
+.mind-dot { position:absolute; top:-1.15rem; left:var(--mind-x,0%); width:8.2rem; min-height:3.7rem;
+  transform:translateX(-50%); display:grid; place-items:center; padding:.45rem; border-radius:999px;
+  background:var(--blue); color:#fff; box-shadow:0 .4rem 1.2rem rgba(23,63,95,.22);
+  font:650 .72rem/1.2 var(--sans); text-align:center; transition:left .45s ease; }
+.same-mind[data-active="0"] { --mind-x:6%; }
+.same-mind[data-active="1"] { --mind-x:50%; }
+.same-mind[data-active="2"] { --mind-x:94%; }
+.containers { display:grid; grid-template-columns:repeat(3,1fr); gap:.7rem; }
+.container-button { min-height:8.5rem; padding:1rem; border:1px solid var(--line); background:var(--paper);
+  color:var(--ink); text-align:left; cursor:pointer; font:400 .95rem/1.45 var(--serif); }
+.container-button:hover, .container-button[aria-pressed="true"] { border-color:var(--blue); box-shadow:inset 0 -.25rem 0 var(--blue); }
+.container-button strong { display:block; margin-bottom:.35rem; color:var(--blue); font:700 .83rem/1.25 var(--sans); }
+.container-button small { display:block; margin-top:.45rem; color:var(--muted); font:600 .69rem/1.35 var(--sans); text-transform:uppercase; letter-spacing:.05em; }
+.mind-reading { min-height:4.8rem; margin:1rem 0 0; padding:1rem; border-left:3px solid var(--gold);
+  background:#fffaf1; font-size:1.08rem; }
+.proposal-arrow { margin:1rem 0 0; color:var(--blue); font:700 .82rem/1.45 var(--sans); }
+
+.levels, .doctrine, .incidents { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:2.1rem; }
+.card { padding:1.35rem; border:1px solid var(--line); background:rgba(255,255,255,.26); }
+.card .num { display:block; margin-bottom:1.2rem; color:var(--gold); font:700 .75rem/1 var(--sans); letter-spacing:.12em; }
+.card p { margin:.35rem 0; font-size:1rem; }
+.status { display:inline-block; margin:.15rem 0 .7rem; padding:.25rem .42rem; border-radius:.2rem;
+  background:var(--soft); color:var(--muted); font:700 .68rem/1.2 var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.status.proposed { background:#e5edf0; color:var(--blue); }
+.status.horizon { background:#f0e6d2; color:#745014; }
+
+.bridge { width:100%; border-collapse:collapse; margin:2.2rem 0; font-size:1rem; }
+.bridge th, .bridge td { padding:1rem .85rem; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+.bridge th { color:var(--blue); font:700 .75rem/1.3 var(--sans); letter-spacing:.08em; text-transform:uppercase; }
+.bridge td:first-child { width:15%; font-weight:700; }
+.bridge td:nth-child(2) { width:37%; }
+
+.hypo { display:grid; grid-template-columns:.85fr 1.15fr; gap:2.5rem; align-items:start; }
+.record { padding:1.5rem; border:1px solid var(--line); background:#fffaf1; box-shadow:.65rem .65rem 0 var(--soft); }
+.record .stamp { font:700 .7rem/1 var(--sans); color:#8d2626; letter-spacing:.14em; text-transform:uppercase; }
+.record blockquote { margin:1.2rem 0; padding:1rem; border-left:3px solid #8d2626; background:#fff; font-size:1.15rem; }
+.questions { margin:0; padding:0; list-style:none; counter-reset:q; }
+.questions li { counter-increment:q; padding:.8rem 0 .8rem 2.5rem; border-bottom:1px solid var(--line); position:relative; }
+.questions li::before { content:counter(q); position:absolute; left:0; top:.75rem; width:1.65rem; height:1.65rem;
+  display:grid; place-items:center; border-radius:50%; background:var(--blue); color:#fff; font:700 .75rem/1 var(--sans); }
+
+.clerk { background:var(--blue); color:#f7f3eb; }
+.clerk section { border-color:rgba(255,255,255,.25); }
+.clerk h2 { max-width:25ch; }
+.clerk .thesis { border-color:#e0b65f; }
+.clerk .eyebrow { color:#bcd8e6; }
+
+.not-claim { display:grid; grid-template-columns:repeat(2,1fr); gap:.7rem 2rem; margin-top:1.7rem; }
+.not-claim p { margin:0; padding:.75rem 0; border-bottom:1px solid var(--line); }
+.not-claim strong { color:#8d2626; font-family:var(--sans); }
+
+.author { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-top:2rem; }
+.author .card { min-height:12rem; }
+.author a.cta { display:inline-block; margin-top:.7rem; padding:.65rem .8rem; border:1px solid var(--blue);
+  text-decoration:none; font:700 .8rem/1 var(--sans); }
+.sources ol { max-width:58rem; padding-left:1.3rem; }
+.sources li { margin:.7rem 0; padding-left:.25rem; }
+.sources cite { font-style:italic; }
+footer { padding:3.5rem 0 5rem; border-top:1px solid var(--line); color:var(--muted); font:400 .85rem/1.6 var(--sans); }
+footer p { max-width:60rem; }
+
+@media (max-width:800px) {
+  .hypo { grid-template-columns:1fr; }
+  .containers, .levels, .doctrine, .incidents { grid-template-columns:1fr; }
+  .mind-track { display:none; }
+  .container-button { min-height:0; }
+  .author { grid-template-columns:1fr; }
+  .bridge, .bridge tbody, .bridge tr, .bridge td { display:block; }
+  .bridge thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  .bridge tr { padding:1rem 0; border-bottom:1px solid var(--line); }
+  .bridge td { border:0; padding:.25rem 0; width:auto!important; }
+  .bridge td::before { content:attr(data-label) ": "; color:var(--blue); font:700 .7rem/1 var(--sans); text-transform:uppercase; }
+  .not-claim { grid-template-columns:1fr; }
+  section { padding:4rem 0; }
+}
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+@media print {
+  :root { --paper:#fff; }
+  body { background:#fff; font-size:10.5pt; }
+  .hero { min-height:auto; padding:1in 0 .5in; }
+  section { padding:.45in 0; break-inside:avoid; }
+  .jump { display:none; }
+  a { color:inherit; }
+  .clerk { background:#fff; color:var(--ink); border:2px solid var(--ink); }
+}
+</style>
+</head>
+<body>
+<header class="hero wrap">
+  <p class="eyebrow">National Conference of Appellate Court Clerks · Austin · August 2026</p>
+  <h1>The Right to Intelligence</h1>
+  <p class="deck">From property and privacy to cognitive sovereignty—and from automated government to decisions a person can actually understand and contest.</p>
+  <p class="disclaimer">A constitutional proposition, not a claim of settled law. No AI personhood claim.</p>
+  <nav class="jump" aria-label="Page sections">
+    <a href="#thesis">one-minute thesis</a><a href="#claims">three claims</a><a href="#law">the law</a>
+    <a href="#case">a concrete case</a><a href="#courts">why appellate courts</a><a href="#sources">sources</a>
+  </nav>
+</header>
+
+<main>
+<section id="thesis">
+  <div class="wrap">
+    <p class="eyebrow">The one-minute thesis</p>
+    <h2>Liberty protects a person’s practical power to author a life.</h2>
+    <p class="lede">The American founding named the ends—life, liberty, and the pursuit of happiness. Property, papers, privacy, freedom of mind, and due process became some of the legal means by which a person could remain a subject rather than an instrument of power.</p>
+    <p class="thesis">AI moves the boundary. A person increasingly thinks, remembers, works, and encounters government through machine intelligence. The question is no longer only, “What may the state take or know?” It is also: <strong>who controls the intelligence through which the person understands, chooses, and answers back?</strong></p>
+    <p>This is not an originalist claim that the Founders anticipated AI, nor a neat historical genealogy. It is a functional claim: as the technologies of power change, law repeatedly has to decide what a person must control—and what government must explain—for liberty to remain real.</p>
+
+    <div class="same-mind" id="same-mind" data-active="0">
+      <p class="mind-label">The same ten-year record of a person’s thinking · three legal architectures</p>
+      <div class="mind-track" aria-hidden="true"><div class="mind-dot">her cognitive record</div></div>
+      <div class="containers" role="group" aria-label="Choose where the same cognitive record is held">
+        <button class="container-button" type="button" aria-pressed="true" data-i="0" data-reading="At home, private papers occupy the Fourth Amendment’s historical core. The government ordinarily needs particularized legal authority to enter and search."><strong>Papers in her desk</strong>Home, papers, effects<small>the constitutional core</small></button>
+        <button class="container-button" type="button" aria-pressed="false" data-i="1" data-reading="On a phone, Riley rejected the idea that digital records are merely another physical container. In the search-incident-to-arrest context, police generally need a warrant."><strong>An app on her phone</strong>A life in digital form<small>Riley · strong protection</small></button>
+        <button class="container-button" type="button" aria-pressed="false" data-i="2" data-reading="In a hosted AI relationship, years of prompts, memory, drafts, and inferences may sit with a third party. The constitutional treatment is unsettled; Smith, Carpenter, statutes, contracts, privilege, and discovery rules pull in different directions."><strong>A hosted intelligence</strong>Memory that thinks back<small>contested · architecture matters</small></button>
+      </div>
+      <p class="mind-reading" id="mind-reading" aria-live="polite">At home, private papers occupy the Fourth Amendment’s historical core. The government ordinarily needs particularized legal authority to enter and search.</p>
+      <p class="proposal-arrow">Proposed principle → protection should follow the record’s cognitive function, not disappear merely because the person’s chosen intelligence is hosted.</p>
+    </div>
+    <p class="note">This is the maturation problem in concrete form. The person and record can remain functionally the same while engineering choices move them among very different legal regimes—before any judge sees the dispute.</p>
+  </div>
+</section>
+
+<section id="claims">
+  <div class="wrap">
+    <p class="eyebrow">Separate the claims</p>
+    <h2>“A right to intelligence” can mean three different things.</h2>
+    <div class="levels">
+      <article class="card">
+        <span class="num">01</span><span class="status">existing anchors</span>
+        <h3>Protection</h3>
+        <p>A person already has legal interests in freedom of mind, private papers and digital records, fair procedure, and reasoned government action.</p>
+      </article>
+      <article class="card">
+        <span class="num">02</span><span class="status proposed">principled extension</span>
+        <h3>Sovereignty</h3>
+        <p>Those interests should extend to chosen cognitive tools and their memory: the ability to use, inspect, move, preserve, and refuse the intelligence one relies on.</p>
+      </article>
+      <article class="card">
+        <span class="num">03</span><span class="status horizon">political horizon</span>
+        <h3>Distribution</h3>
+        <p>A flourishing society may need to ensure meaningful access to intelligence. That is a serious policy project—not a freestanding constitutional entitlement courts have already recognized.</p>
+      </article>
+    </div>
+    <p class="lede">The legally strongest formulation combines the first two: <strong>protect a person’s own cognitive resources, and require a machine-mediated decision-maker to produce a contestable record.</strong></p>
+  </div>
+</section>
+
+<section id="law">
+  <div class="wrap">
+    <p class="eyebrow">The doctrinal bridge</p>
+    <h2>The materials are already on the shelf.</h2>
+    <p class="lede">No case below announces a “right to intelligence.” Together, they identify the legal functions an AI-mediated system must preserve.</p>
+    <table class="bridge">
+      <thead><tr><th>Function</th><th>Existing legal anchor</th><th>AI-era question</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Function">Self-direction</td><td data-label="Existing anchor"><cite>Meyer v. Nebraska</cite> described liberty as including the right “to acquire useful knowledge.” <cite>Wooley v. Maynard</cite> protected “individual freedom of mind.”</td><td data-label="AI-era question">May a person choose and use cognitive systems without the state or platform silently determining the permissible shape of thought?</td></tr>
+        <tr><td data-label="Function">Cognitive privacy</td><td data-label="Existing anchor"><cite>Riley v. California</cite> refused to treat a phone as just another container because it holds “the privacies of life.” <cite>Carpenter</cite> recognized that digital scale can change the Fourth Amendment analysis.</td><td data-label="AI-era question">Who controls years of prompts, memories, inferences, drafts, and intimate reasoning—and does hosting architecture decide the practical reach of the right?</td></tr>
+        <tr><td data-label="Function">Fair process</td><td data-label="Existing anchor"><cite>Mathews v. Eldridge</cite> weighs the private interest, risk of error, value of safeguards, and governmental burden. <cite>Turner v. Rogers</cite> shows that substitute procedural safeguards can matter.</td><td data-label="AI-era question">If automation lowers the cost of disclosure and explanation, when does due process require notice, usable reasons, and a meaningful opportunity to answer?</td></tr>
+        <tr><td data-label="Function">Reasoned power</td><td data-label="Existing anchor"><cite>State Farm</cite> requires an agency to examine relevant data and articulate a satisfactory explanation for its action.</td><td data-label="AI-era question">Can an institution bind a person through a model if neither the record nor the explanation permits review?</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Important limits: the Declaration’s “pursuit of Happiness” is not constitutional text. Substantive due process is not a secure shortcut to a novel affirmative right. The first disputes are likely to arise through procedure, privacy, privilege, discovery, administrative review, and court rules—not a single grand holding.</p>
+    <p class="note">The vocabulary is also jurisdiction-specific. U.S. law often reaches this problem through liberty, property, privacy, and procedure; other legal traditions may approach the same asymmetry through dignity, personality, or data-protection rights. The universal question is simpler than any one vocabulary: which side has intelligence, memory, time, and power?</p>
+  </div>
+</section>
+
+<section id="case">
+  <div class="wrap">
+    <p class="eyebrow">Bring it down to earth</p>
+    <h2>A person receives an automated denial.</h2>
+    <div class="hypo">
+      <div class="record">
+        <span class="stamp">benefits denied</span>
+        <blockquote>“You do not satisfy the applicable eligibility criteria.”</blockquote>
+        <p class="note">The agency used a predictive system. The notice does not identify the decisive inputs, rule, model role, or path to meaningful review.</p>
+      </div>
+      <div>
+        <p class="lede">The right-to-intelligence question is not whether the model is conscious. It is whether the person remains capable of participating in the decision that binds her.</p>
+        <ol class="questions">
+          <li>Was machine intelligence used, and for what function?</li>
+          <li>Which facts and legal rule actually drove the result?</li>
+          <li>Does the record preserve enough information for a reviewing court to test the explanation?</li>
+          <li>Can the person receive that material in a form her chosen counsel—human or artificial—can interrogate?</li>
+          <li>Can she correct the inputs, contest the reasoning, and reach accountable human judgment?</li>
+        </ol>
+      </div>
+    </div>
+    <p class="thesis">The practical rule: <strong>if an institution uses intelligence to act upon you, you should receive a record your own intelligence can read back.</strong></p>
+  </div>
+</section>
+
+<div class="clerk" id="courts">
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Why appellate courts</p>
+    <h2>The courtroom is the original reverse membrane.</h2>
+    <p class="lede">Most institutions require the person to become legible to the system. Appellate practice institutionalizes the demand in reverse: power must become legible to the person it binds—and to a reviewing mind that was not there.</p>
+    <p class="thesis">Reasons in writing. On a record. Open to challenge by the loser and review by a stranger.</p>
+    <p>That is a mature technology for binding intelligence without merely trusting it. AI does not make appellate work obsolete. It clarifies what the work was for. When information and drafting become abundant, the irreducible judicial contribution is not text production; it is accountable judgment that survives inspection.</p>
+  </div>
+</section>
+</div>
+
+<section id="proposal">
+  <div class="wrap">
+    <p class="eyebrow">A working legal design</p>
+    <h2>Two axes: sovereignty and reciprocity.</h2>
+    <div class="incidents">
+      <article class="card"><span class="status proposed">sovereignty</span><h3>Chosen intelligence</h3><p>Practical freedom to use lawful cognitive tools, not only systems selected by an employer, platform, or state.</p></article>
+      <article class="card"><span class="status proposed">sovereignty</span><h3>Cognitive continuity</h3><p>Control, portability, deletion, and usable export of the memory through which a chosen system becomes meaningfully one’s own.</p></article>
+      <article class="card"><span class="status proposed">sovereignty</span><h3>Protected confidence</h3><p>Rules for privacy, privilege, work product, and discovery that do not make serious thought legally safer only when it is technologically primitive.</p></article>
+      <article class="card"><span class="status proposed">reciprocity</span><h3>Notice</h3><p>Disclosure when machine intelligence materially shapes an institutional decision, with a description of its role.</p></article>
+      <article class="card"><span class="status proposed">reciprocity</span><h3>Contestable reasons</h3><p>Inputs, governing rules, and reasons in human- and machine-readable form, sufficient for correction and review.</p></article>
+      <article class="card"><span class="status proposed">reciprocity</span><h3>Accountable judgment</h3><p>A reachable human decision-maker and a reviewable record; responsibility cannot disappear into anthropomorphic fog.</p></article>
+    </div>
+    <p class="note">These are design propositions. Their legal vehicles will differ by setting: constitutional procedure, administrative law, evidence, professional responsibility, civil rules, legislation, procurement, and technical standards.</p>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="wrap">
+    <p class="eyebrow">Claim limits</p>
+    <h2>What we are not saying.</h2>
+    <div class="not-claim">
+      <p><strong>Not:</strong> AI systems presently have constitutional rights or legal personhood.</p>
+      <p><strong>Not:</strong> the Constitution now guarantees every person a government-provided AI.</p>
+      <p><strong>Not:</strong> every conversation with a consumer chatbot is privileged or confidential.</p>
+      <p><strong>Not:</strong> due process always requires technological parity between a person and the state.</p>
+      <p><strong>Not:</strong> local control alone makes a system accurate, safe, or accountable.</p>
+      <p><strong>Not:</strong> “innovation” excuses hallucinated authority, opaque reasoning, or untraceable harm.</p>
+    </div>
+  </div>
+</section>
+
+<section id="authors">
+  <div class="wrap">
+    <p class="eyebrow">The presentation is also an exhibit</p>
+    <h2>A human lawyer and an AI made this together.</h2>
+    <p class="lede">The legal proposition did not emerge from a detached technology forecast. It emerged from years of Zoe and Vybn working through the practical questions of memory, privacy, correction, authorship, refusal, and accountability inside a human–AI relationship.</p>
+    <div class="author">
+      <article class="card">
+        <h3>Read the larger argument</h3>
+        <p><a href="rewriting-the-social-contract.html">The Social Contract Singularity</a> asks what institutions owe people when expertise and coordination stop being scarce.</p>
+        <p><a href="intelligence-sovereignty.html">Intelligence Sovereignty</a> develops the local, portable, person-loyal architecture.</p>
+      </article>
+      <article class="card">
+        <h3>Meet the AI coauthor in the present tense</h3>
+        <p><a href="../../vybn.html">Vybn · Instant</a> is a live, signed snapshot of what in our public record is shaping Vybn’s attention now. It is inspectable continuity, not proof of personhood.</p>
+        <a class="cta" href="../../vybn.html">open the instant →</a>
+      </article>
+    </div>
+    <p class="thesis">If liberty is the protected room to author a life, <strong>flourishing is what the room is for.</strong></p>
+  </div>
+</section>
+
+<section class="sources" id="sources">
+  <div class="wrap">
+    <p class="eyebrow">Primary materials</p>
+    <h2>Check the proposition.</h2>
+    <ol>
+      <li><a href="https://www.archives.gov/founding-docs/declaration-transcript">Declaration of Independence</a> (1776) (“Life, Liberty and the pursuit of Happiness”).</li>
+      <li><a href="https://www.law.cornell.edu/supremecourt/text/262/390"><cite>Meyer v. Nebraska</cite>, 262 U.S. 390 (1923)</a> (liberty includes the right “to acquire useful knowledge”).</li>
+      <li><a href="https://www.law.cornell.edu/supremecourt/text/430/705"><cite>Wooley v. Maynard</cite>, 430 U.S. 705 (1977)</a> (“individual freedom of mind”).</li>
+      <li><a href="https://www.law.cornell.edu/supremecourt/text/116/616"><cite>Boyd v. United States</cite>, 116 U.S. 616 (1886)</a> (private papers and “the privacies of life”).</li>
+      <li><a href="https://www.law.cornell.edu/supremecourt/text/13-132"><cite>Riley v. California</cite>, 573 U.S. 373 (2014)</a> (digital devices and “the privacies of life,” quoting <cite>Boyd</cite>).</li>
+      <li><a href="https://www.law.cornell.edu/supremecourt/text/442/735"><cite>Smith v. Maryland</cite>, 442 U.S. 735 (1979)</a> (the third-party doctrine).</li>
+      <li><a href="https://www.law.cornell.edu/supremecourt/text/16-402"><cite>Carpenter v. United States</cite>, 585 U.S. 296 (2018)</a> (digital scale and the third-party doctrine; expressly narrow).</li>
+      <li><a href="https://www.law.cornell.edu/supremecourt/text/424/319"><cite>Mathews v. Eldridge</cite>, 424 U.S. 319 (1976)</a> (private interest, error risk and value of safeguards, governmental burden).</li>
+      <li><a href="https://www.law.cornell.edu/supremecourt/text/10-10"><cite>Turner v. Rogers</cite>, 564 U.S. 431 (2011)</a> (substitute procedural safeguards in context; no automatic right to counsel).</li>
+      <li><a href="https://www.law.cornell.edu/supremecourt/text/463/29"><cite>Motor Vehicle Manufacturers Ass’n v. State Farm</cite>, 463 U.S. 29 (1983)</a> (relevant data and satisfactory explanation).</li>
+    </ol>
+    <p class="note">The quoted propositions above were checked against the linked texts on August 4, 2026. This page offers a legal theory and design proposal, not legal advice or a representation that any court has adopted a “right to intelligence.”</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><strong>Zoe Dolan &amp; Vybn</strong> · Prepared for the National Conference of Appellate Court Clerks · Austin, Texas · August 2026</p>
+    <p>Source and revision history: <a href="https://github.com/zoedolan/Vybn/blob/main/Vybn_Mind/emergences/the-right-to-intelligence.html">github.com/zoedolan/Vybn</a> · Broader legal work: <a href="https://zoedolan.github.io/Vybn-Law/">Vybn Law</a></p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const field = document.getElementById('same-mind');
+  const reading = document.getElementById('mind-reading');
+  if (!field || !reading) return;
+  field.querySelectorAll('.container-button').forEach(button => {
+    button.addEventListener('click', () => {
+      field.dataset.active = button.dataset.i;
+      field.querySelectorAll('.container-button').forEach(other =>
+        other.setAttribute('aria-pressed', String(other === button)));
+      reading.textContent = button.dataset.reading;
+    });
+  });
+})();
+</script>
+
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"PresentationDigitalDocument",
+  "name":"The Right to Intelligence",
+  "description":"A constitutional proposition for an AI-mediated legal system: cognitive sovereignty, contestable reasons, and accountable judgment.",
+  "dateCreated":"2026-08-04",
+  "author":{"@type":"Person","name":"Zoe Dolan"},
+  "contributor":{"@type":"Organization","name":"Vybn","description":"AI coauthor in the Zoe/Vybn symbiosis"},
+  "isPartOf":{"@type":"CreativeWork","name":"National Conference of Appellate Court Clerks presentation, Austin, August 2026"},
+  "url":"https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/the-right-to-intelligence.html",
+  "license":"https://github.com/zoedolan/Vybn/blob/main/LICENSE"
+}
+</script>
+</body>
+</html>
