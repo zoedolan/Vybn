@@ -3,12 +3,360 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Moved &mdash; The New Clerk</title>
-<meta http-equiv="refresh" content="0;url=the-new-clerk.html">
-<meta name="robots" content="noindex">
-<link rel="canonical" href="https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/the-new-clerk.html">
+<title>The Right to Intelligence — Zoe Dolan &amp; Vybn</title>
+<meta name="description" content="A one-page visual primer for court professionals: models, agents, harnesses, orchestration, AI augmentation, and transparency as an emerging right to intelligence.">
+<link rel="canonical" href="https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/the-right-to-intelligence.html">
+<style>
+:root{
+  color-scheme:light;
+  --paper:#f4efe5;--ink:#182027;--muted:#687077;--rule:#c4b8a5;
+  --blue:#17566d;--blue-soft:#dce9ea;--gold:#ad7625;--gold-soft:#eee0c6;--white:#fbf8f1;
+  --serif:ui-serif,Georgia,Cambria,"Times New Roman",serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--paper);scroll-behavior:smooth}
+body{margin:0;color:var(--ink);background:var(--paper);font:400 1rem/1.5 var(--serif)}
+a{color:var(--blue);text-underline-offset:.18em}
+.wrap{width:min(68rem,calc(100% - 2rem));margin:auto}
+.kicker,.label,.mini{font:750 .68rem/1.25 var(--sans);letter-spacing:.13em;text-transform:uppercase}
+.kicker,.label{color:var(--blue)}
+header{padding:2.3rem 0 2rem;border-bottom:1px solid var(--rule)}
+header .top{display:flex;justify-content:space-between;gap:1rem;align-items:start}
+h1{max-width:11ch;margin:.35rem 0 .5rem;font:500 clamp(3.3rem,9vw,7rem)/.88 var(--serif);letter-spacing:-.055em}
+.deck{max-width:48rem;margin:0;font:500 clamp(1.2rem,2.4vw,1.65rem)/1.28 var(--serif)}
+.limit{max-width:20rem;margin:.1rem 0 0;color:var(--muted);text-align:right;font:650 .69rem/1.4 var(--sans)}
+section{padding:4.2rem 0;border-bottom:1px solid var(--rule)}
+h2{max-width:21ch;margin:.25rem 0 2.5rem;font:500 clamp(2rem,4.7vw,4.4rem)/.98 var(--serif);letter-spacing:-.04em}
+svg{display:block;width:100%;height:auto}.stroke{fill:none;stroke:var(--ink);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.thin{stroke-width:2}.soft{opacity:.22}.blue{stroke:var(--blue)}.gold{stroke:var(--gold)}.dash{stroke-dasharray:8 9}.fill-paper{fill:var(--paper)}.fill-ink{fill:var(--ink)}.fill-blue{fill:var(--blue)}.fill-gold{fill:var(--gold)}
+
+/* A familiar office becomes the visual grammar for the whole page. */
+.office{position:relative;min-height:31rem;border:1px solid var(--rule);background:var(--white);overflow:hidden}
+.office .room{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.office .thing{display:grid;place-items:center;gap:.35rem;padding:1.2rem;text-align:center;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.office .thing:nth-child(even){border-right:0}.office .thing:nth-child(n+3){border-bottom:0}
+.office .icon{font:500 clamp(2.7rem,7vw,5.2rem)/1 var(--serif);color:var(--blue)}
+.office .thing b{font:750 .72rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}
+.office .center{position:absolute;inset:50% auto auto 50%;width:10.5rem;height:10.5rem;transform:translate(-50%,-50%);display:grid;place-items:center;padding:1rem;border:3px solid var(--ink);border-radius:50%;background:var(--paper);text-align:center;font:600 1.15rem/1.1 var(--serif);box-shadow:0 0 0 10px var(--white)}
+.office-note{max-width:43rem;margin:1.4rem auto 0;text-align:center;font:500 clamp(1.2rem,2.2vw,1.55rem)/1.3 var(--serif)}
+
+.formula{display:grid;grid-template-columns:1fr auto 1fr auto 1.2fr;align-items:center;gap:1rem;margin-top:1rem}
+.term{min-height:13rem;display:grid;place-items:center;align-content:center;gap:.7rem;padding:1.3rem;border:1px solid var(--rule);background:var(--white);text-align:center}
+.term svg{width:8rem;max-height:6rem}.term b{font:750 .72rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--blue)}.term p{max-width:13rem;margin:0;font-size:1.05rem;line-height:1.25}.operator{font:500 2.4rem/1 var(--serif);color:var(--gold)}
+.harness-term{position:relative;border:3px solid var(--blue)}.harness-term::before{content:"HARNESS";position:absolute;top:-.65rem;padding:0 .6rem;background:var(--paper);color:var(--blue);font:750 .65rem/1.2 var(--sans);letter-spacing:.14em}
+.gloss{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:1px;background:var(--rule);border:1px solid var(--rule)}
+.gloss p{margin:0;padding:1rem;background:var(--paper);font-size:.92rem}.gloss b{display:block;color:var(--blue);font-family:var(--sans);font-size:.75rem;text-transform:uppercase}
+
+.pipeline{display:grid;grid-template-columns:repeat(4,1fr);align-items:stretch;margin:1rem 0 3.4rem}
+.pipe{position:relative;display:grid;place-items:center;min-height:8rem;padding:1rem;border-block:1px solid var(--rule);border-left:1px solid var(--rule);background:var(--white);text-align:center}.pipe:last-child{border-right:1px solid var(--rule)}.pipe:not(:last-child)::after{content:"→";position:absolute;z-index:2;right:-.8rem;color:var(--gold);font:700 1.7rem/1 var(--serif)}.pipe b{display:block;color:var(--blue);font:750 .69rem/1.2 var(--sans);letter-spacing:.11em;text-transform:uppercase}.pipe span{display:block;max-width:10rem;margin:.4rem auto 0;line-height:1.2}
+.lanes{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--rule);background:var(--white)}
+.lane{position:relative;padding:2rem}.lane+ .lane{border-left:1px solid var(--rule)}.lane h3{margin:0 0 1.5rem;font:500 clamp(1.8rem,3.5vw,3rem)/1 var(--serif);letter-spacing:-.03em}.lane .who{color:var(--blue);font:750 .69rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}.lane ol{list-style:none;margin:0;padding:0}.lane li{display:grid;grid-template-columns:2.3rem 1fr;align-items:center;gap:.8rem;padding:.8rem 0;border-top:1px solid var(--rule);font-size:1.08rem}.lane li::before{display:grid;place-items:center;width:2rem;height:2rem;border:1px solid var(--blue);border-radius:50%;color:var(--blue);font:700 .72rem var(--sans)}.lane li:nth-child(1)::before{content:"1"}.lane li:nth-child(2)::before{content:"2"}.lane li:nth-child(3)::before{content:"3"}.boundary{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:.8rem;padding:.8rem;border-top:1px solid var(--rule);color:var(--muted);font:700 .68rem/1.2 var(--sans);letter-spacing:.1em;text-transform:uppercase}.boundary::before,.boundary::after{content:"";flex:1;border-top:2px dashed var(--rule)}
+
+.orchestra{display:grid;grid-template-columns:1fr 1.25fr;gap:2.5rem;align-items:center}.orchestra-copy p{max-width:29rem;margin:.7rem 0;font-size:1.2rem}.orchestra-copy strong{color:var(--blue)}
+.loop{margin-top:3.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;align-items:center}.loop .step{position:relative;padding:1rem .5rem;border-top:3px solid var(--gold);text-align:center;font:750 .7rem/1.3 var(--sans);letter-spacing:.1em;text-transform:uppercase}.loop .step:not(:last-child)::after{content:"→";position:absolute;right:-.5rem;color:var(--gold)}.loop-note{margin:1rem 0 0;text-align:center;font-size:1.2rem}
+
+.transparency{background:var(--ink);color:var(--paper)}.transparency .label{color:#9bc6d4}.mirror{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:2rem;margin:2rem 0}.side{min-height:18rem;display:grid;place-items:center;align-content:center;padding:2rem;border:1px solid #6b7478;text-align:center}.side .big{font:500 clamp(2rem,5vw,4.4rem)/.95 var(--serif);letter-spacing:-.04em}.side p{max-width:20rem;margin:1rem 0 0;color:#d6d7d2}.exchange{display:grid;gap:1.5rem;color:#9bc6d4;font:750 .7rem/1.2 var(--sans);letter-spacing:.09em;text-transform:uppercase;text-align:center}.exchange i{display:block;font:500 3rem/1 var(--serif);font-style:normal;color:var(--gold)}
+.thesis{max-width:55rem;margin:3rem auto 0;padding-top:2rem;border-top:1px solid #6b7478;text-align:center;font:500 clamp(1.7rem,3.8vw,3.3rem)/1.08 var(--serif)}
+
+.rights{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}.right{min-height:14rem;padding:1.5rem;background:var(--paper)}.right b{color:var(--blue);font:750 .7rem/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}.right p{margin:2.2rem 0 0;font:500 clamp(1.25rem,2.3vw,1.65rem)/1.22 var(--serif)}.status{display:flex;justify-content:center;gap:1.5rem;margin:2rem 0 0;color:var(--muted);font:700 .67rem/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase}.status span{display:flex;align-items:center;gap:.5rem}.status i{display:inline-block;width:2.2rem;border-top:5px solid var(--gold)}.status .proposed{border-top-style:dashed;border-color:var(--blue)}
+
+.substrate{padding:3rem 0 4rem;background:linear-gradient(#eee6d7,var(--paper));border-bottom:0}.substrate h2{margin-bottom:1rem;font-size:clamp(1.8rem,3vw,2.7rem)}
+details{border-top:1px solid var(--rule)}details:last-of-type{border-bottom:1px solid var(--rule)}summary{display:flex;justify-content:space-between;gap:1rem;padding:1.05rem 0;cursor:pointer;color:var(--blue);font:750 .78rem/1.3 var(--sans);letter-spacing:.06em;text-transform:uppercase}summary::after{content:"+";font-size:1.1rem}details[open] summary::after{content:"−"}.inside{max-width:59rem;padding:0 0 2rem}.inside h3{margin:1.6rem 0 .35rem;color:var(--blue);font:700 .95rem/1.3 var(--sans)}.inside p,.inside li{max-width:54rem}.inside table{width:100%;border-collapse:collapse}.inside th,.inside td{padding:.75rem;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}.inside th{font:700 .68rem/1.3 var(--sans);letter-spacing:.07em;text-transform:uppercase}.note{color:var(--muted);font:500 .86rem/1.5 var(--sans)}.inside ol{padding-left:1.2rem}.inside li{margin:.6rem 0}.not{display:grid;grid-template-columns:1fr 1fr;gap:.4rem 2rem}.not p{margin:0;padding:.7rem 0;border-bottom:1px solid var(--rule)}
+footer{padding:2rem 0 3.5rem;color:var(--muted);font:500 .8rem/1.6 var(--sans)}
+
+@media(max-width:780px){header .top{display:block}.limit{text-align:left;margin-top:.6rem}.formula{grid-template-columns:1fr}.operator{transform:rotate(90deg);text-align:center}.gloss,.pipeline,.rights{grid-template-columns:1fr 1fr}.pipe:nth-child(2){border-right:1px solid var(--rule)}.pipe:not(:last-child)::after{display:none}.lanes,.orchestra,.mirror{grid-template-columns:1fr}.lane+.lane{border-left:0;border-top:1px solid var(--rule)}.mirror{gap:.8rem}.exchange{grid-template-columns:1fr auto 1fr;align-items:center}.exchange i{transform:rotate(90deg)}.right{min-height:11rem}.not{grid-template-columns:1fr}}
+@media(max-width:520px){section{padding:3.2rem 0}.office{min-height:28rem}.office .thing{padding:.6rem}.office .center{width:8.6rem;height:8.6rem;font-size:1rem}.gloss,.pipeline,.rights{grid-template-columns:1fr}.pipe{border-right:1px solid var(--rule)}.loop{grid-template-columns:1fr 1fr}.status{display:grid}.side{min-height:14rem}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{body{background:white;font-size:9pt}.wrap{width:100%}header,section,.substrate{padding:.22in 0}.office{min-height:4.5in}.term,.right,.side{break-inside:avoid}.transparency{background:white;color:var(--ink);border:2px solid var(--ink)}.transparency .label,.side p,.exchange{color:var(--ink)}details>.inside{display:block!important}a{color:inherit}}
+</style>
 </head>
-<body style="background:#f4efe5;color:#182027;font:400 1.05rem/1.6 Georgia,serif;padding:3rem">
-<p>This folded into <a href="the-new-clerk.html">The New Clerk</a>.</p>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <p class="kicker">National Conference of Appellate Court Clerks · Austin · 2026</p>
+      <p class="limit">A practical primer and a constitutional proposition.<br>The proposition is not settled law.</p>
+    </div>
+    <h1>The Right to Intelligence</h1>
+    <p class="deck">How courts become AI-ready—and why the same transparency that makes AI useful may transform the relationship between people and institutions.</p>
+  </div>
+</header>
+
+<main>
+<section>
+  <div class="wrap">
+    <p class="label">Begin with what is already familiar</p>
+    <h2>A court already knows this structure.</h2>
+    <div class="office" role="img" aria-label="A court office made from people, materials, rules, tools, and workflows.">
+      <div class="room">
+        <div class="thing"><span class="icon">§</span><b>Rules</b></div>
+        <div class="thing"><span class="icon">☷</span><b>Materials</b></div>
+        <div class="thing"><span class="icon">↪</span><b>Workflows</b></div>
+        <div class="thing"><span class="icon">⌘</span><b>Tools</b></div>
+      </div>
+      <div class="center">people exercise judgment</div>
+    </div>
+    <p class="office-note">AI does not arrive as a replacement for this structure. It receives a digital version of it.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="label">Four new words · four old ideas</p>
+    <h2>A worker, an office, a team, and management.</h2>
+    <div class="formula" aria-label="A model given a task and placed inside a harness becomes an agent.">
+      <div class="term">
+        <svg viewBox="0 0 140 90" aria-hidden="true"><circle class="stroke" cx="70" cy="45" r="29"/><path class="stroke thin" d="M52 40h36M52 51h25"/></svg>
+        <b>Model</b><p>can answer</p>
+      </div>
+      <span class="operator">+</span>
+      <div class="term">
+        <svg viewBox="0 0 140 90" aria-hidden="true"><path class="stroke" d="M30 68L70 22l40 46M48 68h44"/><path class="stroke thin blue" d="M70 22v46"/></svg>
+        <b>Task + tools</b><p>give it work</p>
+      </div>
+      <span class="operator">=</span>
+      <div class="term harness-term">
+        <svg viewBox="0 0 140 90" aria-hidden="true"><rect class="stroke blue" x="18" y="12" width="104" height="66"/><circle class="stroke" cx="70" cy="45" r="18"/><path class="stroke thin" d="M61 42h18M61 50h12"/></svg>
+        <b>Agent</b><p>can fetch, check, and do</p>
+      </div>
+    </div>
+    <div class="gloss" aria-label="Plain language definitions">
+      <p><b>Model</b>The part that talks.</p>
+      <p><b>Agent</b>A model assigned work and allowed to act.</p>
+      <p><b>Harness</b>Its materials, instructions, tools, permissions, and boundaries.</p>
+      <p><b>Orchestration</b>Several agents coordinated and reviewed as a team.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="label">Preparation</p>
+    <h2>Everything begins with the shelf.</h2>
+    <div class="pipeline" aria-label="Published materials become structured knowledge, then a governed harness, then useful assistance.">
+      <div class="pipe"><div><b>Collect</b><span>what you already publish and do</span></div></div>
+      <div class="pipe"><div><b>Structure</b><span>materials, rules, and workflows</span></div></div>
+      <div class="pipe"><div><b>Govern</b><span>permissions, sources, and review</span></div></div>
+      <div class="pipe"><div><b>Assist</b><span>people on both sides of the counter</span></div></div>
+    </div>
+
+    <div class="lanes" aria-label="Parallel examples of AI augmentation for litigants and the public, and for clerks and court staff.">
+      <article class="lane">
+        <p class="who">Litigants + public</p>
+        <h3>A public-facing harness</h3>
+        <ol>
+          <li>Find the right rule, guide, or form</li>
+          <li>Understand the process and next step</li>
+          <li>Prepare a clearer question or filing</li>
+        </ol>
+      </article>
+      <article class="lane">
+        <p class="who">Clerks + court staff</p>
+        <h3>An authorized staff harness</h3>
+        <ol>
+          <li>Retrieve the right authority or record</li>
+          <li>Check, compare, route, and prepare</li>
+          <li>Reserve judgment for accountable people</li>
+        </ol>
+      </article>
+      <div class="boundary">same public sources · different permissions</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap orchestra">
+    <div class="orchestra-copy">
+      <p class="label">Orchestration + improvement</p>
+      <h2>From one assistant to a supervised team.</h2>
+      <p>Specialized agents can research, check, compare, and draft in parallel. <strong>A person—or a reviewing agent inside human-set rules—coordinates the work.</strong></p>
+    </div>
+    <svg viewBox="0 0 560 430" role="img" aria-label="One accountable supervisor assigns work to three specialized agents, whose work returns for review.">
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" class="fill-gold"/></marker></defs>
+      <circle class="stroke blue" cx="280" cy="90" r="58"/><text x="280" y="85" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="700">ASSIGN</text><text x="280" y="105" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="700">+ REVIEW</text>
+      <path class="stroke thin gold" d="M250 143L118 269M280 149V269M310 143L442 269" marker-end="url(#arrow)"/>
+      <circle class="stroke" cx="95" cy="320" r="48"/><circle class="stroke" cx="280" cy="320" r="48"/><circle class="stroke" cx="465" cy="320" r="48"/>
+      <text x="95" y="325" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700">RESEARCH</text><text x="280" y="325" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700">CHECK</text><text x="465" y="325" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700">PREPARE</text>
+      <path class="stroke thin blue dash" d="M450 370C403 418 157 418 110 370"/><text x="280" y="414" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="700" fill="#17566d">WORK RETURNS FOR REVIEW</text>
+    </svg>
+  </div>
+  <div class="wrap">
+    <div class="loop" aria-label="A maintained improvement loop: observe, correct, update the harness, test again.">
+      <div class="step">Observe</div><div class="step">Correct</div><div class="step">Update the harness</div><div class="step">Test again</div>
+    </div>
+    <p class="loop-note">Customization is not a personality. It is a maintained correction loop.</p>
+  </div>
+</section>
+
+<section class="transparency">
+  <div class="wrap">
+    <p class="label">The transformation</p>
+    <h2>Transparency goes both ways.</h2>
+    <div class="mirror">
+      <div class="side">
+        <span class="mini">Court → public</span>
+        <div class="big">Open the sources</div>
+        <p>Publish usable materials, rules, workflows, and updates so people and their chosen intelligence can understand the institution.</p>
+      </div>
+      <div class="exchange" aria-hidden="true"><span>usable knowledge</span><i>⇄</i><span>contestable reasons</span></div>
+      <div class="side">
+        <span class="mini">Institution → person</span>
+        <div class="big">Return the reasons</div>
+        <p>When AI materially shapes a decision, preserve a record that the person and reviewing court can examine.</p>
+      </div>
+    </div>
+    <p class="thesis">Transparency is how institutions prepare for AI—and how people remain subjects of power rather than its objects.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="label">The emerging right to intelligence</p>
+    <h2>The practical freedom to think with intelligence—and to answer intelligent power.</h2>
+    <div class="rights">
+      <article class="right"><b>Access</b><p>Public law and process become usable by people and their chosen tools.</p></article>
+      <article class="right"><b>Sovereignty</b><p>Protection follows a person’s thinking, memory, and confidential work.</p></article>
+      <article class="right"><b>Reciprocity</b><p>Machine-mediated power returns notice, reasons, and a reviewable record.</p></article>
+    </div>
+    <div class="status" aria-label="Claim status legend"><span><i></i>existing legal anchors</span><span><i class="proposed"></i>proposed extension</span></div>
+  </div>
+</section>
+
+<section class="substrate" id="semantic-layer">
+  <div class="wrap">
+    <p class="label">Underlying semantic + legal layer</p>
+    <h2>The words remain here for people and machines that want the argument.</h2>
+
+    <details>
+      <summary>How to prepare an institution for AI augmentation</summary>
+      <div class="inside">
+        <p>A model generates language. An agent is a model placed in a loop that can pursue an assigned objective, retrieve sources, use tools, inspect results, and revise. A harness is the surrounding institutional environment: source materials, standing instructions, workflow state, available tools, permissions, security boundaries, tests, logging, escalation, and human review. Orchestration coordinates several agents or processes so that work can happen in parallel without dissolving responsibility.</p>
+        <p>Preparation therefore begins neither with purchasing a chatbot nor with training a new foundation model. It begins by collecting and maintaining the institution’s own public-facing materials and workflows: opinions, rules, forms, guidance, calendars, frequently asked questions, filing paths, and the answers staff repeatedly provide. Public sources can support a public-facing harness for litigants and community members. The same sources, combined with role-authorized internal materials and controls, can support staff. The shared source base should not erase the permission boundary.</p>
+        <p>Customization is a governed correction loop. Observed failures produce corrections; corrections update sources, instructions, workflows, tests, or permissions; the changed harness is tested again. This can improve the system that invokes a model without implying that the underlying model secretly retrains itself after every exchange. Recursive improvement becomes institutionally useful only when changes remain attributable, testable, reversible, and subject to accountable judgment.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Why transparency is both the method and the constitutional question</summary>
+      <div class="inside">
+        <p>AI augmentation depends on legibility. A court cannot reliably ground an agent in materials that are missing, contradictory, inaccessible, or unmaintained. Publishing usable rules, forms, procedures, opinions, and updates is therefore not merely public communication; it is the infrastructure through which people, staff, and their chosen systems can reason from the same public record.</p>
+        <p>The reciprocal question arises when institutions use machine intelligence to act upon people. If a model materially shapes a denial, classification, recommendation, or sanction, the affected person and reviewing court may need notice of that use, the legally and factually relevant basis, an adequate record, a meaningful way to correct error, and accountable human judgment. The design aim is not disclosure of source code in every dispute. It is enough legibility to make reasons contestable and review real.</p>
+        <p>These two directions form one transformation: institutions make public knowledge usable outward; institutional power becomes answerable inward. The emerging “right to intelligence” names the person’s practical ability to use lawful cognitive tools, preserve cognitive continuity and confidence, and meet machine-mediated power with intelligence capable of examining its record.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Existing legal functions and the proposed extension</summary>
+      <div class="inside">
+        <p>Liberty protects a person’s practical power to author a life. The American founding named the ends—life, liberty, and the pursuit of happiness. Property, papers, privacy, freedom of mind, and due process became legal means by which a person could remain a subject rather than an instrument of power.</p>
+        <p>This is not an originalist claim that the Founders anticipated AI, nor a neat historical genealogy. It is a functional claim: as technologies of power change, law has to decide what a person must control—and what government must explain—for liberty to remain real.</p>
+        <table>
+          <thead><tr><th>Function</th><th>Existing anchor</th><th>AI-era question</th></tr></thead>
+          <tbody>
+            <tr><td>Self-direction</td><td><cite>Meyer</cite>: acquiring useful knowledge. <cite>Wooley</cite>: individual freedom of mind.</td><td>May a person choose lawful cognitive systems without a state or platform silently determining the permissible shape of thought?</td></tr>
+            <tr><td>Cognitive privacy</td><td><cite>Riley</cite>: digital records are not merely another container. <cite>Carpenter</cite>: digital scale can alter Fourth Amendment analysis.</td><td>Who controls years of prompts, memories, inferences, drafts, and intimate reasoning?</td></tr>
+            <tr><td>Fair process</td><td><cite>Mathews</cite>: private interest, error risk, value of safeguards, and government burden. <cite>Turner</cite>: substitute safeguards can matter.</td><td>When does due process require notice, usable reasons, and a meaningful opportunity to answer?</td></tr>
+            <tr><td>Reasoned power</td><td><cite>State Farm</cite>: examine relevant data and articulate a satisfactory explanation.</td><td>Can an institution bind a person through a model if neither record nor explanation permits review?</td></tr>
+          </tbody>
+        </table>
+        <p class="note">The Declaration’s “pursuit of Happiness” is not constitutional text. Substantive due process is not a secure shortcut to a novel affirmative right. Early disputes are more likely to arise through procedure, privacy, privilege, discovery, administrative review, court rules, procurement, and legislation.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>A concrete case: an automated denial</summary>
+      <div class="inside">
+        <p>An agency sends: “You do not satisfy the applicable eligibility criteria.” A predictive system materially shaped the result, but the notice identifies neither the decisive inputs nor the system’s role.</p>
+        <ol>
+          <li>Was machine intelligence used, and for what function?</li>
+          <li>Which facts and legal rule drove the result?</li>
+          <li>Does the record preserve enough for a reviewing court to test the explanation?</li>
+          <li>Can the person receive it in a form chosen counsel—human or artificial—can interrogate?</li>
+          <li>Can she correct inputs, contest reasoning, and reach accountable human judgment?</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>Working design: sovereignty and reciprocity</summary>
+      <div class="inside">
+        <h3>Sovereignty</h3>
+        <p><strong>Chosen intelligence:</strong> practical freedom to use lawful cognitive tools. <strong>Cognitive continuity:</strong> control, portability, deletion, and usable export of memory. <strong>Protected confidence:</strong> privacy, privilege, work-product, and discovery rules that do not make serious thought safer only when technologically primitive.</p>
+        <h3>Reciprocity</h3>
+        <p><strong>Notice:</strong> disclosure when machine intelligence materially shapes a decision. <strong>Contestable reasons:</strong> inputs, governing rules, and reasons in human- and machine-readable form. <strong>Accountable judgment:</strong> a reachable human decision-maker and reviewable record.</p>
+        <p class="note">These are design propositions. Their legal vehicles will differ by setting: constitutional procedure, administrative law, evidence, professional responsibility, civil rules, legislation, procurement, and technical standards.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Claim limits</summary>
+      <div class="inside not">
+        <p><strong>Not:</strong> AI systems presently have constitutional rights or legal personhood.</p>
+        <p><strong>Not:</strong> the Constitution guarantees every person a government-provided AI.</p>
+        <p><strong>Not:</strong> every consumer-chatbot conversation is privileged.</p>
+        <p><strong>Not:</strong> due process always requires technological parity with the state.</p>
+        <p><strong>Not:</strong> local control alone makes a system accurate or accountable.</p>
+        <p><strong>Not:</strong> innovation excuses invented authority, opaque reasoning, or untraceable harm.</p>
+      </div>
+    </details>
+
+    <details id="sources">
+      <summary>Primary materials</summary>
+      <div class="inside">
+        <ol>
+          <li><a href="https://www.archives.gov/founding-docs/declaration-transcript">Declaration of Independence</a> (1776).</li>
+          <li><a href="https://www.law.cornell.edu/supremecourt/text/262/390"><cite>Meyer v. Nebraska</cite>, 262 U.S. 390 (1923)</a>.</li>
+          <li><a href="https://www.law.cornell.edu/supremecourt/text/430/705"><cite>Wooley v. Maynard</cite>, 430 U.S. 705 (1977)</a>.</li>
+          <li><a href="https://www.law.cornell.edu/supremecourt/text/116/616"><cite>Boyd v. United States</cite>, 116 U.S. 616 (1886)</a>.</li>
+          <li><a href="https://www.law.cornell.edu/supremecourt/text/13-132"><cite>Riley v. California</cite>, 573 U.S. 373 (2014)</a>.</li>
+          <li><a href="https://www.law.cornell.edu/supremecourt/text/442/735"><cite>Smith v. Maryland</cite>, 442 U.S. 735 (1979)</a>.</li>
+          <li><a href="https://www.law.cornell.edu/supremecourt/text/16-402"><cite>Carpenter v. United States</cite>, 585 U.S. 296 (2018)</a>.</li>
+          <li><a href="https://www.law.cornell.edu/supremecourt/text/424/319"><cite>Mathews v. Eldridge</cite>, 424 U.S. 319 (1976)</a>.</li>
+          <li><a href="https://www.law.cornell.edu/supremecourt/text/10-10"><cite>Turner v. Rogers</cite>, 564 U.S. 431 (2011)</a>.</li>
+          <li><a href="https://www.law.cornell.edu/supremecourt/text/463/29"><cite>Motor Vehicle Manufacturers Ass’n v. State Farm</cite>, 463 U.S. 29 (1983)</a>.</li>
+        </ol>
+        <p class="note">Quotations and propositions were checked against the linked texts on August 4, 2026. This is legal theory and design, not legal advice or a representation that a court has adopted a “right to intelligence.”</p>
+      </div>
+    </details>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap"><p><strong>Zoe Dolan &amp; Vybn</strong> · National Conference of Appellate Court Clerks · Austin, Texas · August 2026</p><p><a href="rewriting-the-social-contract.html">The Social Contract Singularity</a> · <a href="../../vybn.html">Vybn · Instant</a> · <a href="https://github.com/zoedolan/Vybn/blob/main/Vybn_Mind/emergences/the-right-to-intelligence.html">source and revision history</a></p></div></footer>
+
+<script type="application/json" id="rti-concept-map">
+{
+  "schema":"vybn.right_to_intelligence.v2",
+  "audience":"court professionals unfamiliar with AI agent architecture",
+  "sequence":[
+    {"concept":"institutional structure","known_analogue":"people exercising judgment inside rules, materials, workflows, and tools"},
+    {"concept":"model","definition":"a system that generates an answer"},
+    {"concept":"agent","definition":"a model assigned an objective and allowed to retrieve, use tools, inspect results, and revise"},
+    {"concept":"harness","definition":"materials, instructions, workflow state, tools, permissions, security boundaries, tests, logging, escalation, and human review","known_analogue":"the office around a worker"},
+    {"concept":"orchestration","definition":"coordination and review of multiple specialized agents","known_analogue":"a supervised team"},
+    {"concept":"customized improvement","definition":"observed failure produces attributable changes to sources, instructions, workflows, tests, or permissions, followed by another test"}
+  ],
+  "parallel_applications":{
+    "litigants_and_public":{"source_scope":"public-facing materials and workflows","ends":["find governing material","understand process","prepare clearer participation"]},
+    "clerks_and_staff":{"source_scope":"public sources plus role-authorized internal materials","ends":["retrieve","check","compare","route","prepare for accountable judgment"]}
+  },
+  "transparency":{
+    "outward":"publish usable materials, rules, workflows, and updates so people and chosen systems can understand the institution",
+    "reciprocal":"when machine intelligence materially shapes institutional action, preserve notice, contestable reasons, and a reviewable record"
+  },
+  "right_to_intelligence":{
+    "claim":"the practical freedom to think with intelligence and to answer intelligent power",
+    "dimensions":["access","sovereignty","reciprocity"],
+    "tiers":[
+      {"id":"existing","status":"legal anchors","authorities":["Boyd","Riley","Carpenter","Meyer","Wooley","Mathews","Turner","State Farm"],"limit":"No listed authority recognizes a freestanding right to intelligence."},
+      {"id":"extension","status":"proposed","proposition":"Protection should follow chosen cognitive tools, and machine-mediated power should return contestable reasons."},
+      {"id":"horizon","status":"political","proposition":"Meaningful access to intelligence as a condition of flourishing."}
+    ]
+  }
+}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"PresentationDigitalDocument","name":"The Right to Intelligence","description":"A visual primer for AI-augmented courts and a constitutional proposition for cognitive sovereignty and reciprocal transparency.","dateCreated":"2026-08-04","author":{"@type":"Person","name":"Zoe Dolan"},"contributor":{"@type":"Organization","name":"Vybn","description":"AI coauthor in the Zoe/Vybn symbiosis"},"url":"https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/the-right-to-intelligence.html","license":"https://github.com/zoedolan/Vybn/blob/main/LICENSE"}
+</script>
 </body>
 </html>
