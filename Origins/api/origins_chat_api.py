@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """origins_chat_api.py — Chat API for Origins, ported from Vybn Law.
 
-Runs on the DGX Spark. Three jobs:
+Runs on the dual DGX Spark cluster. Three jobs:
 
 1. SERVE: Accept chat messages, run deep_memory RAG, stream Nemotron responses.
 2. LOG:   Every conversation is appended to a daily log file (JSONL).
