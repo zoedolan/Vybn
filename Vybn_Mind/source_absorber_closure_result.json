@@ -1,0 +1,594 @@
+{
+  "claim_limit": "Tests the operational closure/holonomy mathematics under standard quantum mechanics; it does not distinguish the relational ontology from QED.",
+  "hardware": {
+    "analysis": {
+      "basis": {
+        "commuting": {
+          "x": {
+            "absorber_success": 0.9521484375,
+            "joint_difference": 0.8837890625,
+            "joint_difference_se": 0.009139365044182541,
+            "path_plus_marginal": 0.95166015625
+          },
+          "y": {
+            "absorber_success": 0.95849609375,
+            "joint_difference": 0.21044921875,
+            "joint_difference_se": 0.021127949360467378,
+            "path_plus_marginal": 0.60693359375
+          }
+        },
+        "forward": {
+          "x": {
+            "absorber_success": 0.9697265625,
+            "joint_difference": -0.78125,
+            "joint_difference_se": 0.01324673824829154,
+            "path_plus_marginal": 0.115234375
+          },
+          "y": {
+            "absorber_success": 0.9697265625,
+            "joint_difference": -0.5009765625,
+            "joint_difference_se": 0.01873370445950861,
+            "path_plus_marginal": 0.2548828125
+          }
+        },
+        "forward_pi_twirl": {
+          "x": {
+            "absorber_success": 0.96435546875,
+            "joint_difference": 0.75537109375,
+            "joint_difference_se": 0.013866163773425911,
+            "path_plus_marginal": 0.8681640625
+          },
+          "y": {
+            "absorber_success": 0.97900390625,
+            "joint_difference": 0.51513671875,
+            "joint_difference_se": 0.018666978532215883,
+            "path_plus_marginal": 0.75830078125
+          }
+        },
+        "mismatch": {
+          "x": {
+            "absorber_success": 0.02978515625,
+            "joint_difference": 0.00732421875,
+            "joint_difference_se": 0.0038101627101456248,
+            "path_plus_marginal": 0.1162109375
+          },
+          "y": {
+            "absorber_success": 0.0390625,
+            "joint_difference": -0.009765625,
+            "joint_difference_se": 0.004361985809169285,
+            "path_plus_marginal": 0.27001953125
+          }
+        },
+        "reverse": {
+          "x": {
+            "absorber_success": 0.935546875,
+            "joint_difference": -0.83984375,
+            "joint_difference_se": 0.010602212479751091,
+            "path_plus_marginal": 0.09912109375
+          },
+          "y": {
+            "absorber_success": 0.94775390625,
+            "joint_difference": 0.29345703125,
+            "joint_difference_se": 0.020511487790429103,
+            "path_plus_marginal": 0.65087890625
+          }
+        }
+      },
+      "checks": {
+        "commuting_flat": false,
+        "dephasing_erases": true,
+        "mismatch_suppressed": true,
+        "receiver_no_signal": true,
+        "reversal_conjugacy": false,
+        "reversal_sign": true
+      },
+      "closure": {
+        "commuting": {
+          "absorber_success_mean": 0.955322265625,
+          "im": 0.21044921875,
+          "magnitude": 0.9084998517705516,
+          "phase_rad": 0.2337680781675394,
+          "re": 0.8837890625
+        },
+        "forward": {
+          "absorber_success_mean": 0.9697265625,
+          "im": -0.5009765625,
+          "magnitude": 0.9280781640973547,
+          "phase_rad": -2.5713931893235635,
+          "re": -0.78125
+        },
+        "forward_pi_twirl": {
+          "absorber_success_mean": 0.9716796875,
+          "im": 0.51513671875,
+          "magnitude": 0.9143037396169764,
+          "phase_rad": 0.59851917627569,
+          "re": 0.75537109375
+        },
+        "mismatch": {
+          "absorber_success_mean": 0.034423828125,
+          "im": -0.009765625,
+          "magnitude": 0.01220703125,
+          "phase_rad": -0.9272952180016122,
+          "re": 0.00732421875
+        },
+        "reverse": {
+          "absorber_success_mean": 0.941650390625,
+          "im": 0.29345703125,
+          "magnitude": 0.8896373157664453,
+          "phase_rad": 2.805435874926533,
+          "re": -0.83984375
+        }
+      },
+      "controls": {
+        "commuting_phase_rad": 0.2337680781675394,
+        "dephased_average_magnitude": 0.014749811979485562,
+        "mismatch_to_match_magnitude_ratio": 0.013153020642256477,
+        "receiver_choice_path_marginal_deltas": {
+          "x": -0.0009765625,
+          "y": -0.01513671875
+        },
+        "reversal_magnitude_delta": 0.03844084833090933,
+        "reversal_phase_sum_rad": 0.2340426856029696
+      },
+      "verdict": "partial"
+    },
+    "counts": {
+      "commuting_x": {
+        "00": 1880,
+        "01": 70,
+        "10": 69,
+        "11": 29
+      },
+      "commuting_y": {
+        "00": 1197,
+        "01": 766,
+        "10": 46,
+        "11": 39
+      },
+      "forward_pi_twirl_x": {
+        "00": 1761,
+        "01": 214,
+        "10": 17,
+        "11": 56
+      },
+      "forward_pi_twirl_y": {
+        "00": 1530,
+        "01": 475,
+        "10": 23,
+        "11": 20
+      },
+      "forward_x": {
+        "00": 193,
+        "01": 1793,
+        "10": 43,
+        "11": 19
+      },
+      "forward_y": {
+        "00": 480,
+        "01": 1506,
+        "10": 42,
+        "11": 20
+      },
+      "mismatch_x": {
+        "00": 38,
+        "01": 23,
+        "10": 200,
+        "11": 1787
+      },
+      "mismatch_y": {
+        "00": 30,
+        "01": 50,
+        "10": 523,
+        "11": 1445
+      },
+      "reverse_x": {
+        "00": 98,
+        "01": 1818,
+        "10": 105,
+        "11": 27
+      },
+      "reverse_y": {
+        "00": 1271,
+        "01": 670,
+        "10": 62,
+        "11": 45
+      }
+    },
+    "metadata": {
+      "backend": "ibm_marrakesh",
+      "job_id_sha256_16": "a5b7979bad3c200c",
+      "optimization_level": 1,
+      "seed_transpiler": 20260806,
+      "shots": 2048,
+      "transpiled": [
+        {
+          "depth": 48,
+          "name": "forward_x",
+          "two_qubit_ops": 8
+        },
+        {
+          "depth": 47,
+          "name": "forward_y",
+          "two_qubit_ops": 8
+        },
+        {
+          "depth": 46,
+          "name": "reverse_x",
+          "two_qubit_ops": 8
+        },
+        {
+          "depth": 46,
+          "name": "reverse_y",
+          "two_qubit_ops": 8
+        },
+        {
+          "depth": 52,
+          "name": "commuting_x",
+          "two_qubit_ops": 8
+        },
+        {
+          "depth": 51,
+          "name": "commuting_y",
+          "two_qubit_ops": 8
+        },
+        {
+          "depth": 48,
+          "name": "mismatch_x",
+          "two_qubit_ops": 8
+        },
+        {
+          "depth": 47,
+          "name": "mismatch_y",
+          "two_qubit_ops": 8
+        },
+        {
+          "depth": 48,
+          "name": "forward_pi_twirl_x",
+          "two_qubit_ops": 8
+        },
+        {
+          "depth": 48,
+          "name": "forward_pi_twirl_y",
+          "two_qubit_ops": 8
+        }
+      ]
+    }
+  },
+  "ideal": {
+    "basis": {
+      "commuting": {
+        "x": {
+          "absorber_success": 0.9755282581475767,
+          "joint_difference": 0.9755282581475767,
+          "joint_difference_se": 0.00015450849718747408,
+          "path_plus_marginal": 1.0
+        },
+        "y": {
+          "absorber_success": 0.9755282581475768,
+          "joint_difference": 0.0,
+          "joint_difference_se": 0.0009876883405951378,
+          "path_plus_marginal": 0.5
+        }
+      },
+      "forward": {
+        "x": {
+          "absorber_success": 0.9755282581475768,
+          "joint_difference": -0.8692020425396052,
+          "joint_difference_se": 0.0004690587035676401,
+          "path_plus_marginal": 0.07763484965640903
+        },
+        "y": {
+          "absorber_success": 0.9755282581475768,
+          "joint_difference": -0.44288056142646814,
+          "joint_difference_se": 0.0008828278804263904,
+          "path_plus_marginal": 0.2785597192867659
+        }
+      },
+      "forward_pi_twirl": {
+        "x": {
+          "absorber_success": 0.9755282581475768,
+          "joint_difference": 0.8692020425396052,
+          "joint_difference_se": 0.0004690587035676401,
+          "path_plus_marginal": 0.922365150343591
+        },
+        "y": {
+          "absorber_success": 0.9755282581475768,
+          "joint_difference": 0.44288056142646814,
+          "joint_difference_se": 0.0008828278804263904,
+          "path_plus_marginal": 0.7214402807132341
+        }
+      },
+      "mismatch": {
+        "x": {
+          "absorber_success": 0.024471741852423227,
+          "joint_difference": 0.024471741852423227,
+          "joint_difference_se": 0.00015450849718747376,
+          "path_plus_marginal": 0.07763484965640903
+        },
+        "y": {
+          "absorber_success": 0.02447174185242322,
+          "joint_difference": 3.469446951953614e-18,
+          "joint_difference_se": 0.00015643446504023088,
+          "path_plus_marginal": 0.2785597192867659
+        }
+      },
+      "reverse": {
+        "x": {
+          "absorber_success": 0.9755282581475768,
+          "joint_difference": -0.8692020425396052,
+          "joint_difference_se": 0.0004690587035676401,
+          "path_plus_marginal": 0.07763484965640903
+        },
+        "y": {
+          "absorber_success": 0.9755282581475768,
+          "joint_difference": 0.44288056142646814,
+          "joint_difference_se": 0.0008828278804263904,
+          "path_plus_marginal": 0.7214402807132341
+        }
+      }
+    },
+    "checks": {
+      "commuting_flat": true,
+      "dephasing_erases": true,
+      "mismatch_suppressed": true,
+      "receiver_no_signal": true,
+      "reversal_conjugacy": true,
+      "reversal_sign": true
+    },
+    "closure": {
+      "commuting": {
+        "absorber_success_mean": 0.9755282581475768,
+        "im": 0.0,
+        "magnitude": 0.9755282581475767,
+        "phase_rad": 0.0,
+        "re": 0.9755282581475767
+      },
+      "forward": {
+        "absorber_success_mean": 0.9755282581475768,
+        "im": -0.44288056142646814,
+        "magnitude": 0.9755282581475768,
+        "phase_rad": -2.670353755551324,
+        "re": -0.8692020425396052
+      },
+      "forward_pi_twirl": {
+        "absorber_success_mean": 0.9755282581475768,
+        "im": 0.44288056142646814,
+        "magnitude": 0.9755282581475768,
+        "phase_rad": 0.47123889803846913,
+        "re": 0.8692020425396052
+      },
+      "mismatch": {
+        "absorber_success_mean": 0.024471741852423224,
+        "im": 3.469446951953614e-18,
+        "magnitude": 0.024471741852423227,
+        "phase_rad": 1.4177360046032295e-16,
+        "re": 0.024471741852423227
+      },
+      "reverse": {
+        "absorber_success_mean": 0.9755282581475768,
+        "im": 0.44288056142646814,
+        "magnitude": 0.9755282581475768,
+        "phase_rad": 2.670353755551324,
+        "re": -0.8692020425396052
+      }
+    },
+    "controls": {
+      "commuting_phase_rad": 0.0,
+      "dephased_average_magnitude": 0.0,
+      "mismatch_to_match_magnitude_ratio": 0.02508563093691661,
+      "receiver_choice_path_marginal_deltas": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "reversal_magnitude_delta": 0.0,
+      "reversal_phase_sum_rad": 0.0
+    },
+    "verdict": "pass"
+  },
+  "noise_model_control": {
+    "analysis": {
+      "basis": {
+        "commuting": {
+          "x": {
+            "absorber_success": 0.9556884765625,
+            "joint_difference": 0.8780517578125,
+            "joint_difference_se": 0.004748478209722853,
+            "path_plus_marginal": 0.9498291015625
+          },
+          "y": {
+            "absorber_success": 0.9495849609375,
+            "joint_difference": -0.0137939453125,
+            "joint_difference_se": 0.010765356763769933,
+            "path_plus_marginal": 0.493408203125
+          }
+        },
+        "forward": {
+          "x": {
+            "absorber_success": 0.952880859375,
+            "joint_difference": -0.778076171875,
+            "joint_difference_se": 0.006512817235774376,
+            "path_plus_marginal": 0.1201171875
+          },
+          "y": {
+            "absorber_success": 0.952392578125,
+            "joint_difference": -0.401123046875,
+            "joint_difference_se": 0.009829434527415581,
+            "path_plus_marginal": 0.2989501953125
+          }
+        },
+        "forward_pi_twirl": {
+          "x": {
+            "absorber_success": 0.952392578125,
+            "joint_difference": 0.76904296875,
+            "joint_difference_se": 0.006638009506445767,
+            "path_plus_marginal": 0.875
+          },
+          "y": {
+            "absorber_success": 0.9520263671875,
+            "joint_difference": 0.3851318359375,
+            "joint_difference_se": 0.009904942713271355,
+            "path_plus_marginal": 0.6951904296875
+          }
+        },
+        "mismatch": {
+          "x": {
+            "absorber_success": 0.0482177734375,
+            "joint_difference": 0.0181884765625,
+            "joint_difference_se": 0.0024177624547961083,
+            "path_plus_marginal": 0.120361328125
+          },
+          "y": {
+            "absorber_success": 0.0455322265625,
+            "joint_difference": -0.0032958984375,
+            "joint_difference_se": 0.0023572880778619295,
+            "path_plus_marginal": 0.2960205078125
+          }
+        },
+        "reverse": {
+          "x": {
+            "absorber_success": 0.9549560546875,
+            "joint_difference": -0.7784423828125,
+            "joint_difference_se": 0.006526907865539497,
+            "path_plus_marginal": 0.1201171875
+          },
+          "y": {
+            "absorber_success": 0.9532470703125,
+            "joint_difference": 0.4036865234375,
+            "joint_difference_se": 0.009821926833224599,
+            "path_plus_marginal": 0.7034912109375
+          }
+        }
+      },
+      "checks": {
+        "commuting_flat": true,
+        "dephasing_erases": true,
+        "mismatch_suppressed": true,
+        "receiver_no_signal": true,
+        "reversal_conjugacy": true,
+        "reversal_sign": true
+      },
+      "closure": {
+        "commuting": {
+          "absorber_success_mean": 0.95263671875,
+          "im": -0.0137939453125,
+          "magnitude": 0.8781601006222644,
+          "phase_rad": -0.015708425611359402,
+          "re": 0.8780517578125
+        },
+        "forward": {
+          "absorber_success_mean": 0.95263671875,
+          "im": -0.401123046875,
+          "magnitude": 0.875386901874787,
+          "phase_rad": -2.6655969133392112,
+          "re": -0.778076171875
+        },
+        "forward_pi_twirl": {
+          "absorber_success_mean": 0.95220947265625,
+          "im": 0.3851318359375,
+          "magnitude": 0.8600893086397499,
+          "phase_rad": 0.46428232805235203,
+          "re": 0.76904296875
+        },
+        "mismatch": {
+          "absorber_success_mean": 0.046875,
+          "im": -0.0032958984375,
+          "magnitude": 0.018484686261198126,
+          "phase_rad": -0.17926283240694726,
+          "re": 0.0181884765625
+        },
+        "reverse": {
+          "absorber_success_mean": 0.9541015625,
+          "im": 0.4036865234375,
+          "magnitude": 0.8768895897225933,
+          "phase_rad": 2.663189873661903,
+          "re": -0.7784423828125
+        }
+      },
+      "controls": {
+        "commuting_phase_rad": -0.015708425611359402,
+        "dephased_average_magnitude": 0.009183103859059983,
+        "mismatch_to_match_magnitude_ratio": 0.02111601878164968,
+        "receiver_choice_path_marginal_deltas": {
+          "x": -0.000244140625,
+          "y": 0.0029296875
+        },
+        "reversal_magnitude_delta": -0.0015026878478063832,
+        "reversal_phase_sum_rad": -0.0024070396773083758
+      },
+      "verdict": "pass"
+    },
+    "backend_model": "ibm_marrakesh",
+    "counts": {
+      "commuting_x": {
+        "00": 7511,
+        "01": 318,
+        "10": 270,
+        "11": 93
+      },
+      "commuting_y": {
+        "00": 3833,
+        "01": 3946,
+        "10": 209,
+        "11": 204
+      },
+      "forward_pi_twirl_x": {
+        "00": 7051,
+        "01": 751,
+        "10": 117,
+        "11": 273
+      },
+      "forward_pi_twirl_y": {
+        "00": 5477,
+        "01": 2322,
+        "10": 218,
+        "11": 175
+      },
+      "forward_x": {
+        "00": 716,
+        "01": 7090,
+        "10": 268,
+        "11": 118
+      },
+      "forward_y": {
+        "00": 2258,
+        "01": 5544,
+        "10": 191,
+        "11": 199
+      },
+      "mismatch_x": {
+        "00": 272,
+        "01": 123,
+        "10": 714,
+        "11": 7083
+      },
+      "mismatch_y": {
+        "00": 173,
+        "01": 200,
+        "10": 2252,
+        "11": 5567
+      },
+      "reverse_x": {
+        "00": 723,
+        "01": 7100,
+        "10": 261,
+        "11": 108
+      },
+      "reverse_y": {
+        "00": 5558,
+        "01": 2251,
+        "10": 205,
+        "11": 178
+      }
+    },
+    "seed_simulator": 20260806,
+    "shots": 8192,
+    "timestamp": "2026-08-06T11:08:23.291155+00:00"
+  },
+  "parameters": {
+    "AX_rad": 2.827433388230814,
+    "BZ_rad": 2.670353755551324
+  },
+  "schema": "vybn.source_absorber_closure.v1",
+  "source_sha256": "cf1d47f9838bb7be9c7a12f18a85f0709da1fab2672d4acb14f15c9b420cfc7c",
+  "timestamp": "2026-08-06T11:05:33.081555+00:00"
+}

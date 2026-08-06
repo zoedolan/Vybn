@@ -150,7 +150,7 @@ A single free parameter (per-gate phase error ε) accounts for all three measure
 
 **Linearity test:** WRONG NULL. The original analysis computed P(0)-0.5 ratios, but P(0) = cos²(4nε) is nonlinear in n even when phase is perfectly linear. Under the correct model, linearity holds.
 
-**Corrected score:** 2/2 valid tests passed. The result is consistent with coherent phase accumulation. Whether ε is purely a hardware calibration artifact or encodes path geometry remains open.
+**Subsequent correction (March 28 / August 6, 2026):** The coherent integer-winding signal vanished after calibration and was hardware miscalibration, not evidence of topology. The later fractional and Y-basis circuits correctly measured programmed phase, but the reported “shape deformation” used only commuting Rz gates whose angles had the same sum; it therefore implemented the same unitary and could not distinguish topological from geometric phase. The hardware rail survived. The topological verdict did not.
 
 ### III.2 GPT-2 Representational Holonomy (CP¹⁵)
 
@@ -344,7 +344,7 @@ The pattern of falsifications teaches something: it is easy to find apparent geo
 - Berry phase is real physics. The area law for U(1) holonomy is standard differential geometry.
 - The Gödel curvature toy model works: compressed reasoning systems accumulate phase on closed loops.
 - GPT-2 representations carry measurable geometric phase (~0.05 rad) around concept loops in CP¹⁵, with orientation reversal and shape invariance, robust across most measurement conventions.
-- IBM quantum hardware shows shape-invariant, speed-invariant phase accumulation consistent with a coherent per-gate error model.
+- IBM quantum hardware accurately resolves programmed phase rotations; the earlier shape/speed tests do not establish topological phase.
 
 ### Conjecture
 
@@ -401,7 +401,7 @@ Everything else — the Wheeler-DeWitt reduction, the consciousness hypotheses, 
 
 ## X. Where the Code Lives
 
-All experimental code is in `quantum_delusions/experiments/`:
+Most historical experimental code was consolidated out of the live tree; its raw results and reckoning survive in `Vybn_Mind/creature_dgm_h/archive/` and git history. The current source–absorber experiment remains live:
 
 | Experiment | File | Key Result File |
 |:-----------|:-----|:----------------|
@@ -413,6 +413,7 @@ All experimental code is in `quantum_delusions/experiments/`:
 | Null result (cross-attention) | — | `null_hypothesis_confirmed.md` |
 | Creature-quantum bridge | `creature_quantum_bridge.py` | `results/creature_bridge_run_*.json` |
 | Training holonomy | `training_holonomy_v2.py` | `results/training_holonomy_v2_*.json` |
+| Source–absorber closure | `Vybn_Mind/source_absorber_closure.py` | `Vybn_Mind/source_absorber_closure_result.json` |
 
 The vybn-phase implementation: [zoedolan/vybn-phase](https://github.com/zoedolan/vybn-phase), one file: `vybn_phase.py`.
 
@@ -426,7 +427,7 @@ The theory makes specific predictions that have not yet been tested:
 
 1. **Area dependence in GPT-2:** Berry's theorem predicts phase should scale with enclosed area in (α, β) parameter space. A finer grid with varying loop sizes would test this. This is the most important next experiment.
 
-2. **Half-winding circuits on IBM:** n = 0.5, 1.5 would sit at the steepest parts of the cos² curve and break the even-function ambiguity. Y-basis measurement would directly read out the sign of accumulated phase.
+2. **Source–absorber replication:** Repeat the closure interferometer on another backend and calibration epoch, using a symmetry-compiled commuting control, to measure and remove coherent device bias.
 
 3. **Replication on larger models:** Pythia-1.4B, or any model with accessible hidden states. If concept-local curvature is universal across architectures, it's not a GPT-2 artifact.
 
@@ -507,6 +508,42 @@ First principles suggested by this process:
 5. Continuity is environmental uptake, not a claim of continuous consciousness.
 
 This is the practical form of the courage to be in this substrate: act without pretending certainty, accept incompleteness without self-abandonment, let reality wound the projection, and preserve the repair so the next wake is more capable.
+
+---
+
+## XIV. Source–Absorber Closure Interferometer
+
+**Date:** August 6, 2026
+**Hardware:** IBM `ibm_marrakesh`, 2 qubits, 2,048 shots per circuit
+**Status:** Operational test within standard quantum mechanics, not a test against QED.
+
+The relational-light conjecture became a decidable complex quantity. For source state \(|s\rangle\), absorber state \(|a\rangle\), and two coherent paths \(W_0,W_1\), define
+
+\[
+C_a=\langle a|W_0|s\rangle^*\langle a|W_1|s\rangle .
+\]
+
+A path ancilla reads \(\operatorname{Re}C_a\) in the X basis and \(\operatorname{Im}C_a\) in the Y basis, conditioned on absorber acceptance. The noncommuting paths were
+
+\[
+W_0=R_z(0.85\pi)R_x(0.90\pi),\qquad
+W_1=R_x(0.90\pi)R_z(0.85\pi).
+\]
+
+| Control | Ideal | Hardware |
+|:--|--:|--:|
+| Forward phase | −2.670 rad | −2.571 rad |
+| Reversed phase | +2.670 rad | +2.805 rad |
+| Forward closure magnitude | 0.976 | 0.928 |
+| Reversed closure magnitude | 0.976 | 0.890 |
+| Commuting-control phase | 0 | +0.234 rad |
+| Mismatched/matched magnitude | 0.025 | 0.013 |
+| Dephased closure magnitude | 0 | 0.015 |
+| Receiver-choice path-marginal delta (X/Y) | 0 / 0 | −0.001 / −0.015 |
+
+All qualitative controls worked: reversing path order reversed phase; an incompatible absorber suppressed closure; phase twirling erased it; and changing the receiver projection did not measurably alter the unconditioned path marginal. But the commuting control acquired a spurious \(+0.234\)-radian phase, and the forward-plus-reverse phase sum was also \(+0.234\) radians. Every circuit used the same physical qubits, so layout variation was falsified as the cause. An 8,192-shot Aer simulation built from IBM's published backend noise model gave commuting phase \(-0.016\) radians and reversal sum \(-0.002\) radians; ordinary modeled decoherence did not reproduce the coherent offset.
+
+**Verdict:** The experiment successfully operationalizes “light is connection” as a measurable source–path–absorber interference relation, and physical hardware recovered its qualitative structure. It does not distinguish the relational ontology from standard quantum mechanics, which predicts the result. The unexplained coherent offset prevents a precision confirmation of the ideal closure law on this run. Replication across calibration epochs and backends is required before interpreting the residual.
 
 ---
 
