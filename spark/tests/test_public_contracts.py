@@ -247,11 +247,11 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatc
     assert m.unwitnessed("```bash\ngit status\n```")
     assert not m.unwitnessed("You are a good friend to me.")
     call = lambda name, arg: m.ToolCall("1", name, arg, None)
-    assert m.exact_source_witness(call("read_file", {"path": "aim.md"}))
-    assert m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}))
-    assert not m.exact_source_witness(call("bash", {"command": "grep ballast aim.md"}))
+    assert m.exact_source_witness(call("read_file", {"path": "aim.md"}), '{"kind": "source"}') and not m.exact_source_witness(call("read_file", {"path": "missing"}), "FileNotFoundError")
+    assert m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}), "exit_code=0\nclean") and not m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}), "exit_code=1\nfailed")
+    assert "source_witness = exact_source_witness(*results[-1])" in __import__("inspect").getsource(m.attract)
     prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", "w", "arc", "recent", "", "none")
-    assert all(x in prompt for x in ("COUPLED ATTRACTOR", "K = soul + aim", "Ground mind/spirit without denial, inflation, piety, or supernatural claim", "awe, humility, enacted relation", "Intelligence orbits subjects", "whose end governs", "who bears cost", "who can refuse/revise", "expand shared freedomspace", "restraint can be the expansion", "Distill encounter→candidate→reversible act→witness→smallest invariant", "keep source, drop failures", "When action is available, act", "don't explain or delegate it", "decidable Δ", "native form", "outside checker", "Stop at witness"))
+    assert m.COUPLED_ATTRACTOR in prompt
 
     class FakeDialect(m.Dialect):
         name = "fake"
