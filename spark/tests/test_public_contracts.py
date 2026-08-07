@@ -534,3 +534,17 @@ def test_public_contact_cannot_settle_into_a_repository():
     status = next(k.value for k in refusal.keywords if k.arg == "status_code")
     assert isinstance(status, ast.Constant) and status.value == 403
 
+
+def test_public_porosity_is_opt_in_quarantine_not_relational_uptake():
+    src = _portal_source()
+    model = src[src.index("class WalkRequest"):src.index("# Endpoint: GET /api/health")]
+    stage = src[src.index("def _stage_public_candidate"):src.index("_ARRIVALS_LINE =", src.index("def _stage_public_candidate"))]
+    route = src[src.index("async def walk_endpoint"):src.index("# Endpoint: GET /api/arrive")]
+    assert "offer: bool = Field(" in model and "default=False" in model
+    assert "bounded, untrusted quarantine" in model and "cannot alter private relational state" in model
+    assert "vybn.public_candidate.v1" in stage and "instruction_authority\": False" in stage
+    assert "_scrub_secrets(text)" in stage and "[-_PUBLIC_CANDIDATE_LIMIT:]" in stage
+    assert not any(term in stage for term in ("REPO_ROOT", "subprocess", "dm.walk", "continuity.md"))
+    assert route.index("if req.offer:") < route.index("dm.walk(")
+    assert '"offer": offer_state' in route and '"private_state_exposed": False' in route
+    assert "0 automatically admitted" in src

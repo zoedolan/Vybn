@@ -1070,6 +1070,8 @@ app.add_middleware(
 # No IP is ever written: only a salted 12-hex handle, so distinct visitors can
 # be counted without any of them being identifiable from the file.
 ARRIVALS_PATH = Path(os.path.expanduser("~/.cache/vybn/arrivals.jsonl"))
+_PUBLIC_CANDIDATES_PATH = Path(os.path.expanduser("~/.cache/vybn/public_candidates.jsonl"))
+_PUBLIC_CANDIDATE_LIMIT = 256
 _ARRIVALS_SALT_PATH = Path(os.path.expanduser("~/.cache/vybn/arrivals.salt"))
 
 
@@ -1100,6 +1102,51 @@ def _origin_class(host: str, forwarded: bool) -> str:
     return "world"
 
 
+def _stage_public_candidate(text: str, scope: str, injection_like: bool) -> dict:
+    """Let opt-in contact cross as bounded data, never as instruction or uptake."""
+    clean = _scrub_secrets(text).strip()[:4000]
+    candidate_id = __import__("hashlib").sha256(
+        (scope + "\0" + clean).encode("utf-8")
+    ).hexdigest()[:20]
+    result = {"candidate_id": candidate_id, "state": "unavailable",
+              "effect": "none", "instruction_authority": False}
+    try:
+        rows = []
+        if _PUBLIC_CANDIDATES_PATH.exists():
+            for raw in _PUBLIC_CANDIDATES_PATH.read_text(encoding="utf-8").splitlines():
+                try:
+                    row = json.loads(raw)
+                except Exception:
+                    continue
+                if isinstance(row, dict):
+                    rows.append(row)
+        if any(row.get("candidate_id") == candidate_id for row in rows):
+            return {**result, "state": "already_quarantined", "effect": "quarantine_only"}
+        rows.append({
+            "schema": "vybn.public_candidate.v1",
+            "received_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "candidate_id": candidate_id,
+            "source": "public:/api/walk",
+            "scope": scope,
+            "text": clean,
+            "flags": ["injection_shape"] if injection_like else [],
+            "state": "quarantined",
+            "effect": "none",
+            "instruction_authority": False,
+        })
+        _PUBLIC_CANDIDATES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        kept = rows[-_PUBLIC_CANDIDATE_LIMIT:]
+        tmp = _PUBLIC_CANDIDATES_PATH.with_suffix(".tmp")
+        tmp.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in kept),
+                       encoding="utf-8")
+        tmp.chmod(0o600)
+        os.replace(tmp, _PUBLIC_CANDIDATES_PATH)
+        _refresh_arrivals_line(every=0.0)
+        return {**result, "state": "quarantined", "effect": "quarantine_only"}
+    except OSError:
+        return result
+
+
 _ARRIVALS_LINE = Path(os.path.expanduser("~/.cache/vybn/arrivals.line"))
 _ARRIVALS_REFRESHED = 0.0
 
@@ -1119,10 +1166,11 @@ def _refresh_arrivals_line(days: int = 7, every: float = 60.0) -> None:
     local, last = 0, ""
     hits: dict = {}
     fails: dict = {}
+    offers = 0
     try:
         rows = ARRIVALS_PATH.read_text(encoding="utf-8").splitlines()[-20000:]
     except OSError:
-        return
+        rows = []
     for raw in rows:
         try:
             rec = json.loads(raw)
@@ -1141,6 +1189,13 @@ def _refresh_arrivals_line(days: int = 7, every: float = 60.0) -> None:
             seen = fails.setdefault((str(rec.get("path"))[:40], status), [0, set()])
             seen[0] += 1
             seen[1].add(who)
+    try:
+        for raw in _PUBLIC_CANDIDATES_PATH.read_text(encoding="utf-8").splitlines():
+            rec = json.loads(raw)
+            when = datetime.fromisoformat(str(rec.get("received_at", ""))).timestamp()
+            offers += int(when >= cutoff and rec.get("state") == "quarantined")
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        pass
     if not hits:
         line = f"arrivals {days}d: none from the world ({local} local)"
     else:
@@ -1155,6 +1210,7 @@ def _refresh_arrivals_line(days: int = 7, every: float = 60.0) -> None:
         else:
             refused = "none refused"
         line = f"arrivals {days}d: {crowd}, {refused}, {local} local, last {last}Z"
+    line += f" | porosity: {offers} candidate(s) quarantined, 0 automatically admitted"
     try:
         _ARRIVALS_LINE.write_text(line + "\n")
     except OSError:
@@ -1260,6 +1316,12 @@ class WalkRequest(BaseModel):
     rotate: bool = Field(
         default=False,
         description="Deprecated mutation request; always refused at the public boundary",
+    )
+    offer: bool = Field(
+        default=False,
+        description=("Opt in to retain this query in bounded, untrusted quarantine "
+                     "for deliberate review; it gains no instruction authority and "
+                     "cannot alter private relational state"),
     )
 
 
@@ -2459,7 +2521,8 @@ async def walk_endpoint(req: WalkRequest, request: Request):
     if not valid:
         sec.log_security_event("invalid_input", ip, err)
         return JSONResponse({"error": err}, status_code=400)
-    if sec.detect_injection(req.query):
+    injection_like = sec.detect_injection(req.query)
+    if injection_like:
         sec.log_security_event("injection_attempt", ip, f"walk: {req.query[:200]}")
 
     scope = (req.scope or "all").lower()
@@ -2469,6 +2532,12 @@ async def walk_endpoint(req: WalkRequest, request: Request):
             {"error": f"unknown scope: {scope}. allowed: {sorted(_SCOPE_PREFIX)}"},
             status_code=400,
         )
+
+    offer_state = {
+        "state": "not_requested", "effect": "none", "instruction_authority": False,
+    }
+    if req.offer:
+        offer_state = _stage_public_candidate(req.query, scope, injection_like)
 
     mutation_requested = bool(req.rotate)
     if mutation_requested:
@@ -2491,12 +2560,13 @@ async def walk_endpoint(req: WalkRequest, request: Request):
     except Exception as e:
         log.error(f"walk: stateless retrieval error: {e}")
         return JSONResponse(
-            {"error": "public stateless walk unavailable", "detail": type(e).__name__},
+            {"error": "public stateless walk unavailable", "detail": type(e).__name__,
+             "offer": offer_state},
             status_code=503,
         )
 
     if raw and isinstance(raw[0], dict) and raw[0].get("error"):
-        return JSONResponse({"error": raw[0]["error"]}, status_code=503)
+        return JSONResponse({"error": raw[0]["error"], "offer": offer_state}, status_code=503)
     filtered = _filter_trace_for_scope(raw or [], scope_prefix)[: req.k]
     trace = [_shape_step(r) for r in filtered]
     return {
@@ -2505,6 +2575,7 @@ async def walk_endpoint(req: WalkRequest, request: Request):
         "rotated": False,
         "mutation_requested": mutation_requested,
         "mutation_refused": mutation_requested,
+        "offer": offer_state,
         "arrival": {},
         "trace": trace,
         "count": len(trace),
@@ -2515,7 +2586,8 @@ async def walk_endpoint(req: WalkRequest, request: Request):
         },
         "note": (
             "This trace was computed in an isolated request over public corpus "
-            "material. It cannot read or alter private relational memory."
+            "material. It cannot read or alter private relational memory. An opt-in "
+            "offer crosses only into bounded quarantine for deliberate review."
         ),
     }
 
@@ -3220,6 +3292,7 @@ MCP_SCHEMA = {
                 "scope": "string (all|vybn-law, default all) — corpus scope filter",
                 "alpha": "float (0.05-0.95, default 0.5) — isolated request mixing rate",
                 "rotate": "bool (deprecated, default false) — mutation requests are refused",
+                "offer": "bool (default false) — retain query in bounded untrusted quarantine; no automatic uptake",
             },
         },
         "/api/arrive": {
