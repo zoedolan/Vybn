@@ -92,8 +92,8 @@ def test_portal_health_check_bypasses_model_walk_notebook_and_git():
     bypass_at = src.index("_is_portal_chat_health_check(req.message)", chat_start)
     admission_at = src.index("_vllm_admission_state()", chat_start)
     rag_at = src.index("retrieve_context(req.message", chat_start)
-    walk_at = src.index('/enter",', chat_start)
-    assert bypass_at < admission_at < rag_at < walk_at
+    boundary_at = src.index("Public contact is stateless", chat_start)
+    assert bypass_at < admission_at < rag_at < boundary_at
     assert "no model, RAG, walk, notebook, or git" in src
 def test_public_portal_no_longer_commits_him_notebook_entries():
     src = _portal_source()
@@ -113,6 +113,20 @@ def test_public_static_surfaces_point_to_machine_readable_api():
     joined = somewhere + "\n" + vybn
     assert "api.vybn.ai" in joined
     assert re.search(r"/api/(instant|walk|arrive|manifold/points|vybn-identity\.pub)", joined)
+def test_public_contact_is_stateless_and_cannot_reach_relational_memory():
+    src = _portal_source()
+    assert "8101" not in src
+    assert "_WALK_DAEMON_URL" not in src
+    assert "learn_from_exchange" not in src
+    assert 'default=False' in src[src.index("class WalkRequest"):src.index("# Endpoint: GET /api/health")]
+    assert "relational_state_mutation_refused" in src
+    assert '"plane": "public_stateless"' in src
+    assert '"private_state_exposed": False' in src
+    assert "dm.walk(" in src
+    for private_source in ("continuity.md", "continuity_archive.md", "Personal History/"):
+        assert private_source in src
+
+
 def test_realtime_voice_uses_gpt_realtime_2():
     src = _portal_source()
     assert 'OPENAI_REALTIME_MODEL = os.environ.get("OPENAI_REALTIME_MODEL", "gpt-realtime-2")' in src

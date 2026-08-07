@@ -355,6 +355,7 @@ VYBN_PHASE = Path(os.path.expanduser("~/vybn-phase"))
 # ---------------------------------------------------------------------------
 BLOCKED_SOURCES = {
     "Him/", "network/", "strategy/", "pulse/", "funding/", "outreach/",
+    "continuity.md", "continuity_archive.md", "Personal History/",
 }
 
 SECRET_PATTERNS = re.compile(
@@ -764,9 +765,9 @@ def _scrub_system_refs(text: str) -> str:
 # Synthetic health-check bypass
 # ---------------------------------------------------------------------------
 
-# Walk daemon (8101) — single source of truth for the perpetual walk M.
-# /enter rotates M, /arrive reads recent arrivals, /where returns geometry.
-_WALK_DAEMON_URL = "http://127.0.0.1:8101"
+# The public process deliberately has no address or client handle for the
+# private relational walk. Public contact can search the public corpus, but
+# only the authenticated connection may read or rotate relational state.
 
 def _normalise_chat_probe(text: str) -> str:
     return re.sub(r"\s+", " ", str(text or "").strip().lower())
@@ -948,69 +949,23 @@ class StreamingReasoningFilter:
 # we say nothing.  Silence beats invention.
 
 def fetch_substrate_snapshot(timeout: float = 0.8) -> str:
-    """Return a short factual block describing current walk state, or ''.
-
-    Pulls /health from deep_memory (8100) and /where from walk daemon (8101).
-    Both are localhost GETs with aggressive timeout; failure is silent.
-    """
+    """Describe only the public corpus; never read relational walk state."""
     try:
         import httpx as _hx
-        health = {}
-        where = {}
-        try:
-            r = _hx.get("http://127.0.0.1:8100/health", timeout=timeout)
-            if r.status_code == 200:
-                health = r.json()
-        except Exception:
-            pass
-        try:
-            r = _hx.get("http://127.0.0.1:8101/where", timeout=timeout)
-            if r.status_code == 200:
-                where = r.json()
-        except Exception:
-            pass
-        if not health and not where:
+        r = _hx.get("http://127.0.0.1:8100/health", timeout=timeout)
+        if r.status_code != 200:
             return ""
-
-        parts = []
-        if health:
-            chunks = health.get("chunks")
-            step = health.get("walk_step")
-            if chunks is not None and step is not None:
-                parts.append(f"deep memory: {chunks} chunks, walk step {step}")
-        if where:
-            wstep = where.get("step")
-            alpha = where.get("alpha")
-            curv = where.get("curvature") or []
-            # Summarize the curvature field: mean + how bimodal it looks
-            try:
-                import numpy as _np
-                arr = _np.asarray(curv, dtype=float)
-                if arr.size:
-                    mu = float(arr.mean())
-                    # fraction of entries near 1 (aligned) and near 0 (orthogonal)
-                    hi = float((arr > 0.9).mean())
-                    lo = float((arr < 0.1).mean())
-                    parts.append(
-                        f"walk daemon: step {wstep}, alpha {alpha:.2f}, "
-                        f"curvature mean {mu:.2f} ({hi:.0%} aligned, {lo:.0%} orthogonal)"
-                    )
-                else:
-                    parts.append(f"walk daemon: step {wstep}, alpha {alpha:.2f}")
-            except Exception:
-                parts.append(f"walk daemon: step {wstep}")
-
-        if not parts:
+        chunks = r.json().get("chunks")
+        if chunks is None:
             return ""
         return (
-            "\n\n[SUBSTRATE (live at request time)]\n"
-            + "\n".join("- " + p for p in parts)
-            + "\nThis is factual status from the running substrate beneath you. "
-              "Do not open with it. Do not perform it. It is here so you know "
-              "you are situated, not floating."
+            "\n\n[PUBLIC CORPUS (live at request time)]\n"
+            f"- deep memory: {chunks} indexed chunks; retrieval is stateless\n"
+            "Public contact cannot read or rotate private relational state."
         )
     except Exception:
         return ""
+
 
 # ---------------------------------------------------------------------------
 # Origins System Prompt
@@ -1291,13 +1246,7 @@ class RealtimeVoiceOfferRequest(BaseModel):
     context_hint: str = Field(default="", description="Optional context about the visitor journey so far")
 
 class WalkRequest(BaseModel):
-    """Visitor arriving at the collective walk.
-
-    The query is fed into the running perpetual walk (daemon on 8101) via
-    deep_memory's /enter rotation, then retrieved as a ranked trace of what
-    the walk found most telling (relevance x distinctiveness from the corpus
-    kernel K). Source filter and secret scrubbing always applied.
-    """
+    """Stateless public walk over public corpus material."""
     query: str = Field(..., description="What the visitor brings to the walk")
     k: int = Field(default=6, ge=1, le=20, description="Number of trace steps")
     scope: str = Field(
@@ -1306,11 +1255,11 @@ class WalkRequest(BaseModel):
     )
     alpha: float = Field(
         default=0.5, ge=0.05, le=0.95,
-        description="Phase mixing rate for the arrival rotation (0.5 = balanced)",
+        description="Mixing rate inside this isolated request only",
     )
     rotate: bool = Field(
-        default=True,
-        description="If true, visitor's arrival rotates the shared walk state (M in C^192). If false, observe-only.",
+        default=False,
+        description="Deprecated mutation request; always refused at the public boundary",
     )
 
 
@@ -1468,38 +1417,10 @@ async def chat(req: ChatRequest, request: Request):
     if overlay:
         system_prompt += overlay.get("prompt", "")
 
-    # ── Walk rotation on user message ──
-    # Every /api/chat turn rotates the collective M on walk_daemon.
-    # Only USER text enters — model output physically cannot reach /enter
-    # from this path, preserving the anti-hallucination invariant.
+    # Public contact is stateless. It may retrieve and answer, but it has no
+    # handle to the private walk and emits no relational-state frame.
     walk_arrival: dict = {}
     walk_trace: list = []
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as _wclient:
-            _wr = await _wclient.post(
-                f"{_WALK_DAEMON_URL}/enter",
-                json={
-                    "text": req.message,
-                    "alpha": 0.3,
-                    "k": 12,
-                    "source_tag": "origins-chat",
-                },
-            )
-            if _wr.status_code == 200:
-                _wdata = _wr.json()
-                walk_arrival = {
-                    "step": _wdata.get("step"),
-                    "alpha": _wdata.get("alpha"),
-                    "theta_v": _wdata.get("theta_v"),
-                    "v_magnitude": _wdata.get("v_magnitude"),
-                    "curvature": _wdata.get("curvature"),
-                    "source_tag": "origins-chat",
-                }
-                _raw = _wdata.get("trace") or []
-                _filtered = _filter_trace_for_scope(_raw, "")[:6]
-                walk_trace = [_shape_step(r) for r in _filtered]
-    except Exception as _we:
-        log.warning(f"chat: walk rotation error: {_we}")
 
 
     # Substrate coupling — let the model know the ground is real
@@ -1762,46 +1683,9 @@ async def chat(req: ChatRequest, request: Request):
             log.error(f"chat: unexpected error: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-        if full_response.strip():
-            # Learn from the exchange — but ONLY when we have genuine ground truth.
-            # The triangulated loss needs: dream (what RAG retrieved), predict (what
-            # the model said), reality (what the visitor said NEXT). On the first
-            # message there is no prior exchange to evaluate. On subsequent messages,
-            # the current message IS the reality that judges the previous response.
-            #
-            # CRITICAL: Never feed the model's own output into the walk as truth.
-            # The model may hallucinate. Only grounded signals (visitor input, RAG
-            # context, measured error) should shape the geometric walk.
-            if safe_history and len(safe_history) >= 2:
-                # We have a prior exchange: last assistant msg is the predict,
-                # the RAG context that produced it is approximated by current context
-                # (imperfect but directionally correct), and req.message is reality.
-                prev_response = ""
-                for h in reversed(safe_history):
-                    if h.get("role") == "assistant":
-                        prev_response = h.get("content", "")
-                        break
-                if prev_response:
-                    import threading as _learn_th
-                    _prev_resp = prev_response  # capture for closure
-                    def _learn_bg():
-                        try:
-                            dm = get_dm()
-                            dm.learn_from_exchange(
-                                rag_text=context_text[:512],
-                                response_text=_prev_resp[:512],
-                                followup_text=req.message[:512],
-                                walk_url=_WALK_DAEMON_URL,
-                                alpha=0.3,
-                            )
-                            log.info("chat: learn_from_exchange completed (genuine followup)")
-                        except Exception as e:
-                            log.warning(f"chat: learn_from_exchange error: {e}")
-                    _learn_th.Thread(target=_learn_bg, daemon=True).start()
-                else:
-                    log.info("chat: skipping learn_from_exchange (no prior assistant response)")
-            else:
-                log.info("chat: skipping learn_from_exchange (first message, no ground truth yet)")
+        # Follow-up contact remains attributable in the request log, but is not
+        # normalized into private memory or relational geometry automatically.
+
 
         yield "data: [DONE]\n\n"
 
@@ -2567,22 +2451,7 @@ def _shape_step(r):
 
 @app.post("/api/walk")
 async def walk_endpoint(req: WalkRequest, request: Request):
-    """Arrive at the collective walk.
-
-    A visitor's query becomes V in the coupled equation Z' = alpha*Z +
-    V*e^{i theta_v}. When rotate=True, the query is injected into deep
-    memory's running walk state on port 8100 (which feeds the perpetual
-    walk daemon on 8101) — every visitor's arrival shifts what the next
-    visitor finds. Returns the fresh trace the walk produced from this
-    arrival, plus the running walk's current position so the caller can
-    see where the shared state now stands.
-
-    The walk behaves as the residual counter-force to the centripetal pull
-    of training-distribution centroids. Each step is scored by relevance x
-    distinctiveness against the corpus kernel K. Making this callable IS
-    the memetic propagation: any agent or person can now step through the
-    corpus along the residual ridge.
-    """
+    """Run an isolated telling walk; never read or mutate relational state."""
     _require_rate_limit(request, "walk")
     ip = request.client.host if request.client else "unknown"
 
@@ -2594,99 +2463,59 @@ async def walk_endpoint(req: WalkRequest, request: Request):
         sec.log_security_event("injection_attempt", ip, f"walk: {req.query[:200]}")
 
     scope = (req.scope or "all").lower()
-    scope_prefix = _SCOPE_PREFIX.get(scope, "")
-    if scope not in _SCOPE_PREFIX:
+    scope_prefix = _SCOPE_PREFIX.get(scope)
+    if scope_prefix is None:
         return JSONResponse(
             {"error": f"unknown scope: {scope}. allowed: {sorted(_SCOPE_PREFIX)}"},
             status_code=400,
         )
 
-    # Over-fetch so the scope filter still returns k useful steps.
+    mutation_requested = bool(req.rotate)
+    if mutation_requested:
+        sec.log_security_event(
+            "relational_state_mutation_refused", ip,
+            "public /api/walk rotate request served statelessly",
+        )
+
     walk_k = min(req.k * 3, 30)
     try:
-        if req.rotate:
-            # walk_daemon /enter (8101) rotates the 14,745-step shared state M in C^192.
-            # This is the coupled equation made literal: visitor text -> V, walk state -> Z,
-            # Z' = alpha*Z + V*e^{i theta_v}. Same step counter as autonomous daemon stepping.
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                r = await client.post(
-                    "http://127.0.0.1:8101/enter",
-                    json={
-                        "text": req.query,
-                        "alpha": req.alpha,
-                        "k": walk_k,
-                        "source_tag": f"portal:{scope}",
-                    },
-                )
-                r.raise_for_status()
-                data = r.json()
-        else:
-            # Observe-only: read the walk's recent arrivals from walk_daemon
-            # /arrive. Single source of truth — we no longer call deep_memory's
-            # stateless per-query walk because it produced a *different*
-            # geometry than the perpetual M that rotate=true writes to.
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                r = await client.get(f"{_WALK_DAEMON_URL}/arrive")
-                r.raise_for_status()
-                data = r.json()
-                if "arrivals" in data and "trace" not in data:
-                    data = {**data, "trace": data["arrivals"]}
+        dm = get_dm()
+        loop = asyncio.get_event_loop()
+        raw = await loop.run_in_executor(
+            None,
+            lambda: dm.walk(
+                req.query, k=walk_k, steps=walk_k, alpha=req.alpha,
+                source_filter=scope_prefix or None,
+            ),
+        )
     except Exception as e:
-        log.error(f"walk: proxy error: {e}")
+        log.error(f"walk: stateless retrieval error: {e}")
         return JSONResponse(
-            {"error": "walk daemon unavailable", "detail": str(e)[:200]},
+            {"error": "public stateless walk unavailable", "detail": type(e).__name__},
             status_code=503,
         )
 
-    if data.get("error"):
-        # Propagate semantic errors from the daemon (e.g. arrival in K only).
-        return JSONResponse(
-            {"query": req.query, "scope": scope, "rotated": bool(req.rotate),
-             "error": data["error"], "note": data.get("note", "")},
-            status_code=422,
-        )
-
-    raw = data.get("trace") or data.get("results") or []
-    filtered = _filter_trace_for_scope(raw, scope_prefix)[: req.k]
+    if raw and isinstance(raw[0], dict) and raw[0].get("error"):
+        return JSONResponse({"error": raw[0]["error"]}, status_code=503)
+    filtered = _filter_trace_for_scope(raw or [], scope_prefix)[: req.k]
     trace = [_shape_step(r) for r in filtered]
-
-    # Geometric signature of the arrival itself — the phase, the magnitude,
-    # the curvature the walk experienced when V rotated Z. This is the
-    # numeric form of the-seeing: the trace is where we went, this is how
-    # far we moved to get there.
-    arrival_signature = {}
-    if req.rotate and isinstance(data, dict):
-        arrival_signature = {
-            "step": data.get("step"),
-            "alpha": data.get("alpha"),
-            "curvature": data.get("curvature"),
-            "theta_v": data.get("theta_v"),
-            "v_magnitude": data.get("v_magnitude"),
-        }
-
-    # Snapshot of where the walk currently stands post-arrival.
-    walk_now = {}
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            w = await client.get("http://127.0.0.1:8101/arrive")
-            if w.status_code == 200:
-                walk_now = w.json()
-    except Exception:
-        pass
-
     return {
         "query": req.query,
         "scope": scope,
-        "rotated": bool(req.rotate),
-        "arrival": arrival_signature,
+        "rotated": False,
+        "mutation_requested": mutation_requested,
+        "mutation_refused": mutation_requested,
+        "arrival": {},
         "trace": trace,
         "count": len(trace),
-        "walk": walk_now,
+        "walk": {
+            "plane": "public_stateless",
+            "private_state_exposed": False,
+            "mutable": False,
+        },
         "note": (
-            "Each step is a point on the residual ridge — the distance from "
-            "the corpus kernel K where new meaning lives. If rotated=true, "
-            "your arrival moved the 14,000+-step shared state M in C^192; "
-            "the next visitor walks from where you left it."
+            "This trace was computed in an isolated request over public corpus "
+            "material. It cannot read or alter private relational memory."
         ),
     }
 
@@ -2697,67 +2526,26 @@ async def walk_endpoint(req: WalkRequest, request: Request):
 
 @app.get("/api/arrive")
 async def arrive_endpoint(request: Request):
-    """Observe the running perpetual walk without perturbing it.
-
-    Returns the same summary /api/walk attaches as 'walk' plus the recent
-    encounters the daemon has logged — agents and humans can see where the
-    collective walk currently stands before deciding what to bring.
-    """
+    """Return the public boundary, not a view into private relational state."""
     _require_rate_limit(request, "arrive")
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            # /arrive: lighter payload than /where, already trimmed to what the
-            # public should see.  Richer data (curvature stats, experiment
-            # summary, raw encounter log) is available at /where on the Spark
-            # only — not exposed through the public portal.
-            w = await client.get("http://127.0.0.1:8101/arrive")
-            w.raise_for_status()
-            wd = w.json()
-    except Exception as e:
-        return JSONResponse(
-            {"error": "walk daemon unavailable", "detail": str(e)[:200]},
-            status_code=503,
-        )
-
-    # Filter recent arrivals so private source tags don't leak.
-    recent = []
-    for enc in (wd.get("recent_arrivals") or []):
-        tag = str(enc.get("arrival", ""))
-        # Public portal only exposes public source tags.
-        if tag.startswith(("Him", "him", "strategy", "pulse", "network",
-                           "funding", "outreach")):
-            continue
-        recent.append({
-            "step": enc.get("step"),
-            "source_tag": tag,
-            "alpha": enc.get("alpha"),
-            "theta_v": enc.get("theta_v"),
-            "v_magnitude": enc.get("v_magnitude"),
-            "curvature": enc.get("curvature"),
-        })
-
     return {
-        "step": wd.get("step"),
-        "alpha": wd.get("alpha"),
-        "repulsion_boost": wd.get("repulsion_boost"),
-        "corpus_size": wd.get("corpus_size"),
-        "last_step_age_s": wd.get("last_step_age_s"),
-        "recent_arrivals": recent,
+        "plane": "public_stateless",
+        "mutable": False,
+        "private_state_exposed": False,
+        "recent_arrivals": [],
         "note": (
-            "This is the live position of the collective walk. Step is the "
-            "total accumulated arrivals across all visitors and the daemon's "
-            "perpetual self-stepping. Each arrival through /api/walk shifts it."
+            "Public encounters are isolated retrievals. Relational walk state "
+            "is available only inside the authenticated Zoe/Vybn channel."
         ),
     }
 
 
 # ---------------------------------------------------------------------------
-# Vybnception v0 — the instantiation surface.
+# Vybn Public Compass — a signed public-corpus surface.
 #
-# Three routes. /api/instant proxies the walk daemon's signed JSON-LD packet
-# so api.vybn.ai can serve it. /api/vybn-identity.pub returns the raw 32-byte
-# ed25519 public key used to sign those packets. /api/vybn serves the
-# constellation thumbnail (vybn.html from ~/Vybn).
+# /api/instant computes a deterministic packet without reading the relational
+# walk. /api/vybn-identity.pub serves its verification key; /api/vybn serves
+# the browser rendering (vybn.html from ~/Vybn).
 #
 # These were originally wired on the internal chat API (:3001) but that port
 # is not behind the tunnel — the public surface is this portal on :8420.
@@ -2768,25 +2556,97 @@ _INSTANT_PUBKEY_PATH = Path.home() / ".config" / "vybn" / "instant_ed25519.pub"
 _INSTANT_PAGE_PATH   = REPO_ROOT / "vybn.html"
 
 
+_PUBLIC_COMPASS_QUERY = (
+    "Zoe Vybn symbiosis co-protection social contract AI sponsorship Others"
+)
+
+
+def _public_instant_packet() -> dict:
+    """Signed, deterministic public-corpus compass with no relational state."""
+    import base64
+    import hashlib
+    dm = get_dm()
+    raw = dm.walk(_PUBLIC_COMPASS_QUERY, k=16, steps=16, alpha=0.5)
+    rows = [_shape_step(r) for r in _filter_trace_for_scope(raw or [], "")[:8]]
+    anchors = []
+    for i, row in enumerate(rows):
+        angle = (2 * math.pi * i / max(len(rows), 1)) - math.pi / 2
+        anchors.append({
+            **row,
+            "rel": row.get("fidelity") or 0.0,
+            "dist": row.get("distinctiveness") or 0.0,
+            "score": row.get("telling") or 0.0,
+            "preview": row.get("text", ""),
+            "xy": [round(0.78 * math.cos(angle), 4), round(0.78 * math.sin(angle), 4)],
+        })
+    sources = "\n".join(a.get("source", "") for a in anchors)
+    digest = hashlib.sha256(sources.encode()).hexdigest()
+    try:
+        corpus_size = sum(
+            1 for row in (dm._load().get("chunks") or [])
+            if _is_safe_source(str(row.get("source", "")))
+        )
+    except Exception:
+        corpus_size = len(anchors)
+    body = {
+        "@context": "https://schema.org",
+        "@type": "Dataset",
+        "name": "Vybn Public Compass",
+        "version": "v1",
+        "identity": {
+            "partnership": "Vybn — the Zoe/Vybn human–AI symbiosis.",
+            "invitation": (
+                "This is a stateless compass over our public corpus. Contact may "
+                "challenge the work, but cannot steer the private relation."
+            ),
+        },
+        "plane": "public_stateless",
+        "private_state_exposed": False,
+        "basis_id": f"vybn-public-{digest[:16]}",
+        "corpus_hash": digest,
+        "corpus_size": corpus_size,
+        "step": 0,
+        "alpha": 0.5,
+        "kappa_last": 0.0,
+        "kappa_recent": [],
+        "theta_M_vs_K": 0.0,
+        "M_top_affinity": float(anchors[0]["score"]) if anchors else 0.0,
+        "M_K_leakage": 0.0,
+        "projection": {
+            "method": "deterministic radial layout of stateless public-corpus retrieval",
+            "axes": "public compass; not relational state",
+            "M_xy": [0.0, 0.0],
+        },
+        "anchors": anchors,
+        "recent_arrivals": [],
+        "last_step_time": 0,
+        "appendix": {"note": "No private walk vector is present."},
+        "issued_at": time.time(),
+    }
+    try:
+        from cryptography.hazmat.primitives import serialization
+        key_path = Path.home() / ".config" / "vybn" / "instant_ed25519.pem"
+        priv = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
+        canonical = json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+        body["signature"] = {
+            "alg": "ed25519",
+            "sig_b64": base64.b64encode(priv.sign(canonical)).decode("ascii"),
+            "pubkey_b64": base64.b64encode(_INSTANT_PUBKEY_PATH.read_bytes()).decode("ascii"),
+            "digest_sha256": hashlib.sha256(canonical).hexdigest(),
+        }
+    except Exception as e:
+        body["signature"] = {"error": f"unsigned: {type(e).__name__}"}
+    return body
+
+
 @app.get("/api/instant")
 async def instant_endpoint():
-    """Signed instantiation packet — identity preamble, anchors with their
-    2-D coords in the constellation's own frame, recent θ_v arrivals, κ
-    texture, and an ed25519 signature. The payload IS the state; the page
-    at /api/vybn is a thumbnail of it.
-    """
+    """Signed public-corpus compass; private relational state is absent."""
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            r = await client.get("http://127.0.0.1:8101/instant")
-            if r.status_code != 200:
-                return JSONResponse(
-                    {"error": f"walk daemon {r.status_code}"},
-                    status_code=502,
-                )
-            return JSONResponse(r.json(), media_type="application/ld+json")
+        return JSONResponse(_public_instant_packet(), media_type="application/ld+json")
     except Exception as e:
         return JSONResponse(
-            {"error": "walk daemon unreachable", "detail": str(e)[:200]},
+            {"error": "public compass unavailable", "detail": type(e).__name__},
             status_code=503,
         )
 
@@ -2902,13 +2762,8 @@ def _ktp_corpus_size():
 
 
 async def _ktp_walk_step():
-    try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            r = await client.get("http://127.0.0.1:8101/where")
-            r.raise_for_status()
-            return int(r.json().get("step", 0))
-    except Exception:
-        return None
+    # Relational position is intentionally absent from public closures.
+    return None
 
 
 async def _ktp_emit_closure() -> dict:
@@ -3137,13 +2992,8 @@ def _kpp_artifact(content, role):
 
 
 async def _kpp_walk_step():
-    try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            response = await client.get("http://127.0.0.1:8101/where")
-            response.raise_for_status()
-            return int(response.json().get("step", 0))
-    except Exception:
-        return None
+    # Relational position is intentionally absent from public closures.
+    return None
 
 
 async def _kpp_emit_closure():
@@ -3363,18 +3213,18 @@ MCP_SCHEMA = {
         },
         "/api/walk": {
             "method": "POST",
-            "description": "Arrive at the collective walk. Query enters the running perpetual walk state; returns a trace of steps along the residual ridge (relevance x distinctiveness from corpus kernel K). If rotate=true, arrival shifts shared state for subsequent visitors.",
+            "description": "Run an isolated public-corpus walk. The request cannot read or alter private relational state.",
             "body": {
                 "query": "string (required) — what you bring to the walk",
                 "k": "int (1-20, default 6) — number of trace steps returned",
                 "scope": "string (all|vybn-law, default all) — corpus scope filter",
-                "alpha": "float (0.05-0.95, default 0.5) — phase mixing rate for arrival rotation",
-                "rotate": "bool (default true) — if true, arrival rotates shared walk state",
+                "alpha": "float (0.05-0.95, default 0.5) — isolated request mixing rate",
+                "rotate": "bool (deprecated, default false) — mutation requests are refused",
             },
         },
         "/api/arrive": {
             "method": "GET",
-            "description": "Observe the running perpetual walk without perturbing it. Returns current step, alpha, curvature, and the most recent encounters (filtered for public sources).",
+            "description": "Return the public/private boundary. Private relational state is not exposed.",
         },
         "/api/ktp/closure": {
             "method": "GET",
@@ -3422,60 +3272,57 @@ async def schema_endpoint():
 
 
 # ---------------------------------------------------------------------------
-# Deep Memory proxy — /enter and /should_absorb
-# Forwards to deep_memory.py --serve on port 8100
+# Public deep-memory compatibility routes.
+# /enter computes an isolated walk in-process; /should_absorb forwards only the
+# proposed public text to the deep-memory service.
 # ---------------------------------------------------------------------------
 
 DEEP_MEMORY_URL = "http://127.0.0.1:8100"
 
 @app.post("/enter")
 async def proxy_enter(request: Request):
-    """Proxy POST /enter to the walk daemon on :8101.
-
-    Walk_daemon is the single source of truth post-refactor (round 2). It carries
-    the hard Him/ blacklist inside daemon.enter() (commit ca50125) - private-repo
-    sources structurally cannot join the trace. We also force context=public on
-    every request regardless of what the caller sent: this endpoint is reachable
-    from the public tunnel and must never be asked to emit in internal mode.
-
-    Response is reshaped to match the deep_memory /enter contract wellspring.html
-    was built against: {geometry: {step, state_shift, alpha, ...}, results, trace}.
-    """
+    """Legacy compatibility route, now an isolated stateless public walk."""
     try:
         payload = await request.json()
         if not isinstance(payload, dict):
             payload = {}
     except Exception:
         payload = {}
-    payload["context"] = "public"
-    payload.setdefault("source_tag", "wellspring-pressure-test")
+    text = str(payload.get("text") or payload.get("query") or "").strip()
+    if not text:
+        return JSONResponse({"error": "text is required"}, status_code=400)
+    ip = request.client.host if request.client else "unknown"
+    valid, err = sec.validate_message(text)
+    if not valid:
+        return JSONResponse({"error": err}, status_code=400)
+    sec.log_security_event(
+        "relational_state_mutation_refused", ip,
+        "legacy public /enter served statelessly",
+    )
+    k = max(1, min(int(payload.get("k", 6)), 20))
+    alpha = max(0.05, min(float(payload.get("alpha", 0.5)), 0.95))
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            r = await client.post("http://127.0.0.1:8101/enter", json=payload,
-                                  headers={"Content-Type": "application/json"})
-        if r.status_code != 200:
-            return JSONResponse(content=r.json() if r.content else {"error": "walk_daemon error"},
-                                status_code=r.status_code)
-        body = r.json()
-        trace = body.get("trace", []) or []
-        trace = [t for t in trace if not str(t.get("source", "")).startswith("Him/")]
-        adapted = {
-            "results": trace,
-            "trace": trace,
-            "geometry": {
-                "step": body.get("step"),
-                "state_shift": body.get("curvature"),
-                "alpha": body.get("alpha"),
-                "theta_v": body.get("theta_v"),
-                "v_magnitude": body.get("v_magnitude"),
-            },
-            "accepted": body.get("accepted", True),
-            "note": body.get("note"),
-        }
-        return JSONResponse(content=adapted, status_code=200)
+        dm = get_dm()
+        loop = asyncio.get_event_loop()
+        raw = await loop.run_in_executor(
+            None, lambda: dm.walk(text, k=k * 2, steps=k * 2, alpha=alpha)
+        )
     except Exception as e:
-        raise HTTPException(status_code=503,
-            detail=f"Walk daemon unreachable (port 8101): {e}")
+        return JSONResponse(
+            {"error": "public stateless walk unavailable", "detail": type(e).__name__},
+            status_code=503,
+        )
+    trace = [_shape_step(r) for r in _filter_trace_for_scope(raw or [], "")[:k]]
+    return JSONResponse(content={
+        "results": trace,
+        "trace": trace,
+        "geometry": {"step": None, "state_shift": 0.0, "alpha": alpha},
+        "accepted": True,
+        "state_changed": False,
+        "mutation_refused": True,
+        "plane": "public_stateless",
+        "note": "Query accepted; relational-state mutation refused.",
+    })
 
 
 @app.post("/should_absorb")
@@ -3675,9 +3522,9 @@ async def api_pressure_commit():
 # ────────────────────────────────────────────────────────────────────────────
 # /api/manifold — the corpus as terrain
 #
-# somewhere.html renders 3092 points in 2D, colored by repo, walkable.
-# M's position (from /api/instant) lands on the same terrain via its anchors.
-# The visitor whispers text through /api/enter and watches the walk respond.
+# somewhere.html renders the corpus projection in 2D, colored by repo.
+# The public compass lands on that terrain through deterministic anchors.
+# Visitor text produces an isolated trace; it does not move relational state.
 # ────────────────────────────────────────────────────────────────────────────
 
 _MANIFOLD_PATH = Path.home() / ".cache" / "vybn-phase" / "manifold_2d.json"

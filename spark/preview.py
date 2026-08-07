@@ -13,10 +13,9 @@ refused outright, so .git, .venv and continuity's neighbours never appear.
 Read-only for files: GET and HEAD serve the working copy, nothing else does.
 
 One narrow exception, added 2026-08-01: two API paths (/api/instant, /api/walk)
-are proxied to the portal API on loopback. A draft that is an *instrument* --
-a page whose last stanza does not exist until a reader's arrival rotates the
-shared walk -- cannot be previewed at all unless the preview origin can reach
-the organ, and the portal's CORS allowlist is deliberately public-domains-only.
+are proxied to the portal API on loopback. A draft that is an *instrument* may need the public stateless compass and
+retrieval walk. It cannot be previewed fully unless the preview origin can
+reach that organ, and the portal's CORS allowlist is deliberately public-domains-only.
 Proxying two known paths to 127.0.0.1 keeps that allowlist untouched.
 
 Bind is 127.0.0.1 by default and reachable only through `tailscale serve`, so
