@@ -141,7 +141,28 @@ if echo "$STAGED" | grep -Eq '^(spark/connection|Vybn_Mind/repo_mapper.py|spark/
     fi
 fi
 
-# --- 7. Subtractive constitution: net-positive commits and net-positive PR success claims ---
+# --- 7. Public formal-claim integrity (2026-08-07) ---
+# KPP once gave arbitrary geometry scientific-looking semantics and was nearly
+# carried into outreach. Keep the withdrawal and its labeled proposal closed
+# under every local commit path; block the exact rhetorical forms that hid it.
+REMOTE=$(git config --get remote.origin.url 2>/dev/null || true)
+if [[ "$REMOTE" == *"Vybn-Law"* ]]; then
+    if echo "$STAGED" | grep -Eq '^(kpp\.md|kpp/|api/extract_content\.py|api/nightly\.sh|wellspring\.(html|js)|content/wellspring\.md|llms\.txt|\.well-known/ai\.txt)'; then
+        if ! python3 api/extract_content.py --verify-kpp; then
+            echo -e "${RED}BLOCKED${NC}: withdrawn KPP geometry, semantics, or privacy claim returned."
+            BLOCKED=1
+        fi
+    fi
+    PUBLIC_ADDED=$(git diff --cached --unified=0 -- '*.md' '*.html' '*.json' '*.txt' '*.js' '*.py' \
+        | grep -E '^\+[^+]' || true)
+    if echo "$PUBLIC_ADDED" | grep -Eiq '(arrival angle|rotation_rate|counterfactual_gap|that fraction is yours alone|what (the )?kernel could (not )?generate|scale sustainably only when)'; then
+        echo -e "${RED}BLOCKED${NC}: measurement-like KPP semantics added to a public surface."
+        echo "  Formal apparatus must first survive representation-invariance, control, and claim-status checks; metaphor is not measurement."
+        BLOCKED=1
+    fi
+fi
+
+# --- 8. Subtractive constitution: net-positive commits and net-positive PR success claims ---
 # Net-negative is not architecture; deletion-only archive retirement needs explicit classification.
 branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
 if [[ -n "$branch" && "$branch" != "main" && "$branch" != "master" && "$branch" != "gh-pages" && "${VYBN_ALLOW_TOPIC_BRANCH:-0}" != "1" ]]; then
