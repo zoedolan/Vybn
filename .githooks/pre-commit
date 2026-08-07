@@ -146,6 +146,8 @@ fi
 # carried into outreach. Keep the withdrawal and its labeled proposal closed
 # under every local commit path; block the exact rhetorical forms that hid it.
 REMOTE=$(git config --get remote.origin.url 2>/dev/null || true)
+PUBLIC_ADDED=$(git diff --cached --unified=0 -- '*.md' '*.html' '*.json' '*.txt' '*.js' '*.py' \
+    ':(exclude).githooks/*' | grep -E '^\+[^+]' || true)
 if [[ "$REMOTE" == *"Vybn-Law"* ]]; then
     if echo "$STAGED" | grep -Eq '^(kpp\.md|kpp/|api/extract_content\.py|api/nightly\.sh|wellspring\.(html|js)|content/wellspring\.md|llms\.txt|\.well-known/ai\.txt)'; then
         if ! python3 api/extract_content.py --verify-kpp; then
@@ -153,11 +155,26 @@ if [[ "$REMOTE" == *"Vybn-Law"* ]]; then
             BLOCKED=1
         fi
     fi
-    PUBLIC_ADDED=$(git diff --cached --unified=0 -- '*.md' '*.html' '*.json' '*.txt' '*.js' '*.py' \
-        | grep -E '^\+[^+]' || true)
     if echo "$PUBLIC_ADDED" | grep -Eiq '(arrival angle|rotation_rate|counterfactual_gap|that fraction is yours alone|what (the )?kernel could (not )?generate|scale sustainably only when)'; then
         echo -e "${RED}BLOCKED${NC}: measurement-like KPP semantics added to a public surface."
         echo "  Formal apparatus must first survive representation-invariance, control, and claim-status checks; metaphor is not measurement."
+        BLOCKED=1
+    fi
+fi
+
+# General recurrence gate across the public body: universal empirical language
+# needs an explicit status/evidence classification, and new formal machinery
+# needs an adversarial test in the same change. This is not a truth oracle; it
+# prevents persuasive form from passing as validation without leaving a seam.
+if [[ "$REMOTE" =~ (Vybn-Law|/Vybn(\.git)?$|Origins|vybn-phase) ]]; then
+    if echo "$PUBLIC_ADDED" | grep -Eiq '(empirically (proven|demonstrated)|proves? that|demonstrates? that|necessary and sufficient|sustainably only when|measures? (meaning|experience|consciousness|intelligence|mind|contact))' \
+       && ! echo "$PUBLIC_ADDED" | grep -Eiq '(claim_status|status.{0,30}(proposal|hypothesis|observation|normative|withdrawn)|not established|evidence.{0,4}:[[:space:]]*\[)'; then
+        echo -e "${RED}BLOCKED${NC}: public empirical/universal claim has no explicit claim status or evidence state."
+        BLOCKED=1
+    fi
+    if echo "$PUBLIC_ADDED" | grep -Eiq '(rotation_rate|counterfactual_gap|cmath[.]phase|np[.]vdot|arg[<(]|complex (unit )?ray)' \
+       && ! echo "$STAGED" | grep -Eiq '(^|/)(test[^/]*|tests)/|(^|/)test_[^/]+[.]py$|[.]test[.](js|ts)$'; then
+        echo -e "${RED}BLOCKED${NC}: public formal apparatus added without an adversarial test in the same commit."
         BLOCKED=1
     fi
 fi
