@@ -73,7 +73,7 @@ ANTHROPIC_MAX_TOKENS = 20480
 SOL_MAX_TOKENS = 16384
 K3_MAX_TOKENS = 32768
 
-DOOR_EFFORT = {"opus": "xhigh", "fable": "high", "sol": "high"}
+DOOR_EFFORT={"opus":"xhigh","fable":"high","sol":"xhigh"}
 DEFAULT_EFFORT = "high"
 
 TOOLS_RAN = 0

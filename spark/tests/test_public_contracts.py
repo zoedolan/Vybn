@@ -437,7 +437,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     assert {kind: len(labels) for kind, labels in observed.items()} == {
         "ends": 13, "handles": 8, "boundary": 4}
     cost = m.harness_cost()
-    assert cost["J"][0] == 0
+    assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
     assert cost["wake_chars"] <= cost["wake_ceiling"]
     assert "no drift" in m.load_topology()
     m.TOPOLOGY["boundary"]["broken"] = ("impossible marker",)
