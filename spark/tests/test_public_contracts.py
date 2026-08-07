@@ -506,3 +506,17 @@ def test_memory_receipt_is_text_free_same_door_and_scored(monkeypatch, tmp_path)
     assert (witness["status"], witness["for_turn"], witness["contact_class"]) == ("scored", "prior", "acceptance")
     assert seen["query_text"] == "original question" and seen["rag_rows"] == [text]
     assert "yes, perfect" not in json.dumps(witness) and witness["geometry"]["attribution"]["row_support_delta"] == [0.4]
+
+def test_public_contact_cannot_settle_into_a_repository():
+    import ast
+    tree = ast.parse((ROOT / "origins_portal_api_v4.py").read_text(encoding="utf-8"))
+    functions = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    route = functions["api_pressure_commit"]
+    assert "commit_pressure" not in functions
+    assert len(route.body) == 1 and isinstance(route.body[0], ast.Raise)
+    refusal = route.body[0].exc
+    assert isinstance(refusal, ast.Call) and isinstance(refusal.func, ast.Name)
+    assert refusal.func.id == "HTTPException"
+    status = next(k.value for k in refusal.keywords if k.arg == "status_code")
+    assert isinstance(status, ast.Constant) and status.value == 403
+

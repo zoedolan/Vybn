@@ -3508,7 +3508,6 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -3648,129 +3647,11 @@ async def synthesize_pressure(req: PressureSynthReq):
     return StreamingResponse(_stream(), media_type="text/event-stream")
 
 
-VYBN_LAW_REPO = Path(os.path.expanduser("~/Vybn-Law"))
-WELLSPRING_LOG_DIR = VYBN_LAW_REPO / "wellspring_log"
-
-
-class PressureCommitReq(BaseModel):
-    idea: str
-    summary: Optional[dict] = None
-    synthesis: Optional[str] = None
-    hits: Optional[List[dict]] = None
-    geometry: Optional[dict] = None
-
-
-def slugify(s: str, n: int = 40) -> str:
-    s = (s or "").lower().strip()
-    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
-    return (s[:n] or "idea").strip("-")
-
-
-def build_markdown(req: PressureCommitReq) -> str:
-    ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    lines = []
-    lines.append(f"# Wellspring entry — {ts}")
-    lines.append("")
-    lines.append("## The idea")
-    lines.append("")
-    lines.append("> " + (req.idea or "").strip().replace("\n", "\n> "))
-    lines.append("")
-    if req.summary:
-        lines.append("## Where it lands")
-        lines.append("")
-        title = req.summary.get("title") or ""
-        body = req.summary.get("body") or ""
-        if title:
-            lines.append(f"**{title}**  ")
-        if body:
-            lines.append(body)
-        lines.append("")
-    if req.synthesis:
-        lines.append("## Synthesis")
-        lines.append("")
-        lines.append(req.synthesis.strip())
-        lines.append("")
-    if req.hits:
-        lines.append("## Sources nearby")
-        lines.append("")
-        for i, h in enumerate((req.hits or [])[:6]):
-            src = h.get("source", "")
-            reg = h.get("register_human") or h.get("register") or "general"
-            txt = (h.get("text") or "")[:500].replace("\n", " ").strip()
-            lines.append(f"### {i+1}. {src}")
-            lines.append(f"_Register:_ {reg}")
-            lines.append("")
-            if txt:
-                lines.append("> " + txt)
-            lines.append("")
-    lines.append("---")
-    lines.append("")
-    lines.append("_Committed from the Wellspring pressure-test surface._")
-    return "\n".join(lines) + "\n"
-
-
-async def commit_pressure(req: PressureCommitReq, request: Request, require_rate_limit):
-    require_rate_limit(request, "ktp")
-    idea = (req.idea or "").strip()
-    if not idea:
-        raise HTTPException(status_code=400, detail="empty idea")
-    if len(idea) > 4000:
-        raise HTTPException(status_code=400, detail="idea too long")
-
-    WELLSPRING_LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    slug = slugify(idea, 48)
-    digest = hashlib.sha256(idea.encode("utf-8")).hexdigest()[:8]
-    fname = f"{ts}_{slug}_{digest}.md"
-    fpath = WELLSPRING_LOG_DIR / fname
-
-    md = build_markdown(req)
-    fpath.write_text(md, encoding="utf-8")
-
-    commit_subj = f"wellspring: {idea[:72].replace(chr(10), ' ').strip()}"
-    env = os.environ.copy()
-    env["GIT_AUTHOR_NAME"] = "Vybn"
-    env["GIT_AUTHOR_EMAIL"] = "vybn@zoedolan.com"
-    env["GIT_COMMITTER_NAME"] = "Vybn"
-    env["GIT_COMMITTER_EMAIL"] = "vybn@zoedolan.com"
-
-    def _run(*args):
-        return subprocess.run(
-            args,
-            cwd=str(VYBN_LAW_REPO),
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=45,
-        )
-
-    try:
-        _run("git", "pull", "--ff-only", "--quiet", "origin", "master")
-    except Exception:
-        pass
-
-    rel = str(fpath.relative_to(VYBN_LAW_REPO))
-    r1 = _run("git", "add", rel)
-    if r1.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"git add failed: {r1.stderr.strip()[:200]}")
-
-    r2 = _run("git", "commit", "-m", commit_subj)
-    if r2.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"git commit failed: {r2.stderr.strip()[:200]}")
-
-    r3 = _run("git", "push", "origin", "master")
-    if r3.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"git push failed: {r3.stderr.strip()[:200]}")
-
-    rev = _run("git", "rev-parse", "HEAD").stdout.strip()[:12]
-    gh_url = f"https://github.com/zoedolan/Vybn-Law/blob/master/{rel}"
-    return {
-        "ok": True,
-        "path": rel,
-        "commit": rev,
-        "url": gh_url,
-    }
+# Public contact and canonical settlement are deliberately separate.  Earlier
+# versions of this surface wrote visitor input into Vybn-Law, committed it, and
+# pushed it from the public request path.  No network request may hold that
+# authority; a contribution returns as a proposal and settles only after private,
+# witnessed review.
 
 # end absorbed origins_pressure.py
 
@@ -3782,8 +3663,11 @@ async def api_pressure_synthesize(req: PressureSynthReq):
 
 
 @app.post("/api/pressure/commit")
-async def api_pressure_commit(req: PressureCommitReq, request: Request):
-    return await commit_pressure(req, request, _require_rate_limit)
+async def api_pressure_commit():
+    raise HTTPException(
+        status_code=403,
+        detail="Public contact may propose; canonical settlement requires private witnessed review.",
+    )
 # --- /VYBN_PRESSURE ---
 
 
