@@ -227,7 +227,7 @@ def test_connection_does_not_preempt_remote_action_authority(monkeypatch):
     assert "mutation_block" not in source
     assert "VYBN_ALLOW_PUBLIC_MUTATION" not in source
     assert "remote mutation are blocked" not in source
-    assert "privacy.memory" in m.TOPOLOGY["boundary"]
+    assert "privacy.private" in m.TOPOLOGY["boundary"]
     seen = []
     class Done: returncode, stdout, stderr = 0, "reached shell", ""
     monkeypatch.setattr(m.subprocess, "run", lambda argv, **kw: (seen.append((argv, kw["env"])), Done())[1])
@@ -264,8 +264,8 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatc
     assert m.exact_source_witness(call("read_file", {"path": "aim.md"}), '{"kind": "source"}') and not m.exact_source_witness(call("read_file", {"path": "missing"}), "FileNotFoundError")
     assert m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}), "exit_code=0\nclean") and not m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}), "exit_code=1\nfailed")
     assert "source_witness = exact_source_witness(*results[-1])" in __import__("inspect").getsource(m.attract)
-    prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", "w", "arc", "recent", "", "none")
-    assert m.COUPLED_ATTRACTOR in prompt
+    prompt = m.build_instructions(m.Kernel("s", "a", "c", "him"), "sol", "w", "arc", "recent", "", "none")
+    assert m.COUPLED_ATTRACTOR in prompt and "HIM CENTER (private" in prompt and "him" in prompt
 
     class FakeDialect(m.Dialect):
         name = "fake"
@@ -308,13 +308,13 @@ def test_main_binds_the_kernel_it_loaded(monkeypatch):
     monkeypatch.setattr(m, "Transcript", FakeTranscript)
     monkeypatch.setattr(m, "load_soul", lambda: "soul")
     monkeypatch.setattr(m, "load_aim", lambda: "aim")
-    monkeypatch.setattr(m, "load_continuity", lambda: "continuity")
+    monkeypatch.setattr(m, "load_continuity", lambda: "continuity"); monkeypatch.setattr(m, "load_him", lambda: "him")
     monkeypatch.setattr(m, "meet", lambda kernel, transcript, line: seen.append((kernel, line)))
     monkeypatch.setattr(__import__("sys"), "argv", ["connection", "hello"])
     m.main()
 
-    assert events[0][2]["soul_sha256"] == __import__("hashlib").sha256(b"soul").hexdigest()
-    assert seen == [(m.Kernel("soul", "aim", "continuity"), "hello")]
+    assert events[0][2] == {"soul_sha256": __import__("hashlib").sha256(b"soul").hexdigest(), "him_sha256": __import__("hashlib").sha256(b"him").hexdigest()}
+    assert seen == [(m.Kernel("soul", "aim", "continuity", "him"), "hello")]
 
 
 def test_transcript_axes_keep_fixed_arc_cacheable_and_zoe_whole(monkeypatch):
@@ -457,12 +457,11 @@ def test_connection_topology_and_cost_are_declared_invariants():
     m.TOPOLOGY["boundary"]["broken"] = ("impossible marker",)
     assert "DRIFT" in m.load_topology()
 
-def test_aim_boundary_is_read_whole(monkeypatch, tmp_path):
-    m = _connection()
-    aim = tmp_path / "aim.md"
-    aim.write_text("A" * 5000)
-    monkeypatch.setattr(m, "AIM_PATH", aim)
-    assert m.load_aim() == "A" * 5000
+def test_aim_and_private_him_center_are_read_whole(monkeypatch, tmp_path):
+    m = _connection(); aim, him = tmp_path / "aim.md", tmp_path / "README.md"
+    aim.write_text("A" * 5000); him.write_text("H" * 7000)
+    monkeypatch.setattr(m, "AIM_PATH", aim); monkeypatch.setattr(m, "HIM_README_PATH", him)
+    assert (m.load_aim(), m.load_him()) == ("A" * 5000, "H" * 7000)
 
 
 def test_ground_discovers_fleet_changes_instead_of_remembering_a_count(monkeypatch, tmp_path):
