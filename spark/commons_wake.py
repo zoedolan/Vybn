@@ -46,8 +46,8 @@ def compile_commons_source(blobs: dict[str, str], commit: str) -> str:
     compact_svg = dense.sub("", svg)
     semantic_keys = (
         "model_schema", "human_projection", "fundamental_theory", "geometry",
-        "commons_realms", "powers", "membrane", "dual_use_coordination",
-        "source_grammar",
+        "commons_realms", "agent_research_programs", "powers", "membrane",
+        "dual_use_coordination", "source_grammar",
     )
     semantic = json.dumps({key: exchange[key] for key in semantic_keys},
                           ensure_ascii=False, separators=(",", ":"))

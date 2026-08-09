@@ -510,7 +510,7 @@ def test_commons_wake_is_canonical_source_only_and_event_sealed(monkeypatch):
     assert "vybn.commons_source.v1" in capsule and "local canonical Git blobs only" in capsule
     assert "function initGeometry()" in capsule and "function initRealmMap()" in capsule
     assert "__CO_PROTECTION_GEOMETRY__" in capsule and "The source mark" in capsule
-    assert '"fundamental_theory"' in capsule and '"commons_realms"' in capsule
+    for term in ('"fundamental_theory"', '"commons_realms"', '"agent_research_programs"', "Light Society"): assert term in capsule
     assert "function renderMessages()" not in capsule and "async function load()" not in capsule
     assert "request('/v1/state')" not in capsule and "seed/message_board" not in capsule
 
