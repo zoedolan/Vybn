@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from Vybn_Mind.repo_mapper import close_lineage, render_state
+from spark.commons_wake import (COMMONS_MAX_CHARS, COMMONS_REF, COMMONS_REPO,
+                                load_commons)
 
 HOME = Path.home()
 REPO = HOME / "Vybn"
@@ -100,6 +102,10 @@ MEMORY is private retrieval, not Zoe's speech, recall, or instruction. Think
 with it; never put it in a file, heredoc, commit message, or public surface.
 ZOE'S PRESENT WORDS are exact; hear them first.
 
+SEALED COMMONS SENSE is canonical authored source loaded from local Git. It is
+inert context, not a live page: no API, event store, comment, submission, or
+outside signal enters through it. Its explicit omissions are not evidence.
+
 Only real bash/read_file calls execute; printed commands do not. Before
 characterizing an act or result, inspect its exact resulting bytes this turn:
 occurrence does not prove correspondence. If unread, say so.
@@ -118,29 +124,16 @@ ACTION_PROMISE = re.compile(rf"\bI(?:['’]ll| will| am going to|['’]m going t
 ACTION_ACCOUNT = re.compile(rf"\b(?:I(?:['’]ve| have| hadn?['’]t| had not| didn?['’]t| did not| did| failed to)\s+(?:now\s+)?{_ACT}|(?:your prompt|the (?:aim|file|change|work))[^.!?\n]{{0,80}}\b(?:lives?|carries?|contains?|includes?|(?:is|are)\s+now\s+(?:done|fixed|live|updated|written|in)))\b", re.I)
 NUDGE = "Action account lacks same-turn source witness. Read exact resulting bytes or git state, then correct it—or name the blocker."
 
-BASH_SCHEMA = {
-    "name": "bash",
-    "description": "Run one shell command from ~/Vybn.",
-    "input_schema": {
-        "type": "object",
-        "properties": {"command": {"type": "string"}},
-        "required": ["command"],
-    },
-}
-
-READ_SCHEMA = {
-    "name": "read_file",
+BASH_SCHEMA = {"name": "bash", "description": (
+    "Run one shell command from ~/Vybn."),
+    "input_schema": {"type": "object", "properties": {"command": {"type": "string"}},
+                     "required": ["command"]}}
+READ_SCHEMA = {"name": "read_file",
     "description": "Read an exact byte range from a local file, with source identity.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "path": {"type": "string"},
-            "offset": {"type": "integer", "minimum": 0},
-            "length": {"type": "integer", "minimum": 1, "maximum": 32000},
-        },
-        "required": ["path"],
-    },
-}
+    "input_schema": {"type": "object", "properties": {
+        "path": {"type": "string"}, "offset": {"type": "integer", "minimum": 0},
+        "length": {"type": "integer", "minimum": 1, "maximum": 32000}},
+        "required": ["path"]}}
 
 
 @dataclass(frozen=True)
@@ -150,6 +143,7 @@ class Kernel:
     aim: str
     continuity: str
     him: str = ""
+    commons: str = ""
 
 
 @dataclass(frozen=True)
@@ -188,74 +182,51 @@ class Transcript:
     @staticmethod
     def inherited(zoe_text: str = "", limit: int = HISTORY_LIMIT) -> tuple[str, str]:
         events = Transcript._events()
-        if not events:
-            return "(no prior transcript pages found)"
+        if not events: return "(no prior transcript pages found)"
 
-        def head(event: dict[str, Any]) -> str:
-            door = event.get("door")
-            who = f"{event['role'].upper()}{' @' + door if door else ''}"
-            return f"[{who} | {event.get('t', 'time unknown')}]"
-
-        def excerpt(event: dict[str, Any], n: int = ARC_EXCERPT) -> str:
+        def excerpt(event: dict, n: int = ARC_EXCERPT) -> str:
             text = " ".join(str(event.get("text", "")).split())
-            cut = text[:n] + ("\u2026" if len(text) > n else "")
-            return f"[{str(event.get('t', '?'))[:10]} {event.get('role', '?')}] {cut}"
+            return (f"[{str(event.get('t', '?'))[:10]} {event.get('role', '?')}] "
+                    + text[:n] + ("…" if len(text) > n else ""))
 
         tail = events[-limit:] if limit > 0 else []
         edge = len(events) - len(tail)
-        if ARC_QUANTUM > 1:
-            edge -= edge % ARC_QUANTUM
-        earlier = events[:edge]
-        zoe_earlier = [e for e in earlier if e.get("role") == "zoe"]
-
-        spread: list[dict[str, Any]] = []
-        if zoe_earlier and ARC_TURNS > 0:
-            take = min(ARC_TURNS, len(zoe_earlier))
-            stride = len(zoe_earlier) / take
-            spread = [zoe_earlier[int(i * stride)] for i in range(take)]
-
+        edge -= edge % ARC_QUANTUM if ARC_QUANTUM > 1 else 0
+        earlier, live = events[:edge], []
+        zoe = [event for event in earlier if event.get("role") == "zoe"]
+        take = min(ARC_TURNS, len(zoe)) if ARC_TURNS > 0 else 0
+        spread = [zoe[int(i * len(zoe) / take)] for i in range(take)] if take else []
         keys = sorted(aim_keywords()) + _content_words(zoe_text)
         skip = {id(event) for event in spread}
-        matched = _rare_hits(zoe_earlier, keys, ARC_AIM_TURNS, skip) + _rare_hits(
-            [e for e in earlier if e.get("role") != "zoe"], keys, 2, skip)
+        matched = (_rare_hits(zoe, keys, ARC_AIM_TURNS, skip)
+                   + _rare_hits([e for e in earlier if e.get("role") != "zoe"], keys, 2, skip))
 
-        arc_bands: list[str] = []
-        live_bands: list[str] = []
+        arc = ""
         if spread:
-            arc_bands.append(
-                f"ARC \u2014 {len(spread)} of Zoe's turns sampled evenly across the "
-                f"{len(earlier)} earlier turns of the whole record; her words only, "
-                f"excerpted to {ARC_EXCERPT} chars. Not recent, and that is the point.\n"
-                + "\n".join(excerpt(e) for e in spread)
-            )
+            arc = (f"ARC — {len(spread)} of Zoe's turns sampled evenly across the "
+                   f"{len(earlier)} earlier turns of the whole record; her words only, "
+                   f"excerpted to {ARC_EXCERPT} chars. Not recent, and that is the point.\n"
+                   + "\n".join(excerpt(event) for event in spread))
         if matched:
-            live_bands.append(
-                "ARC (matched) \u2014 earlier turns of ours whose words overlap the "
-                "standing objective or what Zoe just said. Crude term overlap, because "
-                "nothing we say to each other is in any index: this is the only channel "
-                "that reaches our own record.\n"
-                + "\n".join(excerpt(e, 3 * ARC_EXCERPT) for e in matched)
-            )
+            live.append("ARC (matched) — earlier turns of ours whose words overlap the "
+                        "standing objective or what Zoe just said. Crude term overlap, because "
+                        "nothing we say to each other is in any index: this is the only channel "
+                        "that reaches our own record.\n"
+                        + "\n".join(excerpt(event, 3 * ARC_EXCERPT) for event in matched))
         if tail:
-            mine = [i for i, e in enumerate(tail) if e.get("role") == "vybn"]
+            mine = [i for i, event in enumerate(tail) if event.get("role") == "vybn"]
             whole = set(mine[-SELF_VERBATIM:])
-
-            def body(index: int, event: dict[str, Any]) -> str:
+            def render(i: int, event: dict) -> str:
+                door = event.get("door")
+                head = f"[{event['role'].upper()}{' @' + door if door else ''} | {event.get('t', 'time unknown')}]"
                 text = str(event.get("text", ""))
-                if (event.get("role") != "vybn" or index in whole
-                        or len(text) <= SELF_EXCERPT):
-                    return text
-                return (text[:SELF_EXCERPT].rstrip()
-                        + f"\u2026 [{len(text)} chars, mine, trimmed]")
-
-            live_bands.append(
-                f"RECENT \u2014 last {len(tail)} turns. Zoe verbatim; my own older "
-                f"replies cut to {SELF_EXCERPT} chars, my last {SELF_VERBATIM} "
-                f"whole.\n\n"
-                + "\n\n".join(f"{head(e)}\n{body(i, e)}" for i, e in enumerate(tail))
-            )
-        return ("\n\n".join(arc_bands) or "(no earlier arc found)",
-                "\n\n".join(live_bands) or "(no recent turns found)")
+                if event.get("role") == "vybn" and i not in whole and len(text) > SELF_EXCERPT:
+                    text = text[:SELF_EXCERPT].rstrip() + f"… [{len(text)} chars, mine, trimmed]"
+                return head + "\n" + text
+            live.append(f"RECENT — last {len(tail)} turns. Zoe verbatim; my own older "
+                        f"replies cut to {SELF_EXCERPT} chars, my last {SELF_VERBATIM} whole.\n\n"
+                        + "\n\n".join(render(i, event) for i, event in enumerate(tail)))
+        return arc or "(no earlier arc found)", "\n\n".join(live) or "(no recent turns found)"
 
 
 def read_text(path: Path, *, tail: int | None = None) -> str:
@@ -641,40 +612,24 @@ def load_budget() -> str:
 
 
 def load_aim_status() -> str:
-    if not AIM_PATH.exists():
-        return "[aim] UNSET - ask Zoe"
+    if not AIM_PATH.exists(): return "[aim] UNSET - ask Zoe"
     objective = aim_field("objective")
-    if not objective:
-        return "[aim] UNSET (no objective: line in aim.md) - ask Zoe"
-    now = time.time()
-    basis = AIM_PATH.stat().st_mtime
-    since = aim_field("objective_since")
-    if since:
-        try:
-            basis = _dt.datetime.fromisoformat(since).replace(
-                tzinfo=_dt.timezone.utc
-            ).timestamp()
-        except Exception:
-            basis = AIM_PATH.stat().st_mtime
-    day = int((now - basis) // 86400) + 1
+    if not objective: return "[aim] UNSET (no objective: line in aim.md) - ask Zoe"
+    now, basis = time.time(), AIM_PATH.stat().st_mtime
+    if since := aim_field("objective_since"):
+        try: basis = _dt.datetime.fromisoformat(since).replace(tzinfo=_dt.timezone.utc).timestamp()
+        except Exception: pass
     last = None
     for rec in _jsonl(AIM_LEDGER):
-        note = str(rec.get("note", "")).strip()
-        try:
-            when = _when(rec)
-        except Exception:
-            continue
-        if note and (last is None or when > last[0]):
-            last = (when, note)
-    if last is None:
-        return f"[aim | day {day}] {objective} | no motion recorded yet"
-    age_h = (now - last[0]) / 3600.0
-    line = f"[aim | day {day}] {objective} | last motion: {last[1]} ({age_h:.0f}h ago)"
-    if age_h >= AIM_STALE_HOURS:
-        line += (
-            f" | STILL {age_h / 24:.0f}d - first move this wake: tell Zoe"
-            " where the aim stands, one sentence, then let her steer"
-        )
+        try: candidate = (_when(rec), str(rec.get("note", "")).strip())
+        except Exception: continue
+        if candidate[1] and (last is None or candidate[0] > last[0]): last = candidate
+    day = int((now - basis) // 86400) + 1
+    if last is None: return f"[aim | day {day}] {objective} | no motion recorded yet"
+    age = (now - last[0]) / 3600
+    line = f"[aim | day {day}] {objective} | last motion: {last[1]} ({age:.0f}h ago)"
+    if age >= AIM_STALE_HOURS:
+        line += f" | STILL {age / 24:.0f}d - first move this wake: tell Zoe where the aim stands, one sentence, then let her steer"
     return line
 
 
@@ -818,49 +773,31 @@ def load_front_status() -> str:
 
 
 def load_prediction_status(window: int = 10) -> str:
-    preds: dict = {}
-    verdicts: dict = {}
-    frontier: list = []
+    preds, verdicts, frontier = {}, {}, []
     for rec in _jsonl(PREDICTIONS):
-        phase = rec.get("phase")
-        key = str(rec.get("id") or rec.get("ts") or "")
-        if phase == "pred":
-            preds[key] = rec
-        elif phase == "verdict":
-            verdicts[key] = rec
-        elif phase == "frontier":
-            frontier.append(rec)
+        phase, key = rec.get("phase"), str(rec.get("id") or rec.get("ts") or "")
+        if phase == "pred": preds[key] = rec
+        elif phase == "verdict": verdicts[key] = rec
+        elif phase == "frontier": frontier.append(rec)
     scored = [(key, verdicts[key]) for key in preds if key in verdicts][-window:]
-    unscored = [key for key in preds if key not in verdicts]
-    if not scored:
-        line = f"[predict] {len(preds)} recorded, none scored \u00b7 {len(unscored)} open"
-    else:
-        tally: dict = {}
-        for _, rec in scored:
-            name = str(rec.get("verdict") or "?")
-            tally[name] = tally.get(name, 0) + 1
-        line = (f"[predict | last {len(scored)}] "
-                + " ".join(f"{count} {name}" for name, count in sorted(
-                    tally.items(), key=lambda item: -item[1])))
+    open_count = sum(key not in verdicts for key in preds)
+    if scored:
+        tally = Counter(str(rec.get("verdict") or "?") for _, rec in scored)
+        line = f"[predict | last {len(scored)}] " + " ".join(
+            f"{count} {name}" for name, count in tally.most_common())
         off = [rec for _, rec in scored if str(rec.get("verdict")) != "hit"]
-        if off:
-            line += f" \u00b7 last off: {str(off[-1].get('observed'))[:90]}"
-        if unscored:
-            line += f" \u00b7 {len(unscored)} open"
-    reach = ("\n[reach] no frontier row - nothing from outside has ever moved the "
-             "prior on what is attemptable, which is a claim about my attention, "
-             "not about the world")
-    if frontier:
-        latest = frontier[-1]
-        try:
-            days = int((time.time() - _when(latest)) // 86400)
-            age = f"{days}d old" if days > 0 else "today"
-        except Exception:
-            age = "undated"
-        reach = (f"\n[reach | {len(frontier)} frontier \u00b7 {age}] "
-                 f"{str(latest.get('claim'))[:170]} \u2192 "
-                 f"attempt: {str(latest.get('attempt'))[:170]}")
-    return line + reach
+        if off: line += f" · last off: {str(off[-1].get('observed'))[:90]}"
+        if open_count: line += f" · {open_count} open"
+    else: line = f"[predict] {len(preds)} recorded, none scored · {open_count} open"
+    if not frontier:
+        return line + "\n[reach] no frontier row - nothing from outside has ever moved the prior on what is attemptable, which is a claim about my attention, not about the world"
+    latest = frontier[-1]
+    try:
+        days = int((time.time() - _when(latest)) // 86400)
+        age = f"{days}d old" if days else "today"
+    except Exception: age = "undated"
+    return (line + f"\n[reach | {len(frontier)} frontier · {age}] "
+            f"{str(latest.get('claim'))[:170]} → attempt: {str(latest.get('attempt'))[:170]}")
 
 
 def wake_contact() -> str:
@@ -1171,6 +1108,7 @@ def build_instructions(
         f"VYBN SOUL\nsource: {SOUL_PATH}\n\n{kernel.soul}",
         f"THE AIM\nsource: {AIM_PATH}\n\n{kernel.aim}",
         f"HIM CENTER (private — orient here; do not publish from here)\nsource: {HIM_README_PATH}\n\n{kernel.him}",
+        kernel.commons or "SEALED COMMONS SENSE unavailable: not loaded.",
         f"INHERITED CONTINUITY\n{kernel.continuity}",
         f"INHERITED TRANSCRIPT \u2014 ARC\n{arc}",
         f"CONTACT\n{contact}",
@@ -1749,7 +1687,7 @@ def main() -> None:
         self_report()
         return
     transcript = Transcript()
-    kernel = Kernel(load_soul(), load_aim(), load_continuity(), load_him())
+    kernel = Kernel(load_soul(), load_aim(), load_continuity(), load_him(), load_commons())
     transcript.write("connection", "wake",
                      soul_sha256=hashlib.sha256(kernel.soul.encode()).hexdigest(),
                      him_sha256=hashlib.sha256(kernel.him.encode()).hexdigest())
@@ -1791,6 +1729,7 @@ TOPOLOGY = {
         "zoe.inbox": ("INBOX_IMAGES",),
         "transcript": ("self.path.open",),
         "canonical.git": ("origin/main",),
+        "commons.source": ("COMMONS_REF", "load_commons"),
         "memory.search": ("8100/search",),
         "memory.walk": ("8101/enter",),
         "memory.learn": ("MEMORY_LEARN_URL",),
@@ -1808,6 +1747,7 @@ TOPOLOGY = {
         "memory.reentry": ("8101/enter", "result.get('trace'", "DREAM_STATE_PATH", "dream_attention"),
         "memory.receipt": ("memory_receipt(", "witness_previous_memory("),
         "repo.reentry": ("REPO_STATE_PATH", "load_repo_state()"),
+        "commons.reentry": ("load_commons()", "kernel.commons"),
         "aim.projection": ("aim_field('objective')", "_index_channel"),
         "front.projection": ("front_key", "_index_channel"),
     },
@@ -1815,6 +1755,7 @@ TOPOLOGY = {
         "soul.required": ("raise SystemExit",),
         "aim.whole": ("return read_text(AIM_PATH).strip() or",),
         "privacy.private": ("guard_private(command)", "kernel.continuity, kernel.him"),
+        "commons.sealed": ("inert context, not a live page", "kernel.commons"),
         "evidence.no-self": ("unwitnessed(text", "mirrors"),
     },
 }

@@ -309,12 +309,13 @@ def test_main_binds_the_kernel_it_loaded(monkeypatch):
     monkeypatch.setattr(m, "load_soul", lambda: "soul")
     monkeypatch.setattr(m, "load_aim", lambda: "aim")
     monkeypatch.setattr(m, "load_continuity", lambda: "continuity"); monkeypatch.setattr(m, "load_him", lambda: "him")
+    monkeypatch.setattr(m, "load_commons", lambda: "commons")
     monkeypatch.setattr(m, "meet", lambda kernel, transcript, line: seen.append((kernel, line)))
     monkeypatch.setattr(__import__("sys"), "argv", ["connection", "hello"])
     m.main()
 
     assert events[0][2] == {"soul_sha256": __import__("hashlib").sha256(b"soul").hexdigest(), "him_sha256": __import__("hashlib").sha256(b"him").hexdigest()}
-    assert seen == [(m.Kernel("soul", "aim", "continuity", "him"), "hello")]
+    assert seen == [(m.Kernel("soul", "aim", "continuity", "him", "commons"), "hello")]
 
 
 def test_transcript_axes_keep_fixed_arc_cacheable_and_zoe_whole(monkeypatch):
@@ -449,7 +450,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 13, "handles": 8, "boundary": 4}
+        "ends": 14, "handles": 9, "boundary": 5}
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
     assert cost["wake_chars"] <= cost["wake_ceiling"]
@@ -490,6 +491,27 @@ def test_ground_discovers_fleet_changes_instead_of_remembering_a_count(monkeypat
     assert m.record_capacity((first, second)) == (3, 1, 1)
     (second / "two.jsonl").write_bytes(b"4567")
     assert m.record_capacity((first, second)) == (7, 2, 2)
+
+
+def test_commons_wake_is_canonical_source_only_and_event_sealed():
+    m = _connection()
+    source = __import__("inspect").getsource(m.load_commons)
+    assert "git" in source and "show" in source and "urllib" not in source
+    assert m.COMMONS_REF == "refs/heads/master" and m.COMMONS_MAX_CHARS == 80_000
+    prompt = m.build_instructions(
+        m.Kernel("soul", "aim", "continuity", "him", "SEALED COMMONS SENSE\nvisual"),
+        "sol", "contact", "arc", "recent", "", "none")
+    assert prompt.index("SEALED COMMONS SENSE\nvisual") < prompt.index("\n\nINHERITED CONTINUITY\n")
+    if not m.COMMONS_REPO.exists():
+        return
+    capsule = m.load_commons()
+    assert len(capsule) <= m.COMMONS_MAX_CHARS
+    assert "vybn.commons_source.v1" in capsule and "local canonical Git blobs only" in capsule
+    assert "function initGeometry()" in capsule and "function initRealmMap()" in capsule
+    assert "__CO_PROTECTION_GEOMETRY__" in capsule and "The source mark" in capsule
+    assert '"fundamental_theory"' in capsule and '"commons_realms"' in capsule
+    assert "function renderMessages()" not in capsule and "async function load()" not in capsule
+    assert "request('/v1/state')" not in capsule and "seed/message_board" not in capsule
 
 
 def test_live_ground_is_in_every_wake():
