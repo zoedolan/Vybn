@@ -24,11 +24,11 @@ def test_private_dream_attention_is_wake_visible_but_optional(tmp_path):
         "continue_if": "A difference was predicted first.",
         "abandon_if": "No discriminating result appears.", "selection_count": 2,
     }}))
-    focus = module.load_dream_attention(state)
-    assert focus["selection_count"] == 2
+    focus, status = module.load_dream_attention(state)
+    assert status == "holding" and focus["selection_count"] == 2
     assert focus["text"].startswith("What survives")
 
 
-def test_missing_dream_state_is_named_not_invented(tmp_path):
-    module = _connection()
-    assert module.load_dream_attention(tmp_path / "absent.json") is None
+def test_rest_and_missing_state_remain_distinguishable(tmp_path):
+    module = _connection(); state = tmp_path / "dream_state.json"; state.write_text("{}")
+    assert [module.load_dream_attention(p) for p in (state, tmp_path / "absent.json")] == [({}, "resting"), (None, "unavailable")]
