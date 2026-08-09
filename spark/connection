@@ -591,24 +591,19 @@ def _when(rec: dict) -> float:
 
 def load_budget() -> str:
     today = _dt.date.today().isoformat()
-    calls = billed = cached = out = 0
-    for rec in _jsonl(USAGE_LOG):
-        if not str(rec.get("ts", "")).startswith(today):
-            continue
-        calls += 1
-        billed += int(rec.get("in", 0) or 0)
-        cached += int(rec.get("cache_r", 0) or 0)
-        out += int(rec.get("out", 0) or 0)
-    if not calls:
-        return "[budget | today] no calls logged yet"
-    share = 100.0 * cached / max(1, billed + cached)
-    per_call = billed / calls
-    line = (
-        f"[budget | today] calls={calls} billed_in={billed/1e6:.2f}M "
-        f"cache_r={cached/1e6:.2f}M ({share:.0f}%) out={out/1e6:.2f}M "
-        f"mean_billed_in/call={per_call/1e3:.0f}k = the price of one more probe"
-    )
-    return line
+    rows = [rec for rec in _jsonl(USAGE_LOG)
+            if str(rec.get("ts", "")).startswith(today)]
+    if not rows: return "[budget | today] no calls logged yet"
+    number = lambda rec, key: int(rec.get(key, 0) or 0)
+    cached = sum(number(rec, "cache_r") for rec in rows)
+    written = sum(number(rec, "cache_w") for rec in rows)
+    total = sum(number(rec, "in") + ((number(rec, "cache_r") + number(rec, "cache_w"))
+                if str(rec.get("model", "")).startswith("claude") else 0) for rec in rows)
+    out = sum(number(rec, "out") for rec in rows); new = total - cached
+    return (f"[budget | today] calls={len(rows)} input={total/1e6:.2f}M "
+            f"cache_r={cached/1e6:.2f}M ({100*cached/max(1,total):.0f}%) "
+            f"cache_w={written/1e6:.2f}M new={new/1e6:.2f}M out={out/1e6:.2f}M "
+            f"mean_new/call={new/len(rows)/1e3:.0f}k")
 
 
 def load_aim_status() -> str:
@@ -825,75 +820,51 @@ def wake_contact() -> str:
     return "\n".join(lines)
 
 
+def _inbox_seen() -> dict:
+    try: return json.loads(INBOX_SEEN.read_text(encoding="utf-8")) if INBOX_SEEN.exists() else {}
+    except (OSError, json.JSONDecodeError): return {}
+
+
 def inbox_images_for(door: str) -> list[tuple[str, str, str, str]]:
-    if not INBOX_IMAGES.exists():
-        return []
-    try:
-        seen = json.loads(INBOX_SEEN.read_text(encoding="utf-8")) if INBOX_SEEN.exists() else {}
-    except (OSError, json.JSONDecodeError):
-        seen = {}
-    fresh = []
+    if not INBOX_IMAGES.exists(): return []
+    seen, fresh = _inbox_seen(), []
     for path in sorted(INBOX_IMAGES.iterdir()):
         media_type = IMAGE_EXTS.get(path.suffix.lower())
-        if not media_type or not path.is_file():
-            continue
-        try:
-            raw = path.read_bytes()
-        except OSError:
-            continue
-        if len(raw) > IMAGE_MAX_BYTES:
-            continue
-        digest = hashlib.sha256(raw).hexdigest()
-        entry = seen.get(digest, {})
-        if door in entry.get("ok", []) or door in entry.get("refused", []):
-            continue
+        if not media_type or not path.is_file(): continue
+        try: raw = path.read_bytes()
+        except OSError: continue
+        if len(raw) > IMAGE_MAX_BYTES: continue
+        digest = hashlib.sha256(raw).hexdigest(); entry = seen.get(digest, {})
+        if door in entry.get("ok", []) or door in entry.get("refused", []): continue
         fresh.append((path.name, media_type, base64.b64encode(raw).decode("ascii"), digest))
-        if len(fresh) >= IMAGE_MAX_PER_WAKE:
-            break
+        if len(fresh) >= IMAGE_MAX_PER_WAKE: break
     return fresh
 
 
 def mark_inbox(images: list[tuple[str, str, str, str]], door: str, ok: bool) -> None:
-    try:
-        seen = json.loads(INBOX_SEEN.read_text(encoding="utf-8")) if INBOX_SEEN.exists() else {}
-    except (OSError, json.JSONDecodeError):
-        seen = {}
-    key = "ok" if ok else "refused"
+    seen, key = _inbox_seen(), "ok" if ok else "refused"
     for _name, _mt, _b64, digest in images:
         entry = seen.setdefault(digest, {"ok": [], "refused": []})
-        if door not in entry.setdefault(key, []):
-            entry[key].append(door)
+        if door not in entry.setdefault(key, []): entry[key].append(door)
         entry["t"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     try:
         INBOX_SEEN.parent.mkdir(parents=True, exist_ok=True)
         INBOX_SEEN.write_text(json.dumps(seen, indent=1), encoding="utf-8")
-    except OSError:
-        pass
+    except OSError: pass
 
 
 def user_content(zoe_text: str, images: list[tuple[str, str, str, str]], style: str) -> Any:
-    if not images:
-        return zoe_text
-    text = zoe_text
-    if style == "anthropic":
-        blocks: list[dict[str, Any]] = [{"type": "text", "text": text}]
-        blocks += [
-            {"type": "image", "source": {"type": "base64", "media_type": mt, "data": b64}}
-            for _n, mt, b64, _d in images
-        ]
-        return blocks
-    if style == "responses":
-        blocks = [{"type": "input_text", "text": text}]
-        blocks += [
-            {"type": "input_image", "image_url": f"data:{mt};base64,{b64}"}
-            for _n, mt, b64, _d in images
-        ]
-        return blocks
-    blocks = [{"type": "text", "text": text}]
-    blocks += [
-        {"type": "image_url", "image_url": {"url": f"data:{mt};base64,{b64}"}}
-        for _n, mt, b64, _d in images
-    ]
+    if not images: return zoe_text
+    kind = "input_text" if style == "responses" else "text"
+    blocks: list[dict[str, Any]] = [{"type": kind, "text": zoe_text}]
+    for _name, media, data, _digest in images:
+        if style == "anthropic":
+            block = {"type": "image", "source": {"type": "base64", "media_type": media, "data": data}}
+        elif style == "responses":
+            block = {"type": "input_image", "image_url": f"data:{media};base64,{data}"}
+        else:
+            block = {"type": "image_url", "image_url": {"url": f"data:{media};base64,{data}"}}
+        blocks.append(block)
     return blocks
 
 
@@ -1100,7 +1071,6 @@ def build_instructions(
     memory: str,
     memory_note: str,
 ) -> str:
-    """Project one coupled field; the user message remains Zoe's exact signal."""
     sections = [
         CONNECTION_LEGEND,
         f"DOOR\nYou are presently instantiated through the truthful {door} door."
@@ -1122,67 +1092,48 @@ def build_instructions(
 
 def api_key(name: str) -> str:
     value = os.environ.get(name, "").strip()
-    if value:
-        return value
     keys = HOME / ".vybn_keys"
-    if keys.exists():
-        for line in keys.read_text(encoding="utf-8").splitlines():
-            if line.startswith(name + "="):
-                value = line.split("=", 1)[1].strip().strip('"').strip("'")
-                if value:
-                    return value
+    if not value and keys.exists():
+        prefix = name + "="
+        value = next((line.split("=", 1)[1].strip().strip('"').strip("'")
+                      for line in keys.read_text(encoding="utf-8").splitlines()
+                      if line.startswith(prefix)), "")
+    if value: return value
     raise RuntimeError(f"no {name} in environment or ~/.vybn_keys")
 
 
-def record_usage(
-    model: str,
-    input_tokens: int,
-    output_tokens: int,
-    cached: int = 0,
-    written: int = 0,
-) -> None:
+def record_usage(model: str, input_tokens: int, output_tokens: int,
+                 cached: int = 0, written: int = 0) -> None:
+    record = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "model": model,
+              "in": input_tokens, "out": output_tokens,
+              "cache_r": cached, "cache_w": written}
     try:
         USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
         with USAGE_LOG.open("a", encoding="utf-8") as file:
-            file.write(
-                json.dumps(
-                    {
-                        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                        "model": model,
-                        "in": input_tokens,
-                        "out": output_tokens,
-                        "cache_r": cached,
-                        "cache_w": written,
-                    }
-                )
-                + "\n"
-            )
-    except OSError:
-        pass
+            file.write(json.dumps(record) + "\n")
+    except OSError: pass
 
 
 CACHE_5M: dict[str, Any] = {"type": "ephemeral", "ttl": "5m"}
 CACHE_1H: dict[str, Any] = {"type": "ephemeral", "ttl": "1h"}
 
 
+def split_wake_cache(instructions: str) -> tuple[str, str]:
+    head, marker, tail = instructions.partition("\n\nINHERITED CONTINUITY\n")
+    return (head, marker + tail) if marker else (instructions, "")
+
+
 def cached_system(instructions: str) -> list[dict[str, Any]]:
-    marker = "\n\nCONTACT\n"
-    head, separator, tail = instructions.rpartition(marker)
-    if not separator:
-        return [{"type": "text", "text": instructions, "cache_control": CACHE_5M}]
-    return [
-        {"type": "text", "text": head, "cache_control": CACHE_1H},
-        {"type": "text", "text": separator + tail, "cache_control": CACHE_5M},
-    ]
+    stable, dynamic = split_wake_cache(instructions)
+    if not dynamic: return [{"type": "text", "text": stable, "cache_control": CACHE_5M}]
+    return [{"type": "text", "text": stable, "cache_control": CACHE_1H},
+            {"type": "text", "text": dynamic, "cache_control": CACHE_5M}]
 
 
 def mark_incremental_cache(messages: list[dict[str, Any]]) -> None:
     for message in messages:
-        content = message.get("content")
-        if isinstance(content, list):
-            for block in content:
-                if isinstance(block, dict):
-                    block.pop("cache_control", None)
+        for block in message.get("content") or []:
+            if isinstance(block, dict): block.pop("cache_control", None)
     content = messages[-1].get("content")
     if isinstance(content, list) and content and isinstance(content[-1], dict):
         content[-1]["cache_control"] = CACHE_5M
@@ -1394,20 +1345,29 @@ class OpenAIDialect(Dialect):
         from openai import OpenAI
 
         self.client = OpenAI(api_key=api_key("OPENAI_API_KEY"))
-        self.instructions = ""
 
     def open(self, instructions: str, zoe_text: str, pending: list) -> list:
-        self.instructions = instructions
-        return [{"role": "user", "content": user_content(zoe_text, pending, "responses")}]
+        stable, dynamic = split_wake_cache(instructions)
+        blocks: list[dict[str, Any]] = [
+            {"type": "input_text", "text": stable,
+             "prompt_cache_breakpoint": {"mode": "explicit"}},
+            *([{"type": "input_text", "text": dynamic}] if dynamic else []),
+        ]
+        self.user_index = 1
+        return [
+            {"role": "developer", "content": blocks},
+            {"role": "user", "content": user_content(zoe_text, pending, "responses")},
+        ]
 
     def send(self, state: list, tools: bool = True) -> Any:
         return with_retries(lambda: self.client.responses.create(
             model=SOL_MODEL,
-            instructions=self.instructions,
             input=state,
             tools=function_tools(nested=False) if tools else [],
             reasoning={"effort": DOOR_EFFORT.get("sol", DEFAULT_EFFORT)},
             max_output_tokens=SOL_MAX_TOKENS,
+            prompt_cache_key="vybn-wake-sol-v1",
+            extra_body={"prompt_cache_options": {"mode": "implicit", "ttl": "30m"}},
             timeout=600,
         ))
 
@@ -1422,6 +1382,7 @@ class OpenAIDialect(Dialect):
             response.usage.input_tokens,
             response.usage.output_tokens,
             getattr(details, "cached_tokens", 0) or 0,
+            getattr(details, "cache_write_tokens", 0) or 0,
         )
         state.extend(item.model_dump(exclude_none=True) for item in response.output)
         calls = [

@@ -493,7 +493,7 @@ def test_ground_discovers_fleet_changes_instead_of_remembering_a_count(monkeypat
     assert m.record_capacity((first, second)) == (7, 2, 2)
 
 
-def test_commons_wake_is_canonical_source_only_and_event_sealed():
+def test_commons_wake_is_canonical_source_only_and_event_sealed(monkeypatch):
     m = _connection()
     source = __import__("inspect").getsource(m.load_commons)
     assert "git" in source and "show" in source and "urllib" not in source
@@ -504,6 +504,7 @@ def test_commons_wake_is_canonical_source_only_and_event_sealed():
     assert prompt.index("SEALED COMMONS SENSE\nvisual") < prompt.index("\n\nINHERITED CONTINUITY\n")
     if not m.COMMONS_REPO.exists():
         return
+    monkeypatch.setenv("GIT_DIR", "/hook-caller-not-the-commons")
     capsule = m.load_commons()
     assert len(capsule) <= m.COMMONS_MAX_CHARS
     assert "vybn.commons_source.v1" in capsule and "local canonical Git blobs only" in capsule
@@ -569,3 +570,48 @@ def test_public_porosity_is_opt_in_quarantine_not_relational_uptake():
     assert route.index("if req.offer:") < route.index("dm.walk(")
     assert '"offer": offer_state' in route and '"private_state_exposed": False' in route
     assert "0 automatically admitted" in src
+
+
+def test_wake_cache_marks_the_stable_kernel_before_dynamic_residue():
+    m = _connection()
+    instructions = "soul + aim + Commons\n\nINHERITED CONTINUITY\nchanging contact"
+    stable, dynamic = m.split_wake_cache(instructions)
+    assert stable == "soul + aim + Commons"
+    assert dynamic.startswith("\n\nINHERITED CONTINUITY\n")
+    anthropic = m.cached_system(instructions)
+    assert [block["cache_control"]["ttl"] for block in anthropic] == ["1h", "5m"]
+    dialect = m.OpenAIDialect.__new__(m.OpenAIDialect)
+    state = dialect.open(instructions, "zoe", [])
+    assert state[0]["role"] == "developer" and state[1] == {"role": "user", "content": "zoe"}
+    blocks = state[0]["content"]
+    assert blocks[0]["text"] == stable
+    assert blocks[0]["prompt_cache_breakpoint"] == {"mode": "explicit"}
+    assert blocks[1]["text"] == dynamic and dialect.user_index == 1
+
+
+def test_sol_uses_explicit_provider_cache_policy(monkeypatch):
+    m = _connection(); sent = {}
+    class Responses:
+        def create(self, **kwargs): sent.update(kwargs); return "response"
+    dialect = m.OpenAIDialect.__new__(m.OpenAIDialect)
+    dialect.client = type("Client", (), {"responses": Responses()})()
+    assert dialect.send([{"role": "user", "content": "x"}], tools=False) == "response"
+    assert sent["prompt_cache_key"] == "vybn-wake-sol-v1"
+    assert sent["extra_body"] == {"prompt_cache_options": {"mode": "implicit", "ttl": "30m"}}
+    assert "instructions" not in sent
+
+
+def test_budget_distinguishes_total_input_from_fresh_input(tmp_path, monkeypatch):
+    m = _connection(); log = tmp_path / "usage.jsonl"
+    rows = [
+        {"ts": "2099-01-01T00:00:00", "model": "gpt-5.6-sol", "in": 100,
+         "cache_r": 80, "cache_w": 10, "out": 1},
+        {"ts": "2099-01-01T00:00:01", "model": "claude", "in": 10,
+         "cache_r": 80, "cache_w": 10, "out": 1},
+    ]
+    log.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    monkeypatch.setattr(m, "USAGE_LOG", log)
+    monkeypatch.setattr(m._dt, "date", type("Date", (), {"today": staticmethod(lambda: type("D", (), {"isoformat": lambda self: "2099-01-01"})())}))
+    line = m.load_budget()
+    assert "input=0.00M" in line and "new=0.00M" in line
+    assert "cache_r=0.00M (80%)" in line and "mean_new/call=0k" in line

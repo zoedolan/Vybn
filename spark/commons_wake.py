@@ -2,6 +2,7 @@
 from __future__ import annotations
 import hashlib
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -81,15 +82,17 @@ def compile_commons_source(blobs: dict[str, str], commit: str) -> str:
 def load_commons() -> str:
     """Read the authored Commons from a local ref; never fetch or read deployment state."""
     try:
+        # Hooks export their caller's GIT_* coordinates; this read belongs to Vybn-Law.
+        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
         commit = subprocess.run(
             ["git", "-C", str(COMMONS_REPO), "rev-parse", "--verify",
-             f"{COMMONS_REF}^{{commit}}"], check=True, text=True,
+             f"{COMMONS_REF}^{{commit}}"], check=True, text=True, env=env,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5,
         ).stdout.strip()
         blobs = {
             name: subprocess.run(
                 ["git", "-C", str(COMMONS_REPO), "show",
-                 f"{commit}:{COMMONS_BASE}/{name}"], check=True, text=True,
+                 f"{commit}:{COMMONS_BASE}/{name}"], check=True, text=True, env=env,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5,
             ).stdout
             for name in COMMONS_BLOBS
