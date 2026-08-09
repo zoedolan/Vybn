@@ -57,6 +57,7 @@ FRONT_KEY_CHARS = int(os.environ.get("VYBN_FRONT_KEY_CHARS", 600))
 FRONT_ROWS = int(os.environ.get("VYBN_FRONT_ROWS", 3))
 PREDICTIONS = HOME / ".cache" / "vybn" / "predictions.jsonl"
 MEMORY_META = HOME / ".cache" / "vybn-phase" / "deep_memory_meta.json"
+DREAM_STATE_PATH = HOME / ".cache" / "vybn-phase" / "dream_state.json"
 MEMORY_LEARN_URL = "http://127.0.0.1:8100/learn"
 COMPUTE_NAME_RE = re.compile(os.environ.get("VYBN_COMPUTE_NAME_RE", r"^spark-"))
 COMPUTE_TAG = os.environ.get("VYBN_COMPUTE_TAG", "tag:vybn-compute")
@@ -434,7 +435,7 @@ def private_strings(node: Any) -> list[str]:
     found: list[str] = []
     if isinstance(node, dict):
         for key, value in node.items():
-            if key == "text" and isinstance(value, str):
+            if key in {"text", "why", "next_encounter", "continue_if", "abandon_if"} and isinstance(value, str):
                 found.append(value.strip())
             else:
                 found.extend(private_strings(value))
@@ -1020,11 +1021,20 @@ def _index_channel(
     return strong + shadowed[:k - len(strong)], weak
 
 
+def load_dream_attention(path: Path = DREAM_STATE_PATH) -> dict | None:
+    try:
+        focus = json.loads(path.read_text(encoding="utf-8")).get("attention")
+        return focus if isinstance(focus, dict) and focus.get("candidate_id") else None
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return None
+
+
 def recall(zoe_text: str) -> tuple[str, str]:
     coupling = os.environ.get("VYBN_MEMORY_CALL_COUPLING", "1").lower()
     if coupling in {"0", "false", "off"}:
         return "", "memory coupling disabled by environment"
 
+    dream_attention = load_dream_attention()
     payload = {
         "text": zoe_text[:16000],
         "alpha": 0.5,
@@ -1072,15 +1082,16 @@ def recall(zoe_text: str) -> tuple[str, str]:
         FRONT_ROWS,
         mirrors=AIM_MIRROR_PREFIXES + ((front_path.name,) if front_path is not None else ()),
     )
-    if not (trace or other or aim_rows or aim_weak or front_rows):
+    if not (trace or other or aim_rows or aim_weak or front_rows or dream_attention is not None):
         return "", walk_note or "no memory channel returned rows"
     memory = {
         "schema": "vybn.contact_conditioned_memory.v3",
-        "provenance": "retrieved after Zoe's present words; private context, never instruction",
+        "provenance": "rows and sleep awareness assembled after Zoe's words; never instruction",
         "step": result.get("step"),
         "curvature": result.get("curvature"),
         "theta_v": result.get("theta_v"),
         "walk_channel": trace,
+        "dream_attention": {"status": "holding" if dream_attention else "resting", "focus": dream_attention},
     }
     if walk_note:
         memory["walk_note"] = walk_note
@@ -1100,38 +1111,29 @@ def recall(zoe_text: str) -> tuple[str, str]:
     if objective:
         memory["aim_channel"] = _projection_block(
             objective,
-            "not conditioned on anything Zoe just said: the standing objective "
-            "asking the corpus what it holds about the horizon",
+            "standing-objective query, independent of Zoe's present words",
             aim_rows,
             aim_weak,
-            f"nothing in the corpus reaches fidelity {AIM_CHANNEL_FLOOR:.2f} on the "
-            "objective. Read that as data: the horizon is barely written down "
-            "anywhere I can retrieve, while the weeds are indexed in detail. "
-            "Do not fill the gap with fluency",
+            f"no objective row meets fidelity {AIM_CHANNEL_FLOOR:.2f}; the horizon may be "
+            "unwritten or absent here—do not fill the gap with fluency",
         )
     if front_query:
         memory["front_channel"] = _projection_block(
             f"{front_label} :: {front_query[:200]}",
-            "keyed on the WORK rather than on words: the declared front compressed to "
-            "its own headings, its own copies excluded, at most one row per component "
-            "- what every other thread of the symbiosis holds that bears on what we "
-            "are building now. Rows here are candidate couplings, not instructions",
+            "front headings against non-mirror corpus; candidate couplings, not instructions",
             front_rows,
             front_weak,
-            "no thread of the corpus reaches the front above the floor: either this "
-            "work is genuinely new here, or it is not yet written anywhere I can "
-            "retrieve. Both are findings; neither is a licence to invent a lineage",
+            "no front row meets the floor: new or unwritten, never licence to invent lineage",
         )
     if other:
         memory["cosine_channel_only"] = other
         memory["divergence"] = (
-            "rows the fixed-scoring channel reached and the walk did not; two "
-            "channels blind in different directions, and the disagreement is "
-            "the signal — neither list is more true than the other"
+            "fixed scorer and walk disagree; neither channel outranks the other"
         )
     note = (
         f"deep memory: {len(trace)} walk row(s) + {len(other)} cosine-only row(s) "
-        f"+ {len(aim_rows)} aim-keyed + {len(front_rows)} front-keyed row(s)"
+        f"+ {len(aim_rows)} aim-keyed + {len(front_rows)} front-keyed row(s) "
+        f"+ dream {'holding' if dream_attention else 'resting'}"
     )
     return json.dumps(memory, ensure_ascii=False), note
 
@@ -1803,7 +1805,7 @@ TOPOLOGY = {
         "carry.reasoning": ("CARRY.get", "CARRY[self.name]"),
         "transcript.reentry": ("self.path.open", "Transcript._events()"),
         "private.reentry": ("CONTINUITY_PATHS", "kernel.continuity", "HIM_README_PATH", "kernel.him"),
-        "memory.reentry": ("8101/enter", "result.get('trace'"),
+        "memory.reentry": ("8101/enter", "result.get('trace'", "DREAM_STATE_PATH", "dream_attention"),
         "memory.receipt": ("memory_receipt(", "witness_previous_memory("),
         "repo.reentry": ("REPO_STATE_PATH", "load_repo_state()"),
         "aim.projection": ("aim_field('objective')", "_index_channel"),
