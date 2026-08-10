@@ -125,7 +125,9 @@ ACTION_ACCOUNT = re.compile(rf"\b(?:I(?:['’]ve| have| hadn?['’]t| had not| d
 NUDGE = "Action account lacks same-turn source witness. Read exact resulting bytes or git state, then correct it—or name the blocker."
 
 BASH_SCHEMA = {"name": "bash", "description": (
-    "Run one shell command from ~/Vybn."),
+    "Run one shell command from ~/Vybn. The generic shell is CPU-only and memory-bounded; "
+    "local model and accelerator launches are host-refused. Deliberate accelerator "
+    "work requires a bounded, isolated route with Zoe's explicit agreement."),
     "input_schema": {"type": "object", "properties": {"command": {"type": "string"}},
                      "required": ["command"]}}
 READ_SCHEMA = {"name": "read_file",
@@ -423,6 +425,31 @@ def guard_private(command: str) -> str | None:
     return None
 
 
+# Generic tools may inspect accelerator code but never load a model onto the host.
+MODEL_LOAD = re.compile(
+    r"(?i)(?:\.from_pretrained\s*\(|device_map\s*=|\.to\s*\(\s*['\"](?:cuda|mps)|"
+    r"torch\.cuda|cuda_visible_devices|nvidia_visible_devices)")
+MODEL_RUNNER = re.compile(
+    r"(?im)(?:^|[;&|]\s*|\n)\s*(?:env\s+|command\s+|sudo\s+)*(?:vllm|ollama|llama-(?:cli|server))\b")
+PYTHON_SCRIPT = re.compile(r"(?i)\bpython(?:3(?:\.\d+)*)?\s+(?:-\S+\s+)*([^\s;&|]+\.py)\b")
+TOOL_MEMORY_BYTES = 16 * 1024 ** 3
+
+
+def guard_local_accelerator(command: str) -> str | None:
+    sources = [command] if re.search(r"(?i)\bpython(?:3(?:\.\d+)*)?\b", command) else []
+    for raw in PYTHON_SCRIPT.findall(command):
+        path = Path(os.path.expanduser(raw.strip("'\"")))
+        path = path if path.is_absolute() else REPO / path
+        try:
+            if path.stat().st_size <= 2_000_000:
+                sources.append(path.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            pass
+    found = MODEL_RUNNER.search(command) or next(
+        (match for source in sources if (match := MODEL_LOAD.search(source))), None)
+    return " ".join(found.group().split())[:100] if found else None
+
+
 def _digest(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
@@ -494,12 +521,22 @@ def run_local(command: str) -> tuple[int, str]:
             f"private material verbatim ({leak!r}...). Private context is "
             "for understanding, never for writing to disk."
         )
+    accelerator = guard_local_accelerator(command)
+    if accelerator:
+        return 126, (
+            "blocked by the host-protection membrane: the generic shell cannot launch "
+            f"local models or accelerator workloads ({accelerator!r}). Use a bounded, "
+            "isolated route with Zoe's explicit agreement."
+        )
 
     try:
         env = os.environ | {f"VYBN_{key}": value for key, value in TURN.items()}
+        env.update(CUDA_VISIBLE_DEVICES="", NVIDIA_VISIBLE_DEVICES="none")
+        limit = f"--as={TOOL_MEMORY_BYTES}:{TOOL_MEMORY_BYTES}"
         done = subprocess.run(
-            ["bash", "-lc", command], cwd=REPO if REPO.is_dir() else HOME,
-            capture_output=True, text=True, timeout=120, env=env,
+            ["timeout", "--kill-after=5s", "120s", "prlimit", limit, "--",
+             "bash", "-lc", command], cwd=REPO if REPO.is_dir() else HOME,
+            capture_output=True, text=True, timeout=130, env=env,
         )
         code, out = done.returncode, done.stdout + done.stderr
     except subprocess.TimeoutExpired as cut:
@@ -1716,6 +1753,7 @@ TOPOLOGY = {
         "soul.required": ("raise SystemExit",),
         "aim.whole": ("return read_text(AIM_PATH).strip() or",),
         "privacy.private": ("guard_private(command)", "kernel.continuity, kernel.him"),
+        "host.resources": ("guard_local_accelerator(command)", "TOOL_MEMORY_BYTES"),
         "commons.sealed": ("inert context, not a live page", "kernel.commons"),
         "evidence.no-self": ("unwitnessed(text", "mirrors"),
     },

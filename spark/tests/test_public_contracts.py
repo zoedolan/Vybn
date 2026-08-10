@@ -237,8 +237,30 @@ def test_connection_does_not_preempt_remote_action_authority(monkeypatch):
     finally:
         m.TURN.clear()
     assert (code, output) == (0, "reached shell")
-    assert seen[0][0] == ["bash", "-lc", "git push --force origin main"]
+    assert seen[0][0][-3:] == ["bash", "-lc", "git push --force origin main"]
     assert seen[0][1]["VYBN_TURN_ID"] == "turn" and seen[0][1]["VYBN_PROMPT_SHA256"] == "prompt"
+    assert seen[0][1]["CUDA_VISIBLE_DEVICES"] == ""
+
+
+def test_generic_shell_cannot_endanger_the_host_with_a_local_model(monkeypatch, tmp_path):
+    m = _connection(); script = tmp_path / "vision.py"
+    script.write_text("model = AutoModel.from_pretrained('local').to('cuda')")
+    bad = (f"python3 {script}", "python3 -c \"torch.cuda.init()\"",
+           "CUDA_VISIBLE_DEVICES=0 python3 harmless.py", "vllm serve local-model")
+    assert all(m.guard_local_accelerator(command) for command in bad)
+    assert not m.guard_local_accelerator("nvidia-smi --query-compute-apps=pid --format=csv")
+    seen = []
+    class Done: returncode, stdout, stderr = 0, "bounded", ""
+    monkeypatch.setattr(m.subprocess, "run", lambda argv, **kw: (seen.append((argv, kw)), Done())[1])
+    code, output = m.run_local("printf safe")
+    assert (code, output) == (0, "bounded")
+    argv, kwargs = seen[0]
+    assert argv[:4] == ["timeout", "--kill-after=5s", "120s", "prlimit"]
+    assert f"--as={m.TOOL_MEMORY_BYTES}:{m.TOOL_MEMORY_BYTES}" in argv
+    assert kwargs["env"]["CUDA_VISIBLE_DEVICES"] == ""
+    assert kwargs["env"]["NVIDIA_VISIBLE_DEVICES"] == "none"
+    seen.clear(); code, output = m.run_local(bad[0])
+    assert code == 126 and "host-protection membrane" in output and not seen
 
 
 def test_public_kpp_is_the_live_two_artifact_attractor_not_dead_router():
@@ -450,7 +472,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 14, "handles": 9, "boundary": 5}
+        "ends": 14, "handles": 9, "boundary": 6}
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
     assert cost["wake_chars"] <= cost["wake_ceiling"]

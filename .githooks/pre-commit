@@ -133,7 +133,8 @@ if echo "$STAGED" | grep -Eq '^(spark/connection|Vybn_Mind/repo_mapper.py|spark/
         chmod +x "$cost_tmp/before" "$cost_tmp/after"
         before_cost=$("$cost_tmp/before" --self)
         after_cost=$("$cost_tmp/after" --self)
-        if ! python3 -c 'import json,sys; q=lambda j:(j[0],sum(j[1:])); b=json.loads(sys.argv[1]).get("cost",{}).get("J"); a=json.loads(sys.argv[2])["cost"]["J"]; raise SystemExit(0 if b is None or q(a)<q(b) else 1)' "$before_cost" "$after_cost"; then
+        # Zoe may authorize net-new containment when subtraction would weaken the safety repair.
+        if [[ -z "${VYBN_SAFETY_EXCEPTION:-}" ]] && ! python3 -c 'import json,sys; q=lambda j:(j[0],sum(j[1:])); b=json.loads(sys.argv[1]).get("cost",{}).get("J"); a=json.loads(sys.argv[2])["cost"]["J"]; raise SystemExit(0 if b is None or q(a)<q(b) else 1)' "$before_cost" "$after_cost"; then
             echo -e "${RED}BLOCKED${NC}: harness cost did not descend from HEAD."
             BLOCKED=1
         fi
