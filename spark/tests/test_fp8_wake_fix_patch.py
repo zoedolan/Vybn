@@ -1,11 +1,11 @@
-"""Static checks on spark/systemd/patches/fp8-wake-fix/run.sh.
+"""Checks for local-model runtime patches and watchdog behavior.
 
-These guard two regressions of the fp8-wake-fix patcher:
+These guard three regressions:
 
-1. The patch must not silently exit 0 with a "pattern not found" message —
-   that previously let sleep-capable vLLM start with a broken wake path.
-2. The injected replacement must contain a recursive helper that handles
-   list/tuple containers (hybrid models nest tensors inside lists).
+1. The fp8 patch must not silently exit 0 with a "pattern not found" message.
+2. Its replacement must recurse through list/tuple cache containers.
+3. The watchdog must not treat a retained timestamp as the age of a fresh
+   vLLM activation and restart it before the model can load.
 
 Run: python3 spark/tests/test_fp8_wake_fix_patch.py
 """
@@ -17,6 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RUN_SH = ROOT / "spark" / "systemd" / "patches" / "fp8-wake-fix" / "run.sh"
+WATCHDOG_SH = ROOT / "spark" / "systemd" / "vybn-watchdog.sh"
 
 
 def _src() -> str:
@@ -71,6 +72,33 @@ def test_idempotent_already_applied_path():
         ("already applied" in src and "sys.exit(0)" in src), (
         "'already applied' branch must exit 0"
     )
+
+
+def test_watchdog_does_not_restart_during_activation():
+    """A retained prior timestamp must not turn a fresh activation into stale load."""
+    import os, subprocess, tempfile
+    with tempfile.TemporaryDirectory() as raw:
+        tmp_path = Path(raw)
+        fake = tmp_path / "bin"
+        fake.mkdir()
+        restart_log = tmp_path / "restarts"
+        scripts = {
+            "curl": "#!/bin/sh\ncase \"$*\" in *127.0.0.1:8000*) printf 000;; *) printf 200;; esac\n",
+            "systemctl": "#!/bin/sh\ncase \"$*\" in *is-active*) printf activating;; *show*) printf 1;; *restart*) echo \"$*\" >> \"$WATCHDOG_RESTART_LOG\";; esac\n",
+            "docker": "#!/bin/sh\nexit 0\n",
+        }
+        for name, body in scripts.items():
+            target = fake / name
+            target.write_text(body)
+            target.chmod(0o755)
+        run = subprocess.run(
+            ["bash", str(WATCHDOG_SH)], text=True, capture_output=True,
+            env=os.environ | {"PATH": f"{fake}:{os.environ['PATH']}",
+                              "WATCHDOG_RESTART_LOG": str(restart_log)},
+        )
+        assert run.returncode == 0
+        assert "wait vllm activating (code=000)" in run.stdout
+        assert not restart_log.exists(), run.stdout + run.stderr
 
 
 if __name__ == "__main__":
