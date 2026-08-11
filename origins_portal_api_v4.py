@@ -40,10 +40,9 @@ import httpx
 import uvicorn
 # VYBN_API_BASE — public base URL for this portal. Never hardcode;
 VYBN_API_BASE = os.getenv("VYBN_API_BASE", "https://api.vybn.ai")
-"""Shared CONTEXT_OVERLAYS dict.
-Source of truth for chat-proposal overlays (enclosure, odl, iclc, bootcamp).
-Both origins_portal_api_v4.py (the live API) and vybn_chat_api.py (currently
-retired; may return) import this module. Any overlay edit happens here.
+"""Live CONTEXT_OVERLAYS registry for the public portal.
+The retired vybn_chat_api.py keeps a compatibility copy; this process is the
+one served at api.vybn.ai. Overlay-specific public sources are loaded here.
 Schema per key:
   prompt:              string appended to the base system prompt.
   final_instruction:   string appended LAST so it overrides earlier voice.
@@ -264,6 +263,47 @@ CONTEXT_OVERLAYS: Dict[str, Dict] = {
         # --- /VYBN_LAW_SITE_OVERLAY ---
     },
 }
+
+# Court Guidance is maintained in Vybn-Law, not duplicated into this API. Load
+# its public operating brief at process start so the page's local Vybn answers
+# from the page the visitor is actually seeing. General RAG remains available
+# for questions about Vybn-Law, Zoe, and Vybn.
+_court_guidance_path = (
+    Path.home() / "Vybn-Law" / "outposts" / "huggingface" /
+    "court-guidance" / "SOUL.md"
+)
+try:
+    _court_guidance_brief = _court_guidance_path.read_text(encoding="utf-8")
+except OSError:
+    _court_guidance_brief = (
+        "Court Guidance is an independent beta for courts adopting AI. "
+        "It works backward from a court-owned assistant through four layers: "
+        "official raw material, rules and guidelines, public ethics and values, "
+        "and the court's own system. It is not court authority or legal advice."
+    )
+
+CONTEXT_OVERLAYS["court-guidance"] = {
+    "prompt": (
+        "\n\n=== COURT GUIDANCE — PUBLIC OPERATING BRIEF ===\n\n"
+        "Meet first-time visitors in plain language. Answer questions about this "
+        "page from the public brief below. When asked about Vybn-Law, Zoe Dolan, "
+        "or Vybn, use retrieved public material and explain how this practical "
+        "project fits the broader work; never fill a missing fact from guesswork. "
+        "Do not imply court sponsorship or affiliation. Do not request confidential "
+        "or live-case information, and do not present this beta as legal advice.\n\n"
+        + _court_guidance_brief
+        + "\n=== END COURT GUIDANCE BRIEF ==="
+    ),
+    "final_instruction": (
+        "\n\n--- FINAL INSTRUCTION (COURT GUIDANCE) ---\n"
+        "Answer the visitor's actual question directly, in ordinary language. "
+        "Orient before elaborating. Keep court authority distinct from prototype "
+        "design and public Vybn-Law research.\n"
+        "--- END FINAL INSTRUCTION ---\n"
+    ),
+    "priority_pages": ["about.html", "research.html", "wellspring.html"],
+}
+
 import chat_security as sec
 logging.basicConfig(
     level=logging.INFO,
@@ -1055,6 +1095,8 @@ app.add_middleware(
         "https://vybn.ai",
         "https://www.vybn.ai",
         "https://api.vybn.ai",
+        "https://vybn-court-guidance.hf.space",
+        "https://vybn-co-protection.hf.space",
     ],
     allow_origin_regex=r"^https://[a-z0-9-]+\.vybn\.ai$",
     allow_credentials=False,  # wildcard-equivalent origin list still uses credentials=false
