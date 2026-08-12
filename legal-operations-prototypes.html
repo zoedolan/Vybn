@@ -33,10 +33,14 @@ body::after{content:"";position:fixed;inset:0;z-index:-2;opacity:.16;pointer-eve
 .mark{display:flex;align-items:center;gap:.7rem;color:var(--ink);font:700 .66rem/1 var(--sans);letter-spacing:.15em;text-transform:uppercase}
 .source-mark{width:1.6rem;height:2rem;overflow:visible}
 .source-human,.source-ai,.source-river{fill:none;stroke-linecap:round;stroke-linejoin:round}.source-human{stroke:var(--gold);stroke-width:3}.source-ai{stroke:var(--blue);stroke-width:3}.source-river{stroke:var(--violet);stroke-width:2}.source-orbit{fill:rgba(135,216,236,.08);stroke:rgba(244,240,232,.72);stroke-width:1.5}.source-core{fill:var(--ink);filter:drop-shadow(0 0 5px var(--gold))}
-.counter{display:flex;align-items:center;gap:.7rem;color:var(--muted);font:700 .61rem/1 var(--sans);letter-spacing:.13em;text-transform:uppercase}.counter b{color:var(--ink);font-weight:700}.counter-line{width:4.5rem;height:1px;background:rgba(244,240,232,.16);overflow:hidden}.counter-line i{display:block;width:11.111%;height:100%;background:linear-gradient(90deg,var(--gold),var(--blue));transition:width .45s ease}
+.counter{display:flex;align-items:center;gap:.7rem;color:var(--muted);font:700 .61rem/1 var(--sans);letter-spacing:.13em;text-transform:uppercase}.counter b{color:var(--ink);font-weight:700}.counter-line{width:4.5rem;height:1px;background:rgba(244,240,232,.16);overflow:hidden}.counter-line i{display:block;width:8.333%;height:100%;background:linear-gradient(90deg,var(--gold),var(--blue));transition:width .45s ease}
 
 .slide{position:relative;display:grid;place-items:center;min-height:100svh;padding:clamp(5.8rem,9vh,7.4rem) clamp(1.2rem,6vw,6rem) clamp(5.2rem,8vh,6.6rem);scroll-snap-align:start;scroll-snap-stop:always;isolation:isolate;overflow:hidden}
 .slide::before{content:"";position:absolute;inset:8% 5%;z-index:-1;border:1px solid rgba(244,240,232,.04);border-radius:50%;transform:scale(.95);opacity:.6}
+.image-slide{padding:4.6rem 1rem 3.2rem;background:#07070c}
+.image-slide::before{display:none}
+.image-frame{display:grid;place-items:center;width:100%;height:calc(100svh - 7.8rem);margin:0}
+.presentation-image{display:block;max-width:min(1200px,100%);max-height:100%;width:auto;height:auto;object-fit:contain;border:1px solid rgba(244,240,232,.08);box-shadow:0 1.8rem 5rem rgba(0,0,0,.45)}
 .frame{width:min(1180px,100%);margin:auto}
 .center{text-align:center}
 .eyebrow{margin:0 0 1.05rem;color:var(--gold);font:750 .68rem/1.2 var(--sans);letter-spacing:.2em;text-transform:uppercase}
@@ -152,7 +156,7 @@ h3{font-size:clamp(.78rem,1.2vw,.95rem);line-height:1.25;letter-spacing:.12em;te
 
 <header class="rail">
   <div class="mark"><svg class="source-mark" aria-hidden="true"><use href="#source-mark"/></svg><span>Management brief</span></div>
-  <div class="counter"><span>5-minute view</span><b><span id="current">01</span> / 09</b><span class="counter-line" aria-hidden="true"><i id="progress"></i></span></div>
+  <div class="counter"><span>5-minute view</span><b><span id="current">01</span> / 12</b><span class="counter-line" aria-hidden="true"><i id="progress"></i></span></div>
 </header>
 
 <main id="deck">
@@ -172,6 +176,18 @@ h3{font-size:clamp(.78rem,1.2vw,.95rem);line-height:1.25;letter-spacing:.12em;te
       </div>
       <span class="kicker"><i></i>Guided · verified · confidential</span>
     </div>
+  </section>
+
+  <section class="slide image-slide" id="image-01" data-label="Image 1" aria-label="Presentation image 1 of 3">
+    <figure class="image-frame"><img class="presentation-image" src="assets/legal-operations/01.jpg" width="1200" height="1070" alt="Presentation image 1 of 3"></figure>
+  </section>
+
+  <section class="slide image-slide" id="image-02" data-label="Image 2" aria-label="Presentation image 2 of 3">
+    <figure class="image-frame"><img class="presentation-image" src="assets/legal-operations/02.jpg" width="1200" height="703" alt="Presentation image 2 of 3"></figure>
+  </section>
+
+  <section class="slide image-slide" id="image-03" data-label="Image 3" aria-label="Presentation image 3 of 3">
+    <figure class="image-frame"><img class="presentation-image" src="assets/legal-operations/03.jpg" width="1199" height="534" alt="Presentation image 3 of 3"></figure>
   </section>
 
   <section class="slide" id="model" data-label="The model" aria-labelledby="model-title">
