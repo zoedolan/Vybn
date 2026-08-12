@@ -311,6 +311,7 @@ def test_tool_intent_is_bound_and_mismatches_are_refused():
     assert "missing" in m.guard_tool_intent(m.ToolCall("c", "bash", {"command": "touch x"}, None))
     assert "conflicts" in m.guard_tool_intent(call("touch x", intent()))
     assert m.guard_tool_intent(call("touch x", intent("modify", "reversible"))) is None
+    assert m.guard_tool_intent(m.ToolCall("r", "read_file", {"path": "x", "intent": intent(data="private_or_unknown")}, None)) is None
     assert "declared local" in m.guard_tool_intent(call("git push origin main", intent("publish", "reversible")))
     assert m.guard_tool_intent(call("git push origin main", intent("publish", "reversible", "canonical_remote", "public_source"))) is None
     assert m.guard_tool_intent(call("git commit -m safe", intent("publish", "reversible", "canonical_remote", "public_source"))) is None
@@ -378,7 +379,10 @@ def test_executed_mutation_stays_open_until_corresponding_witness(monkeypatch):
     m.execute_tool(wrong, T())
     assert m.PENDING_EFFECTS and not any(x[1] == "witnessed" for x in events)
     second = m.ToolCall("m2", "bash", {"command": "touch y", "intent": local}, None)
-    assert "prior effect remains open" in m.execute_tool(second, T()) and len(m.PENDING_EFFECTS) == 1
+    blocks = m.VIGILANCE_BLOCKS
+    refusal = m.execute_tool(second, T())
+    assert ("prior effect remains open" in refusal and m.effect_id(changed) in refusal
+            and len(m.PENDING_EFFECTS) == 1 and m.VIGILANCE_BLOCKS == blocks)
     remote_read = m.ToolCall("rr", "bash", {"command": "git ls-remote origin", "intent": read}, None)
     m.execute_tool(remote_read, T())
     assert m.PENDING_EFFECTS

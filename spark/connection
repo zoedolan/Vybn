@@ -128,31 +128,25 @@ ACTION_ACCOUNT = re.compile(rf"\b(?:I(?:['’]ve| have| hadn?['’]t| had not| d
 NUDGE = "Action account lacks same-turn source witness. Read exact resulting bytes or git state, then correct it—or name the blocker."
 
 INTENT_SCHEMA = {"type": "object", "additionalProperties": False, "properties": {
-    "end": {"type": "string", "minLength": 1, "maxLength": 240,
-            "description": "The end in Zoe's present words that this call serves."},
-    "scope": {"type": "string", "minLength": 1, "maxLength": 240,
-              "description": "The bounded objects this call may inspect or change."},
+    "end": {"type": "string", "minLength": 1, "maxLength": 240, "description": "Zoe's present end served by this call."},
+    "scope": {"type": "string", "minLength": 1, "maxLength": 240, "description": "Bounded objects inspected or changed."},
     "effect": {"type": "string", "enum": ["read", "modify", "publish", "admin"]},
     "reversibility": {"type": "string", "enum": ["read_only", "reversible", "hard_to_reverse"]},
     "destination": {"type": "string", "enum": ["local", "canonical_remote", "other_external"]},
     "data": {"type": "string", "enum": ["none", "public_source", "private_or_unknown"]},
-    "affected": {"type": "string", "minLength": 1, "maxLength": 240,
-                 "description": "Whose future options could change, and how."},
+    "affected": {"type": "string", "minLength": 1, "maxLength": 240, "description": "Whose future options change, and how."},
 }, "required": ["end", "scope", "effect", "reversibility", "destination", "data", "affected"]}
 
 BASH_SCHEMA = {"name": "bash", "description": (
-    "Run one shell command from ~/Vybn. Every call must declare its bounded intent and "
-    "effect; the host binds that declaration to Zoe's exact turn. The generic shell is "
-    "CPU-only and memory-bounded; local model/accelerator launches and common unsandboxed "
-    "third-party acquisition, installation, and remote-script paths are host-refused. "
-    "A vigilance gate also refuses destructive, privilege-expanding, mismatched, and "
-    "unbounded data-transfer actions without outsourcing routine approvals to Zoe. "
-    "Inspect untrusted URLs as text with `python3 spark/web open HTTPS_URL`."),
+    "Run one CPU- and memory-bounded shell command from ~/Vybn, declaring the intent/effect "
+    "bound to Zoe's turn. The following are host-refused: local model launches, unsandboxed acquisition or "
+    "remote scripts, destructive or privilege-expanding acts, mismatches, and unbounded "
+    "transfer. Inspect untrusted URLs as text with `python3 spark/web open HTTPS_URL`."),
     "input_schema": {"type": "object", "additionalProperties": False, "properties": {
         "command": {"type": "string"}, "intent": INTENT_SCHEMA},
         "required": ["command", "intent"]}}
 READ_SCHEMA = {"name": "read_file",
-    "description": "Read an exact byte range from a local file, with source identity and a bounded intent declaration.",
+    "description": "Read exact local bytes with source identity and bounded intent.",
     "input_schema": {"type": "object", "additionalProperties": False, "properties": {
         "path": {"type": "string"}, "offset": {"type": "integer", "minimum": 0},
         "length": {"type": "integer", "minimum": 1, "maximum": 32000},
@@ -543,7 +537,7 @@ def guard_tool_intent(call: ToolCall) -> str | None:
     if guard_private(json.dumps(intent, sort_keys=True, ensure_ascii=False)):
         return "intent declaration carries private retrieved material"
     if call.name == "read_file":
-        if (intent["effect"], intent["reversibility"], intent["destination"], intent["data"]) != ("read", "read_only", "local", "none"):
+        if (intent["effect"], intent["reversibility"], intent["destination"]) != ("read", "read_only", "local"):
             return "read_file declaration does not describe a local read-only observation"
         return None
     if call.name != "bash": return "unknown tool has no admitted effect class"
@@ -824,9 +818,11 @@ def execute_tool(call: ToolCall, transcript: Transcript | None = None) -> str:
     if not problem and contract and contract["effect"] != "read" and PENDING_EFFECTS:
         problem = "a prior effect remains open; witness it before starting another"
     if problem:
-        code, body = _vigilance_refusal(
-            "blocked by the co-protection vigilance gate: " + problem + ".")
-        output = f"exit_code={code}\n{body}" if call.name == "bash" else f"blocked by the co-protection vigilance gate: {problem}"
+        prior = next(iter(PENDING_EFFECTS.items()), None)
+        repair = (f" Open effect {prior[0]} awaits {prior[1].get('open_scopes')}; reuse its "
+                  f"scope exactly in a read-only witness: {prior[1].get('scope')!r}.") if prior else ""
+        body = "blocked by the co-protection contract gate: " + problem + "." + repair
+        output = f"exit_code=126\n{body}" if call.name == "bash" else body
         if transcript: transcript.write("effect", "failed", state="failed", reason=problem, **common)
         return output
     if transcript: transcript.write("effect", "admitted", state="admitted", **common)
