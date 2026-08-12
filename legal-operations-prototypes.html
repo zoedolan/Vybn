@@ -79,7 +79,7 @@ h3{font-size:clamp(.78rem,1.2vw,.95rem);line-height:1.25;letter-spacing:.12em;te
 
 /* 05 */
 .calendar-field{position:relative;width:min(900px,100%);min-height:27rem;margin:clamp(2rem,4vh,3rem) auto 0}.calendar-core{position:absolute;left:50%;top:50%;z-index:3;display:grid;place-items:center;width:12.5rem;aspect-ratio:1;transform:translate(-50%,-50%);border:1px solid rgba(244,240,232,.35);border-radius:50%;background:radial-gradient(circle,rgba(135,216,236,.19),rgba(7,7,12,.94) 68%);box-shadow:0 0 4rem rgba(135,216,236,.13);text-align:center}.calendar-core strong{font:400 2.15rem/1 var(--serif)}.calendar-core small{margin-top:.35rem;color:var(--muted);font:700 .58rem/1.3 var(--sans);letter-spacing:.12em;text-transform:uppercase}.calendar-core::before,.calendar-core::after{content:"";position:absolute;border:1px solid rgba(244,240,232,.08);border-radius:50%}.calendar-core::before{inset:-55%}.calendar-core::after{inset:-107%;border-style:dashed}
-.source-node{position:absolute;z-index:2;display:flex;align-items:center;gap:.65rem;min-width:9.7rem;padding:.72rem .85rem;border:1px solid var(--line);border-radius:999px;background:rgba(9,9,15,.84);color:var(--muted);font:700 .63rem/1 var(--sans);letter-spacing:.09em;text-transform:uppercase;box-shadow:0 .7rem 2rem rgba(0,0,0,.22)}.source-node .icon{width:1.35rem;height:1.35rem}.source-node.court{left:3%;top:7%;color:var(--gold)}.source-node.sheet{right:3%;top:7%;color:var(--violet)}.source-node.drive{left:0;bottom:10%;color:var(--blue)}.source-node.gcal{right:0;bottom:10%;color:var(--green)}.source-node.slack{left:50%;bottom:-2%;transform:translateX(-50%);color:var(--red)}.source-node span{color:var(--ink)}
+.source-node{position:absolute;z-index:2;display:flex;align-items:center;gap:.65rem;min-width:9.7rem;padding:.72rem .85rem;border:1px solid var(--line);border-radius:999px;background:rgba(9,9,15,.84);color:var(--muted);font:700 .63rem/1 var(--sans);letter-spacing:.09em;text-transform:uppercase;box-shadow:0 .7rem 2rem rgba(0,0,0,.22)}.source-node .icon{width:1.35rem;height:1.35rem}.source-node.court{left:3%;top:7%;color:var(--gold)}.source-node.sheet{right:3%;top:7%;color:var(--violet)}.source-node.drive{left:0;bottom:10%;color:var(--blue)}.source-node.gcal{right:0;bottom:10%;color:var(--green)}.source-node.slack{left:50%;bottom:4%;transform:translateX(-50%);color:var(--red)}.source-node span{color:var(--ink)}
 .calendar-output{display:flex;justify-content:center;gap:1.4rem;margin-top:-.3rem;color:var(--muted);font:700 .61rem/1.25 var(--sans);letter-spacing:.1em;text-transform:uppercase}.calendar-output span{display:flex;align-items:center;gap:.4rem}.calendar-output i{width:.35rem;height:.35rem;border-radius:50%;background:var(--blue)}
 
 /* 06 */
@@ -222,11 +222,11 @@ h3{font-size:clamp(.78rem,1.2vw,.95rem);line-height:1.25;letter-spacing:.12em;te
     <div class="frame center">
       <p class="eyebrow">Prototype 2 · Courtroom Coordinator</p>
       <h2 id="calendar-flow-title">One courtroom <span class="blue">operating picture.</span></h2>
-      <div class="calendar-field" aria-label="Court, spreadsheet, Drive, Calendar, and Slack converge on one daily view">
+      <div class="calendar-field" aria-label="Court, spreadsheet, Google Drive, Google Calendar, and Slack converge on one daily view">
         <div class="calendar-core"><div><strong>Today</strong><small>Verified view</small></div></div>
         <div class="source-node court"><svg class="icon" aria-hidden="true"><use href="#i-court"/></svg><span>Court record</span></div>
         <div class="source-node sheet"><svg class="icon" aria-hidden="true"><use href="#i-sheet"/></svg><span>Courtroom sheet</span></div>
-        <div class="source-node drive"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg><span>Drive</span></div>
+        <div class="source-node drive"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg><span>Google Drive</span></div>
         <div class="source-node gcal"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg><span>Google Calendar</span></div>
         <div class="source-node slack"><svg class="icon" aria-hidden="true"><use href="#i-message"/></svg><span>Slack alerts</span></div>
       </div>
