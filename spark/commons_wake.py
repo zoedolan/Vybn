@@ -27,7 +27,7 @@ def compile_commons_source(blobs: dict[str, str], commit: str) -> str:
     html, css, app, svg = (blobs[name] for name in COMMONS_BLOBS[:4])
     exchange = json.loads(blobs["exchange.json"])
     html_parts = (
-        _source_span(html, '<figure class="geometry', "</figure>", True),
+        _source_span(html, '<figure class="self-circuit', "</figure>", True),
         _source_span(html, '<section id="thesis"', "</section>", True),
         _source_span(html, '<figure class="source-figure', "</figure>", True),
         _source_span(html, '<nav class="symbol-legend"', "</nav>", True),
@@ -36,11 +36,11 @@ def compile_commons_source(blobs: dict[str, str], commit: str) -> str:
     )
     css_parts = (
         _source_span(css, ":root{", "}\n", True),
-        _source_span(css, ".geometry{", ".symbol-legend"),
+        _source_span(css, ".self-circuit{", ".section-head"),
         _source_span(css, "/* The living Commons:", "/* In-box reveal:"),
         css[css.index("/* The source mark"):],
     )
-    visual_js = _source_span(app, "function initGeometry()", "\n\nasync function load")
+    visual_js = _source_span(app, "function initRealmMap()", "\n\nasync function load")
     dense = re.compile(r'<path class="(?:sphere-core|inset-sphere)"[^>]*/>')
     omitted = dense.findall(svg)
     compact_svg = dense.sub("", svg)
