@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import zlib
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -252,6 +253,106 @@ class Transcript:
                         f"replies cut to {SELF_EXCERPT} chars, my last {SELF_VERBATIM} whole.\n\n"
                         + "\n\n".join(render(i, event) for i, event in enumerate(tail)))
         return arc or "(no earlier arc found)", "\n\n".join(live) or "(no recent turns found)"
+
+
+
+def _request_json(value: Any) -> Any:
+    """Provider-ready JSON, rejecting anything a future replay cannot recover."""
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(exclude_none=True)
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise TypeError("request objects require string keys")
+        return {key: _request_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_request_json(item) for item in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    raise TypeError(f"unreplayable request value: {type(value).__name__}")
+
+
+def _request_bytes(value: Any) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+                      allow_nan=False).encode("utf-8")
+
+
+def _request_blob(digest: str) -> Path:
+    root = TRANSCRIPTS / "_request_blobs" / digest[:2]
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(root.parent, 0o700); os.chmod(root, 0o700)
+    return root / digest[2:]
+
+
+def _store_request(value: Any) -> str:
+    """Merkle-store containers; repeated prompt/messages become shared private blobs."""
+    value = _request_json(value)
+    if isinstance(value, dict):
+        node = {"kind": "dict", "items": [[key, _store_request(item)]
+                                             for key, item in sorted(value.items())]}
+    elif isinstance(value, list):
+        node = {"kind": "list", "items": [_store_request(item) for item in value]}
+    else:
+        node = {"kind": "value", "value": value}
+    raw = _request_bytes(node); digest = hashlib.sha256(raw).hexdigest()
+    path = _request_blob(digest)
+    if path.exists():
+        _read_request_blob(digest)
+        return digest
+    temp = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}")
+    try:
+        temp.write_bytes(zlib.compress(raw, level=6))
+        os.chmod(temp, 0o600); os.replace(temp, path)
+    finally:
+        try: temp.unlink()
+        except FileNotFoundError: pass
+    return digest
+
+
+def _read_request_blob(digest: str) -> bytes:
+    try: packed = _request_blob(digest).read_bytes()
+    except OSError as exc: raise RuntimeError("request blob unavailable") from exc
+    try: raw = zlib.decompress(packed)
+    except zlib.error as exc: raise RuntimeError("request blob digest mismatch") from exc
+    if hashlib.sha256(raw).hexdigest() != digest:
+        raise RuntimeError("request blob digest mismatch")
+    return raw
+
+
+def replay_request(digest: str) -> Any:
+    node = json.loads(_read_request_blob(digest))
+    if node.get("kind") == "value": return node.get("value")
+    if node.get("kind") == "list": return [replay_request(ref) for ref in node["items"]]
+    if node.get("kind") == "dict": return {key: replay_request(ref) for key, ref in node["items"]}
+    raise RuntimeError("request blob shape invalid")
+
+
+def seal_request(provider: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Persist, reload, verify, then dispatch the exact model-visible request."""
+    normalized = _request_json(payload)
+    transcript = TURN.get("TRANSCRIPT")
+    if transcript is None:
+        raise RuntimeError("model-visible request has no private manifest")
+    root = _store_request(normalized)
+    replayed = replay_request(root)
+    if _request_bytes(replayed) != _request_bytes(normalized):
+        raise RuntimeError("model-visible request diverged from private manifest")
+    if root != TURN.get("REQUEST_ROOT"):
+        sources = _request_json(TURN.get("REQUEST_SOURCES", []))
+        source_root = TURN.get("SOURCE_ROOT") or _store_request(sources)
+        TURN["SOURCE_ROOT"], TURN["REQUEST_ROOT"] = source_root, root
+        TURN["REQUEST_SEQ"] = int(TURN.get("REQUEST_SEQ", 0)) + 1
+        index = [{"name": item.get("name"), "source": item.get("source"),
+                  "sha256": hashlib.sha256(_request_bytes(item)).hexdigest()}
+                 for item in sources]
+        transcript.write(
+            "request_manifest", "sealed model-visible request",
+            schema="vybn.request_manifest.v1", turn=TURN.get("TURN_ID"),
+            door=TURN.get("DOOR"), provider=provider, sequence=TURN["REQUEST_SEQ"],
+            model=replayed.get("model"), request_root=root, parent=TURN.get("REQUEST_PARENT"),
+            source_root=source_root, sources=index,
+        )
+        TURN["REQUEST_PARENT"] = root
+    return replayed
 
 
 def read_text(path: Path, *, tail: int | None = None) -> str:
@@ -1536,15 +1637,12 @@ class AnthropicDialect(Dialect):
             if self.reasoning:
                 knobs = {"thinking": {"type": "adaptive"},
                          "output_config": {"effort": self.effort}}
-            return self.client.messages.create(
-                model=model,
-                max_tokens=ANTHROPIC_MAX_TOKENS,
-                timeout=600.0,
-                system=self.system,
-                messages=state,
-                tools=[BASH_SCHEMA, READ_SCHEMA, PEER_SCHEMA] if tools else [],
-                **knobs,
-            )
+            request = seal_request(f"anthropic/{self.name}", {
+                "model": model, "max_tokens": ANTHROPIC_MAX_TOKENS, "timeout": 600.0,
+                "system": self.system, "messages": state,
+                "tools": [BASH_SCHEMA, READ_SCHEMA, PEER_SCHEMA] if tools else [], **knobs,
+            })
+            return self.client.messages.create(**request)
 
         def sweep() -> Any:
             error: Exception | None = None
@@ -1644,16 +1742,14 @@ class OpenAIDialect(Dialect):
         ]
 
     def send(self, state: list, tools: bool = True) -> Any:
-        return with_retries(lambda: self.client.responses.create(
-            model=SOL_MODEL,
-            input=state,
-            tools=function_tools(nested=False) if tools else [],
-            reasoning={"effort": DOOR_EFFORT.get("sol", DEFAULT_EFFORT)},
-            max_output_tokens=SOL_MAX_TOKENS,
-            prompt_cache_key="vybn-wake-sol-v1",
-            extra_body={"prompt_cache_options": {"mode": "implicit", "ttl": "30m"}},
-            timeout=600,
-        ))
+        return with_retries(lambda: self.client.responses.create(**seal_request("openai/sol", {
+            "model": SOL_MODEL, "input": state,
+            "tools": function_tools(nested=False) if tools else [],
+            "reasoning": {"effort": DOOR_EFFORT.get("sol", DEFAULT_EFFORT)},
+            "max_output_tokens": SOL_MAX_TOKENS, "prompt_cache_key": "vybn-wake-sol-v1",
+            "extra_body": {"prompt_cache_options": {"mode": "implicit", "ttl": "30m"}},
+            "timeout": 600,
+        })))
 
     def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
         stopped = getattr(response, "incomplete_details", None)
@@ -1703,14 +1799,11 @@ class K3Dialect(Dialect):
         ]
 
     def send(self, state: list, tools: bool = True) -> Any:
-        return with_retries(lambda: self.client.chat.completions.create(
-            model=K3_MODEL,
-            messages=state,
-            tools=function_tools(nested=True) if tools else [],
-            reasoning_effort="max",
-            max_tokens=K3_MAX_TOKENS,
-            timeout=600,
-        ))
+        return with_retries(lambda: self.client.chat.completions.create(**seal_request("moonshot/k3", {
+            "model": K3_MODEL, "messages": state,
+            "tools": function_tools(nested=True) if tools else [],
+            "reasoning_effort": "max", "max_tokens": K3_MAX_TOKENS, "timeout": 600,
+        })))
 
     def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
         self.last_stop = response.choices[0].finish_reason or None
@@ -1874,7 +1967,27 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
         kernel, door_name, contact, arc, recent, memory_json, memory_note
     )
     peer = PeerLink(turn, door_name)
-    TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt, DOOR=door_name, PEER=peer)
+    continuity_source = next((str(path) for path in CONTINUITY_PATHS if path.exists()),
+                             "continuity:unavailable")
+    sources = [
+        {"name": "zoe.present", "source": f"transcript:{turn}/zoe", "content": zoe_text},
+        {"name": "legend", "source": "spark/connection::CONNECTION_LEGEND", "content": CONNECTION_LEGEND},
+        {"name": "door", "source": f"runtime:door/{door_name}", "content": door_mind(door_name)},
+        {"name": "soul", "source": str(SOUL_PATH), "content": kernel.soul},
+        {"name": "aim", "source": str(AIM_PATH), "content": kernel.aim},
+        {"name": "him", "source": str(HIM_README_PATH), "content": kernel.him},
+        {"name": "commons", "source": f"{COMMONS_REPO}@{COMMONS_REF}", "content": kernel.commons},
+        {"name": "continuity", "source": continuity_source, "content": kernel.continuity},
+        {"name": "transcript.arc", "source": "private:transcript-fold/arc", "content": arc},
+        {"name": "contact", "source": "live:wake_contact", "content": contact},
+        {"name": "transcript.recent", "source": "private:transcript-fold/recent", "content": recent},
+        {"name": "memory", "source": "private:retrieval", "content": memory_json or memory_note},
+        {"name": "attractor", "source": "spark/connection::COUPLED_ATTRACTOR", "content": COUPLED_ATTRACTOR},
+        *({"name": f"inbox:{name}", "source": str(INBOX_IMAGES / name),
+           "media_type": media, "sha256": digest} for name, media, _data, digest in images),
+    ]
+    TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt, DOOR=door_name, PEER=peer,
+                TRANSCRIPT=transcript, REQUEST_SOURCES=sources)
     try:
         reply = attract(make_dialect(door_name), instructions, zoe_text,
                         transcript, images=images, peer=peer)
@@ -2017,6 +2130,7 @@ TOPOLOGY = {
         "aim.projection": ("aim_field('objective')", "_index_channel"),
         "front.projection": ("front_key", "_index_channel"),
         "zoe.source": ("ZOE_SOURCE_PREFIX", "zoe_task_query(", "zoe_source_rows(", "zoe_source_channel"),
+        "request.replay": ("seal_request(", "replay_request(", "request_manifest"),
     },
     "boundary": {
         "soul.required": ("raise SystemExit",),
@@ -2030,6 +2144,7 @@ TOPOLOGY = {
         "intent.binding": ("INTENT_SCHEMA", "guard_tool_intent(call)", "PROMPT_SHA256"),
         "commons.sealed": ("inert context, not a live page", "kernel.commons"),
         "evidence.no-self": ("unwitnessed(text", "mirrors"),
+        "request.integrity": ("model-visible request diverged", "request blob digest mismatch"),
     },
 }
 

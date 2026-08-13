@@ -231,6 +231,65 @@ def _connection():
     return module
 
 
+
+def test_model_visible_request_is_private_replayable_and_fail_closed(monkeypatch, tmp_path):
+    import pytest as _pt
+    m = _connection(); monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "connection")
+    transcript = m.Transcript(); secret = "private exact field"
+    sources = [{"name": "him", "source": "private:Him", "content": secret}]
+    payload = {"model": "test-model", "input": [{"role": "developer", "content": secret}],
+               "tools": m.function_tools(False), "reasoning": {"effort": "high"}}
+    with _pt.raises(RuntimeError, match="no private manifest"):
+        m.seal_request("openai/sol", payload)
+    m.TURN.update(TURN_ID="turn", DOOR="sol", TRANSCRIPT=transcript,
+                  REQUEST_SOURCES=sources)
+    try:
+        sealed = m.seal_request("openai/sol", payload)
+        event = list(m._jsonl(transcript.path))[-1]
+        blobs_before = {path for path in m.TRANSCRIPTS.rglob("*") if path.is_file()}
+        assert m.seal_request("openai/sol", payload) == sealed
+        assert blobs_before == {path for path in m.TRANSCRIPTS.rglob("*") if path.is_file()}
+    finally: m.TURN.clear()
+    assert event["role"] == "request_manifest" and event["schema"] == "vybn.request_manifest.v1"
+    assert secret not in json.dumps(event) and event["request_root"] != event["source_root"]
+    assert m.replay_request(event["request_root"]) == payload
+    assert m.replay_request(event["source_root"]) == sources
+    blob = m._request_blob(event["request_root"])
+    assert blob.stat().st_mode & 0o777 == 0o600
+    blob.write_text("{}")
+    with _pt.raises(RuntimeError, match="digest mismatch"):
+        m.replay_request(event["request_root"])
+
+
+
+def test_every_dialect_dispatches_only_replayed_kwargs(monkeypatch, tmp_path):
+    m = _connection(); monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "connection")
+    transcript = m.Transcript(); sent = {}
+    class Endpoint:
+        def __init__(self, name): self.name = name
+        def create(self, **kwargs): sent[self.name] = kwargs; return self.name
+    m.TURN.update(TURN_ID="turn", DOOR="test", TRANSCRIPT=transcript,
+                  REQUEST_SOURCES=[])
+    try:
+        anth = m.AnthropicDialect.__new__(m.AnthropicDialect)
+        anth.models, anth.name, anth.reasoning, anth.system = ("a",), "fable", False, []
+        anth.client = type("Client", (), {"messages": Endpoint("anthropic")})()
+        assert anth.send([{"role": "user", "content": "a"}]) == "anthropic"
+        sol = m.OpenAIDialect.__new__(m.OpenAIDialect)
+        sol.client = type("Client", (), {"responses": Endpoint("openai")})()
+        assert sol.send([{"role": "user", "content": "s"}]) == "openai"
+        k3 = m.K3Dialect.__new__(m.K3Dialect)
+        k3.client = type("Client", (), {"chat": type("Chat", (), {"completions": Endpoint("k3")})()})()
+        assert k3.send([{"role": "user", "content": "k"}]) == "k3"
+    finally: m.TURN.clear()
+    events = [row for row in m._jsonl(transcript.path) if row.get("role") == "request_manifest"]
+    assert [row["provider"] for row in events] == ["anthropic/fable", "openai/sol", "moonshot/k3"]
+    assert sent["anthropic"]["messages"][0]["content"] == "a"
+    assert sent["openai"]["input"][0]["content"] == "s"
+    assert sent["k3"]["messages"][0]["content"] == "k"
+    assert all(m.replay_request(row["request_root"])["model"] == row["model"] for row in events)
+
+
 def test_leak_guard_covers_every_retrieval_channel():
     """2026-07-30: the guard read a "trace" key the v3 memory schema had
     renamed to walk_channel, so no retrieved row was ever inside it - only
@@ -698,7 +757,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 15, "handles": 10, "boundary": 11}
+        "ends": 15, "handles": 11, "boundary": 12}
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
     assert m.STEP_LIMIT == 48
@@ -879,6 +938,7 @@ def test_sol_uses_explicit_provider_cache_policy(monkeypatch):
         def create(self, **kwargs): sent.update(kwargs); return "response"
     dialect = m.OpenAIDialect.__new__(m.OpenAIDialect)
     dialect.client = type("Client", (), {"responses": Responses()})()
+    monkeypatch.setattr(m, "seal_request", lambda _provider, payload: payload)
     assert dialect.send([{"role": "user", "content": "x"}], tools=False) == "response"
     assert sent["prompt_cache_key"] == "vybn-wake-sol-v1"
     assert sent["extra_body"] == {"prompt_cache_options": {"mode": "implicit", "ttl": "30m"}}
