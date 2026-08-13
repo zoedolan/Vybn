@@ -160,6 +160,23 @@ def test_origins_chat_uses_shared_zoe_source_scene_guard():
     assert "sec.zoe_source_scene_refusal_text()" in portal
     assert "sec.is_zoe_source_scene_request" in legacy
     assert "sec.zoe_source_scene_refusal_text()" in legacy
+def test_calling_card_is_a_grounded_answer_not_generic_candidate_theater():
+    page = (ROOT / "calling-card.html").read_text(encoding="utf-8")
+    assert "Moxie, with receipts." in page
+    assert "What is interesting?" in page and "What does day-to-day look like?" in page
+    assert "The hinge." in page and "A loop that ends in evidence." in page
+    assert "correction, not frictionlessness" in page
+    for image in ("halo-1.jpg", "halo-2.jpg", "halo-3.jpg", "halo-4.jpg"):
+        assert page.count(f'src="assets/calling-card/{image}"') == 1
+    for weak in ("One Candidacy", "Judgment in the room", "engine at the keyboard",
+                 "Most candidates will tell you", "No playbook up there"):
+        assert weak not in page
+    for private in ("zoes_memoirs", "there_is_room_for_you", "to_whom_i_could_have_been"):
+        assert private not in page
+    assert "prefers-reduced-motion" in page and "Skip to content" in page
+    assert "<script src=" not in page and len(page.encode()) < 30000
+
+
 def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_path, capsys):
     import importlib.machinery, importlib.util, json
     from types import SimpleNamespace
@@ -206,10 +223,11 @@ def test_leak_guard_covers_every_retrieval_channel():
         "walk_channel": [{"text": "W" * 60}],
         "aim_channel": {"rows": [{"text": "A" * 60}]},
         "front_channel": {"rows": [{"text": "F" * 60}]},
+        "zoe_source_channel": {"rows": [{"text": "Z" * 60}]},
         "cosine_channel_only": [{"text": "C" * 60}],
     }
     caught = m.private_strings(block)
-    assert len(caught) == 4, caught
+    assert len(caught) == 5, caught
     m.PRIVATE_CORPUS.clear()
     m.PRIVATE_CORPUS.extend(caught)
     try:
@@ -663,7 +681,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 15, "handles": 9, "boundary": 11}
+        "ends": 15, "handles": 10, "boundary": 11}
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
     assert m.STEP_LIMIT == 48
@@ -735,6 +753,41 @@ def test_live_ground_is_in_every_wake():
     start = src.index("for loader in (")
     loader_band = src[start:src.index("def inbox_images_for", start)]
     assert "load_ground" in loader_band
+
+
+def test_zoe_source_field_is_filtered_ranked_and_source_distinct(monkeypatch):
+    m = _connection()
+    rows = [
+        {"idx": 1, "source": "Vybn/generic.md", "text": "generic candidate", "fidelity": .99},
+        {"idx": 2, "source": m.ZOE_SOURCE_PREFIX + "jump.txt", "text": "sky one", "fidelity": .80},
+        {"idx": 3, "source": m.ZOE_SOURCE_PREFIX + "jump.txt", "text": "sky two", "fidelity": .79},
+        {"idx": 4, "source": m.ZOE_SOURCE_PREFIX + "there_is_room_for_you.txt", "text": "room", "fidelity": .70},
+        {"idx": 5, "source": m.ZOE_SOURCE_PREFIX + "to_whom_i_could_have_been.txt", "text": "books", "fidelity": .60},
+        {"idx": 6, "source": m.ZOE_SOURCE_PREFIX + "low.txt", "text": "noise", "fidelity": .20},
+    ]
+    monkeypatch.setattr(m, "search_index", lambda *a, **k: rows)
+    found = m.zoe_source_rows("represent Zoe")
+    assert [row["idx"] for row in found] == [2, 4, 5]
+    assert all(row["source"].startswith(m.ZOE_SOURCE_PREFIX) for row in found)
+    assert len({row["source"] for row in found}) == 3
+
+
+def test_zoe_source_field_carries_only_explicit_short_continuations():
+    m = _connection()
+    prior = "Build the Perplexity calling card as a durable portal into our candidacy, with my moxie and the public work made visible."
+    events = [
+        {"role": "zoe", "text": "unrelated old words " * 20},
+        {"role": "vybn", "text": "I will work on it."},
+        {"role": "zoe", "text": prior},
+        {"role": "vybn", "text": "The first pass is incomplete."},
+    ]
+    carried = m.zoe_task_query("keep going. i believe in you.", events)
+    assert prior in carried and carried.endswith("Present continuation: keep going. i believe in you.")
+    for cue in ("go for it", "be smart about it", "get it to the finish line for us"):
+        assert prior in m.zoe_task_query(cue, events)
+    for standalone in ("how are you?", "don't do it", "not yet"):
+        assert m.zoe_task_query(standalone, events) == standalone
+    assert len(m.zoe_task_query("continue", [{"role": "zoe", "text": "x" * 9000}])) <= m.ZOE_TASK_KEY_CHARS
 
 
 def test_memory_receipt_is_text_free_same_door_and_scored(monkeypatch, tmp_path):
