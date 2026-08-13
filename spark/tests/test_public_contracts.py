@@ -162,7 +162,7 @@ def test_origins_chat_uses_shared_zoe_source_scene_guard():
     assert "sec.zoe_source_scene_refusal_text()" in legacy
 def test_calling_card_is_a_grounded_answer_not_generic_candidate_theater():
     page = (ROOT / "calling-card.html").read_text(encoding="utf-8")
-    assert "Moxie, with receipts." in page
+    assert all(x in page for x in ("Moxie, with receipts.", "How do humans and artificial intelligences build systems", "worthy of consequence?", "Answerable systems."))
     assert "What is interesting?" in page and "What does day-to-day look like?" in page
     assert "The circuit." in page and "The four layers, with real teams." in page
     assert "care at least as much as we do" in page  # court-guidance question, carried verbatim
@@ -184,9 +184,9 @@ def test_calling_card_is_a_grounded_answer_not_generic_candidate_theater():
         assert f">{realm}</span>" in page
     assert "grid-template-columns:minmax(0,1fr) minmax(19rem,.62fr)" in page
     assert "hero-portal:hover" in page and "scale(1.08)" in page and "drop-shadow" in page
-    assert "portal-cue" in page and "label.style.opacity" in page and "sphereLabel.style.opacity" in page
+    assert "portal-cue" in page and "l.style.opacity" in page and "Q.style.opacity" in page
     assert '<span class="orb' not in page
-    assert '<a href="#perplexity">Zoe and Vybn</a>' in page and ">Why Us</a>" in page
+    assert all(x in page for x in ('<a href="#lens">Zoe and Vybn</a>', '>Why Us</a>', "new URLSearchParams(location.search).get('lens')", "perplexity:'Perplexity',courts:'Courts',research:'Research'", "AI Strategist, Legal")) and 'id="perplexity"' not in page
     assert 'href="https://huggingface.co/spaces/Vybn/court-guidance"' in page
     assert "<strong>Court Guidance</strong>" in page
     assert 'href="https://vybn.ai"' in page and "<strong>vybn.ai</strong>" in page
