@@ -178,6 +178,13 @@ def test_calling_card_is_a_grounded_answer_not_generic_candidate_theater():
     for private in ("zoes_memoirs", "there_is_room_for_you", "to_whom_i_could_have_been"):
         assert private not in page
     assert "prefers-reduced-motion" in page and "Skip to content" in page
+    assert 'id="heroGeometry"' in page and "H=2*Math.SQRT2" in page
+    assert '<span class="orb' not in page
+    assert '<a href="#perplexity">Zoe and Vybn</a>' in page and ">Why Us</a>" in page
+    assert 'href="https://huggingface.co/spaces/Vybn/court-guidance"' in page
+    assert "<strong>Court Guidance</strong>" in page
+    assert 'href="https://vybn.ai"' in page and "<strong>vybn.ai</strong>" in page
+    assert "Legal operations prototypes" not in page and "<strong>Synaptic Justice</strong>" not in page
     assert "<script src=" not in page and len(page.encode()) < 30000
 
 
