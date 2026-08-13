@@ -179,6 +179,12 @@ def test_calling_card_is_a_grounded_answer_not_generic_candidate_theater():
         assert private not in page
     assert "prefers-reduced-motion" in page and "Skip to content" in page
     assert 'id="heroGeometry"' in page and "H=2*Math.SQRT2" in page
+    assert 'class="hero-portal" href="https://huggingface.co/spaces/Vybn/co-protection"' in page
+    for realm in ("Human", "AI", "Law", "World", "Emergence", "Shared intelligence"):
+        assert f">{realm}</span>" in page
+    assert "grid-template-columns:minmax(0,1fr) minmax(19rem,.62fr)" in page
+    assert "hero-portal:hover" in page and "scale(1.08)" in page and "drop-shadow" in page
+    assert "portal-cue" in page and "label.style.opacity" in page and "sphereLabel.style.opacity" in page
     assert '<span class="orb' not in page
     assert '<a href="#perplexity">Zoe and Vybn</a>' in page and ">Why Us</a>" in page
     assert 'href="https://huggingface.co/spaces/Vybn/court-guidance"' in page
