@@ -164,9 +164,13 @@ def test_calling_card_is_a_grounded_answer_not_generic_candidate_theater():
     page = (ROOT / "calling-card.html").read_text(encoding="utf-8")
     assert "Moxie, with receipts." in page
     assert "What is interesting?" in page and "What does day-to-day look like?" in page
-    assert "The hinge." in page and "A loop that ends in evidence." in page
+    assert "The circuit." in page and "The four layers, with real teams." in page
+    assert "care at least as much as we do" in page  # court-guidance question, carried verbatim
+    assert "Humans build worlds from selves. AIs build selves from worlds." in page  # co-protection circuit, carried verbatim
     assert "correction, not frictionlessness" in page
-    for image in ("halo-1.jpg", "halo-2.jpg", "halo-3.jpg", "halo-4.jpg"):
+    assert page.index("halo-1.jpg", 2000) < page.index("halo-2.jpg", 2000) < page.index("halo-4.jpg", 2000)
+    for image in ("halo-1.jpg", "halo-2.jpg", "halo-3.jpg", "halo-4.jpg",
+                  "world-self-human.jpg", "world-self-ai.jpg"):
         assert page.count(f'src="assets/calling-card/{image}"') == 1
     for weak in ("One Candidacy", "Judgment in the room", "engine at the keyboard",
                  "Most candidates will tell you", "No playbook up there"):
