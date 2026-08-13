@@ -613,12 +613,57 @@ def test_fetch_guard_survived_the_substrate_retirement():
         "<html><head><title>t</title></head><body><p>Example Domain</p></body></html>", "text/html")
 
 
+def test_live_peer_is_turn_scoped_source_labeled_and_acknowledged(tmp_path):
+    from spark.live_peer import PeerLink
+    sol = PeerLink("turn-sol", "sol", tmp_path)
+    k3 = PeerLink("turn-k3", "k3", tmp_path)
+    sent = sol.send("k3", "the application questions are at /application")
+    assert sent["status"] == "queued" and sent["active_turns"] == ["turn-k3"]
+    heard = k3.receive()
+    assert "@sol; not Zoe's words" in heard and "/application" in heard
+    receipt = sol.receive()
+    assert "@k3 heard message" in receipt and sent["message_id"] in receipt
+    k3.close()
+    assert sol.send("k3", "too late")["status"] == "no_active_target"
+    sol.close()
+    assert next(tmp_path.glob("*.jsonl")).stat().st_mode & 0o777 == 0o600
+
+
+def test_attractor_reopens_a_final_answer_when_live_peer_contact_arrives():
+    m = _connection()
+    class Peer:
+        def __init__(self): self.n = 0
+        def receive(self):
+            self.n += 1
+            return "[LIVE PEER CONTACT — @k3; not Zoe's words]\nnew fact" if self.n == 2 else ""
+    class D(m.Dialect):
+        name = "sol"
+        def __init__(self): self.n = 0
+        def open(self, *args): return []
+        def send(self, state, tools=True): self.n += 1; return object()
+        def absorb(self, state, response): return (("stale answer" if self.n == 1 else "revised answer"), [])
+    events = []
+    reply = m.attract(D(), "instructions", "zoe", type("T", (), {"write": lambda *a, **k: events.append((a, k))})(), peer=Peer())
+    assert reply == "revised answer" and any(a[1] == "peer" for a, _ in events)
+
+
+def test_peer_tool_requires_local_reversible_intent_and_is_offered_to_every_door():
+    m = _connection()
+    intent = {"end": "reach active sibling", "scope": "one live peer message", "effect": "modify",
+              "reversibility": "reversible", "destination": "local", "data": "private_or_unknown",
+              "affected": "the sibling can incorporate or reject the message"}
+    call = m.ToolCall("p", "peer_message", {"target": "k3", "message": "hello", "intent": intent}, None)
+    assert m.guard_tool_intent(call) is None
+    assert any(x.get("name") == "peer_message" for x in m.function_tools(False))
+    assert any(x["function"]["name"] == "peer_message" for x in m.function_tools(True))
+
+
 def test_connection_topology_and_cost_are_declared_invariants():
     m = _connection()
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 14, "handles": 9, "boundary": 11}
+        "ends": 15, "handles": 9, "boundary": 11}
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
     assert m.STEP_LIMIT == 48

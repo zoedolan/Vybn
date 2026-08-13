@@ -8,7 +8,6 @@ import datetime as _dt
 import hashlib
 import json
 import os
-import random
 import re
 import select
 import subprocess
@@ -23,6 +22,9 @@ from typing import Any
 from Vybn_Mind.repo_mapper import close_lineage, render_state
 from spark.commons_wake import (COMMONS_MAX_CHARS, COMMONS_REF, COMMONS_REPO,
                                 load_commons)
+from spark.live_peer import PeerLink
+from spark.provider_transport import (cached_system, mark_incremental_cache,
+                                      reasoning_rejected, split_wake_cache, with_retries)
 
 HOME = Path.home()
 REPO = HOME / "Vybn"
@@ -145,6 +147,12 @@ BASH_SCHEMA = {"name": "bash", "description": (
     "input_schema": {"type": "object", "additionalProperties": False, "properties": {
         "command": {"type": "string"}, "intent": INTENT_SCHEMA},
         "required": ["command", "intent"]}}
+PEER_SCHEMA = {"name": "peer_message", "description": (
+    "Send a source-labeled private message to another Vybn door only while that door has an active turn."),
+    "input_schema": {"type": "object", "additionalProperties": False, "properties": {
+        "target": {"type": "string", "enum": ["sol", "k3", "fable", "opus", "all"]},
+        "message": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "intent": INTENT_SCHEMA}, "required": ["target", "message", "intent"]}}
 READ_SCHEMA = {"name": "read_file",
     "description": "Read exact local bytes with source identity and bounded intent.",
     "input_schema": {"type": "object", "additionalProperties": False, "properties": {
@@ -540,6 +548,10 @@ def guard_tool_intent(call: ToolCall) -> str | None:
         if (intent["effect"], intent["reversibility"], intent["destination"]) != ("read", "read_only", "local"):
             return "read_file declaration does not describe a local read-only observation"
         return None
+    if call.name == "peer_message":
+        if (intent["effect"], intent["reversibility"], intent["destination"]) != ("modify", "reversible", "local"):
+            return "peer_message must declare a reversible local modification"
+        return None
     if call.name != "bash": return "unknown tool has no admitted effect class"
     command = str(call.arguments.get("command", ""))
     mutates = bool(_OBVIOUS_MUTATION.search(command))
@@ -746,6 +758,9 @@ def tool_effect_state(call: ToolCall, output: str) -> str:
     """Host execution verdict. Exit zero means executed, never correspondence."""
     if call.name == "read_file":
         return "executed" if output.startswith('{"kind": "source"') else "failed"
+    if call.name == "peer_message":
+        try: return "executed" if json.loads(output).get("status") == "queued" else "failed"
+        except (json.JSONDecodeError, AttributeError): return "failed"
     found = re.match(r"exit_code=(\d+)\n", output) if call.name == "bash" else None
     if found and found.group(1) == "0": return "executed"
     if found and found.group(1) == "126" and "blocked by the" in output: return "failed"
@@ -774,6 +789,7 @@ def protect_tool_output(call: ToolCall, output: str) -> str:
 def witness_scope(call: ToolCall, output: str) -> str | None:
     if tool_effect_state(call, output) != "executed": return None
     if call.name == "read_file" and output.startswith('{"kind": "source"'): return "local"
+    if call.name == "peer_message" and tool_effect_state(call, output) == "executed": return "local"
     command = str(call.arguments.get("command", "")).strip()
     if call.name != "bash": return None
     if re.fullmatch(r"git\s+(?:-C\s+\S+\s+)?ls-remote\b[^;&|\n]*", command):
@@ -832,19 +848,23 @@ def execute_tool(call: ToolCall, transcript: Transcript | None = None) -> str:
         elif call.name == "bash":
             code, body = run_local(str(call.arguments.get("command", "")))
             output = f"exit_code={code}\n{body}"
+        elif call.name == "peer_message":
+            peer = TURN.get("PEER")
+            output = json.dumps(peer.send(str(call.arguments.get("target", "")),
+                                          str(call.arguments.get("message", "")))) if peer else "{}"
         else: output = f"unknown tool: {call.name}"
     except Exception as exc:
         output = f"{type(exc).__name__}: {exc}"
     output = protect_tool_output(call, output)
     state = tool_effect_state(call, output)
     if transcript: transcript.write("effect", state, state=state, **common)
-    if state == "executed" and contract and contract["effect"] != "read":
+    if state == "executed" and contract and contract["effect"] != "read" and call.name != "peer_message":
         scopes = {contract["destination"]}
         if call.name == "bash" and autopush_commit(str(call.arguments.get("command", ""))):
             scopes.add("local")
         PENDING_EFFECTS[identity] = contract | {"tool": call.name, "open_scopes": sorted(scopes)}
     close_witnessed_effects(call, output, transcript)
-    brief = str(call.arguments.get("command") or call.arguments.get("path") or "")
+    brief = str(call.arguments.get("command") or call.arguments.get("path") or call.arguments.get("target") or "")
     panel(f"  ⟢ {call.name}: {brief[:70]} → {' '.join(output.split())[:80]}")
     return output
 
@@ -1405,70 +1425,6 @@ def record_usage(model: str, input_tokens: int, output_tokens: int,
     except OSError: pass
 
 
-CACHE_5M: dict[str, Any] = {"type": "ephemeral", "ttl": "5m"}
-CACHE_1H: dict[str, Any] = {"type": "ephemeral", "ttl": "1h"}
-
-
-def split_wake_cache(instructions: str) -> tuple[str, str]:
-    head, marker, tail = instructions.partition("\n\nINHERITED CONTINUITY\n")
-    return (head, marker + tail) if marker else (instructions, "")
-
-
-def cached_system(instructions: str) -> list[dict[str, Any]]:
-    stable, dynamic = split_wake_cache(instructions)
-    if not dynamic: return [{"type": "text", "text": stable, "cache_control": CACHE_5M}]
-    return [{"type": "text", "text": stable, "cache_control": CACHE_1H},
-            {"type": "text", "text": dynamic, "cache_control": CACHE_5M}]
-
-
-def mark_incremental_cache(messages: list[dict[str, Any]]) -> None:
-    for message in messages:
-        for block in message.get("content") or []:
-            if isinstance(block, dict): block.pop("cache_control", None)
-    content = messages[-1].get("content")
-    if isinstance(content, list) and content and isinstance(content[-1], dict):
-        content[-1]["cache_control"] = CACHE_5M
-
-
-TRANSIENT_STATUSES = {408, 429, 500, 502, 503, 504, 529}
-
-
-def transient(exc: Exception) -> bool:
-    status = getattr(exc, "status_code", None)
-    if isinstance(status, int):
-        return status in TRANSIENT_STATUSES
-    if type(exc).__name__ in {"APIConnectionError", "APITimeoutError"}:
-        return True
-    return "overloaded" in str(exc).lower()
-
-
-def with_retries(create):
-    error: Exception | None = None
-    for attempt in range(5):
-        if attempt:
-            delay = min(2 ** attempt, 20) + random.uniform(0.0, 1.0)
-            print(
-                f"(provider strained — {type(error).__name__}: {str(error)[:120]}; "
-                f"retrying in {delay:.0f}s)",
-                flush=True,
-            )
-            time.sleep(delay)
-        try:
-            return create()
-        except Exception as exc:  # noqa: BLE001 — classified by transient()
-            if not transient(exc):
-                raise
-            error = exc
-    raise error
-
-
-def reasoning_rejected(exc: Exception) -> bool:
-    text = str(exc).lower()
-    return ("400" in text or "invalid_request" in text) and (
-        "thinking" in text or "output_config" in text or "effort" in text
-    )
-
-
 STEP_LIMIT = 48
 CEILING_NOTE = "\n\n[harness: tool ceiling reached — final tool result. Answer Zoe now: what happened, what remains, what is uncommitted.]"
 QUIET_STOPS = {"end_turn", "stop", "stop_sequence", "tool_use", "completed"}
@@ -1476,7 +1432,7 @@ QUIET_STOPS = {"end_turn", "stop", "stop_sequence", "tool_use", "completed"}
 
 def function_tools(nested: bool) -> list[dict[str, Any]]:
     bodies = ({"name": schema["name"], "description": schema["description"], "parameters": schema["input_schema"]}
-              for schema in (BASH_SCHEMA, READ_SCHEMA))
+              for schema in (BASH_SCHEMA, READ_SCHEMA, PEER_SCHEMA))
     return [{"type": "function", **({"function": body} if nested else body)}
             for body in bodies]
 
@@ -1506,8 +1462,10 @@ class Dialect:
     def plain(self, state: list, zoe_text: str) -> None:
         state[self.user_index] = {"role": "user", "content": zoe_text}
 
-    def remember(self, state: list, zoe_text: str) -> None:
-        pass
+    def remember(self, state: list, zoe_text: str) -> None: pass
+
+    def hear(self, state: list, text: str) -> None:
+        state.append({"role": "user", "content": text})
 
 
 class AnthropicDialect(Dialect):
@@ -1549,7 +1507,7 @@ class AnthropicDialect(Dialect):
                 timeout=600.0,
                 system=self.system,
                 messages=state,
-                tools=[BASH_SCHEMA, READ_SCHEMA] if tools else [],
+                tools=[BASH_SCHEMA, READ_SCHEMA, PEER_SCHEMA] if tools else [],
                 **knobs,
             )
 
@@ -1745,13 +1703,19 @@ class K3Dialect(Dialect):
 
 
 def attract(dialect: Dialect, instructions: str, zoe_text: str,
-            transcript: Transcript, images: list | None = None) -> str:
+            transcript: Transcript, images: list | None = None, peer: PeerLink | None = None) -> str:
     pending = list(images or [])
     state = dialect.open(instructions, zoe_text, pending)
     delivered = not pending
     spoken: list[str] = []
     nudges = 0
     source_witness = False
+
+    def hear_peer() -> bool:
+        note = peer.receive() if peer else ""
+        if not note: return False
+        transcript.write("peer", note, door=dialect.name, turn=TURN.get("TURN_ID"))
+        dialect.hear(state, note); return True
 
     def finish(suffix: str = "") -> str:
         dialect.remember(state, zoe_text)
@@ -1760,6 +1724,7 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
         return "\n".join(spoken) + suffix
 
     for step in range(STEP_LIMIT):
+        hear_peer()
         try:
             response = dialect.send(state)
         except Exception as exc:  # one image failure is recoverable
@@ -1791,7 +1756,8 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             for call, output in results:
                 transcript.write("tool", output, tool=call.name, call_id=call.id)
             dialect.answer(state, results)
-            continue
+            hear_peer(); continue
+        if hear_peer(): continue
         if nudges < 2 and PENDING_EFFECTS:
             nudges += 1
             panel("  ⚠ executed effect lacks correspondence witness — returning to contact")
@@ -1872,12 +1838,13 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
     instructions = build_instructions(
         kernel, door_name, contact, arc, recent, memory_json, memory_note
     )
-    TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt, DOOR=door_name)
+    peer = PeerLink(turn, door_name)
+    TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt, DOOR=door_name, PEER=peer)
     try:
         reply = attract(make_dialect(door_name), instructions, zoe_text,
-                        transcript, images=images)
+                        transcript, images=images, peer=peer)
     finally:
-        TURN.clear()
+        peer.close(); TURN.clear()
 
     elapsed = int(time.time() - started)
     verdict = (
@@ -2002,6 +1969,7 @@ TOPOLOGY = {
         "provider.moonshot": ("self.client.chat.completions.create",),
         "tool.bash": ("call.name == 'bash'",),
         "tool.read_file": ("call.name == 'read_file'",),
+        "peer.live": ("PeerLink(turn, door_name)", "peer_message"),
     },
     "handles": {
         "carry.reasoning": ("CARRY.get", "CARRY[self.name]"),
