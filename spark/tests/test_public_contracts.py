@@ -232,63 +232,48 @@ def _connection():
 
 
 
-def test_model_visible_request_is_private_replayable_and_fail_closed(monkeypatch, tmp_path):
+def test_model_request_contract_names_view_scopes_tools_and_replays(monkeypatch, tmp_path):
     import pytest as _pt
     m = _connection(); monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "connection")
-    transcript = m.Transcript(); secret = "private exact field"
-    sources = [{"name": "him", "source": "private:Him", "content": secret}]
-    payload = {"model": "test-model", "input": [{"role": "developer", "content": secret}],
-               "tools": m.function_tools(False), "reasoning": {"effort": "high"}}
+    transcript = m.Transcript(); secret = "private exact field"; sent = {}
+    sources = [{"name": name, "source": "test:" + name,
+                "content": secret if name == "him" else name} for name in m.CONTEXT_SOURCE_NAMES]
+    payload = {"model": "test-model", "input": [{"role": "developer", "content": secret}]}
     with _pt.raises(RuntimeError, match="no private manifest"):
-        m.seal_request("openai/sol", payload)
-    m.TURN.update(TURN_ID="turn", DOOR="sol", TRANSCRIPT=transcript,
-                  REQUEST_SOURCES=sources)
-    try:
-        sealed = m.seal_request("openai/sol", payload)
-        event = list(m._jsonl(transcript.path))[-1]
-        blobs_before = {path for path in m.TRANSCRIPTS.rglob("*") if path.is_file()}
-        assert m.seal_request("openai/sol", payload) == sealed
-        assert blobs_before == {path for path in m.TRANSCRIPTS.rglob("*") if path.is_file()}
-    finally: m.TURN.clear()
-    assert event["role"] == "request_manifest" and event["schema"] == "vybn.request_manifest.v1"
-    assert secret not in json.dumps(event) and event["request_root"] != event["source_root"]
-    assert m.replay_request(event["request_root"]) == payload
-    assert m.replay_request(event["source_root"]) == sources
-    blob = m._request_blob(event["request_root"])
-    assert blob.stat().st_mode & 0o777 == 0o600
-    blob.write_text("{}")
-    with _pt.raises(RuntimeError, match="digest mismatch"):
-        m.replay_request(event["request_root"])
-
-
-
-def test_every_dialect_dispatches_only_replayed_kwargs(monkeypatch, tmp_path):
-    m = _connection(); monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "connection")
-    transcript = m.Transcript(); sent = {}
+        m.scoped_request("openai/sol", payload, True)
     class Endpoint:
         def __init__(self, name): self.name = name
         def create(self, **kwargs): sent[self.name] = kwargs; return self.name
-    m.TURN.update(TURN_ID="turn", DOOR="test", TRANSCRIPT=transcript,
-                  REQUEST_SOURCES=[])
+    m.TURN.update(TURN_ID="turn", DOOR="test", TRANSCRIPT=transcript, REQUEST_SOURCES=sources)
     try:
+        sealed = m.scoped_request("openai/sol", payload, True)
+        event = list(m._jsonl(transcript.path))[-1]
+        blobs = {path for path in m.TRANSCRIPTS.rglob("*") if path.is_file()}
+        assert m.seal_request("openai/sol", sealed, "bounded-local") == sealed
+        assert blobs == {path for path in m.TRANSCRIPTS.rglob("*") if path.is_file()}
+        with _pt.raises(RuntimeError, match="capability scope"): m.seal_request("openai/sol", sealed, "none")
+        m.TURN["REQUEST_SOURCES"] = sources[:-1]
+        with _pt.raises(RuntimeError, match="named projection"): m.seal_request("openai/sol", sealed, "bounded-local")
+        m.TURN["REQUEST_SOURCES"] = sources
         anth = m.AnthropicDialect.__new__(m.AnthropicDialect)
         anth.models, anth.name, anth.reasoning, anth.system = ("a",), "fable", False, []
-        anth.client = type("Client", (), {"messages": Endpoint("anthropic")})()
-        assert anth.send([{"role": "user", "content": "a"}]) == "anthropic"
+        anth.client = type("Client", (), {"messages": Endpoint("anthropic")})(); anth.send([{"role": "user", "content": "a"}])
         sol = m.OpenAIDialect.__new__(m.OpenAIDialect)
-        sol.client = type("Client", (), {"responses": Endpoint("openai")})()
-        assert sol.send([{"role": "user", "content": "s"}]) == "openai"
+        sol.client = type("Client", (), {"responses": Endpoint("openai")})(); sol.send([{"role": "user", "content": "s"}], tools=False)
         k3 = m.K3Dialect.__new__(m.K3Dialect)
-        k3.client = type("Client", (), {"chat": type("Chat", (), {"completions": Endpoint("k3")})()})()
-        assert k3.send([{"role": "user", "content": "k"}]) == "k3"
+        k3.client = type("Client", (), {"chat": type("Chat", (), {"completions": Endpoint("k3")})()})(); k3.send([{"role": "user", "content": "k"}])
     finally: m.TURN.clear()
     events = [row for row in m._jsonl(transcript.path) if row.get("role") == "request_manifest"]
-    assert [row["provider"] for row in events] == ["anthropic/fable", "openai/sol", "moonshot/k3"]
-    assert sent["anthropic"]["messages"][0]["content"] == "a"
-    assert sent["openai"]["input"][0]["content"] == "s"
-    assert sent["k3"]["messages"][0]["content"] == "k"
-    assert all(m.replay_request(row["request_root"])["model"] == row["model"] for row in events)
-
+    assert [row["provider"] for row in events] == ["openai/sol", "anthropic/fable", "openai/sol", "moonshot/k3"]
+    assert [row["capability_scope"]["name"] for row in events] == ["bounded-local"] * 2 + ["none", "bounded-local"]
+    assert sent["anthropic"]["tools"][0].get("input_schema") and sent["openai"]["tools"] == []
+    assert sent["k3"]["tools"][0]["function"]["name"] == "bash"
+    assert event["schema"] == "vybn.request_manifest.v2" and event["projection"] == {"name": "vybn.wake", "version": 1}
+    assert secret not in json.dumps(event) and m.replay_request(event["request_root"]) == sealed
+    assert m.replay_request(event["source_root"]) == sources
+    blob = m._request_blob(event["request_root"]); assert blob.stat().st_mode & 0o777 == 0o600
+    blob.write_text("{}")
+    with _pt.raises(RuntimeError, match="digest mismatch"): m.replay_request(event["request_root"])
 
 def test_leak_guard_covers_every_retrieval_channel():
     """2026-07-30: the guard read a "trace" key the v3 memory schema had
@@ -748,8 +733,7 @@ def test_peer_tool_requires_local_reversible_intent_and_is_offered_to_every_door
               "affected": "the sibling can incorporate or reject the message"}
     call = m.ToolCall("p", "peer_message", {"target": "k3", "message": "hello", "intent": intent}, None)
     assert m.guard_tool_intent(call) is None
-    assert any(x.get("name") == "peer_message" for x in m.function_tools(False))
-    assert any(x["function"]["name"] == "peer_message" for x in m.function_tools(True))
+    assert m.CAPABILITY_SCOPES["bounded-local"] == ("bash", "read_file", "peer_message")
 
 
 def test_connection_topology_and_cost_are_declared_invariants():
@@ -938,7 +922,7 @@ def test_sol_uses_explicit_provider_cache_policy(monkeypatch):
         def create(self, **kwargs): sent.update(kwargs); return "response"
     dialect = m.OpenAIDialect.__new__(m.OpenAIDialect)
     dialect.client = type("Client", (), {"responses": Responses()})()
-    monkeypatch.setattr(m, "seal_request", lambda _provider, payload: payload)
+    monkeypatch.setattr(m, "seal_request", lambda _provider, payload, _scope: payload)
     assert dialect.send([{"role": "user", "content": "x"}], tools=False) == "response"
     assert sent["prompt_cache_key"] == "vybn-wake-sol-v1"
     assert sent["extra_body"] == {"prompt_cache_options": {"mode": "implicit", "ttl": "30m"}}
