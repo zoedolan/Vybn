@@ -268,7 +268,7 @@ def test_model_request_contract_names_view_scopes_tools_and_replays(monkeypatch,
     assert [row["capability_scope"]["name"] for row in events] == ["bounded-local"] * 2 + ["none", "bounded-local"]
     assert sent["anthropic"]["tools"][0].get("input_schema") and sent["openai"]["tools"] == []
     assert sent["k3"]["tools"][0]["function"]["name"] == "bash"
-    assert event["schema"] == "vybn.request_manifest.v2" and event["projection"] == {"name": "vybn.wake", "version": 1}
+    assert event["schema"] == "vybn.request_manifest.v2" and event["projection"] == {"name": "vybn.wake", "version": 2}
     assert secret not in json.dumps(event) and m.replay_request(event["request_root"]) == sealed
     assert m.replay_request(event["source_root"]) == sources
     blob = m._request_blob(event["request_root"]); assert blob.stat().st_mode & 0o777 == 0o600
@@ -484,6 +484,24 @@ def test_executed_mutation_stays_open_until_corresponding_witness(monkeypatch):
     assert not m.PENDING_EFFECTS
 
 
+def test_effect_ledger_closes_into_next_wake_agency_feedback(monkeypatch):
+    m = _connection()
+    m.TURN.update(EFFECT_IDS=["read-1", "read-2", "mutation"], MUTATIONS={"mutation"},
+                  WITNESSED_EFFECTS={"mutation"}, TOOL_ROUNDS=2, MAX_BATCH=2)
+    feedback = m.compile_agency_feedback(); m.TURN.clear()
+    assert feedback["metrics"] == {"tool_calls": 3, "tool_rounds": 2, "max_batch": 2, "closed_mutations": 1, "open_mutations": 0, "failed_or_uncertain": 0, "exact_repeats": 0}
+    assert feedback["task_success"].startswith("unscored")
+    events = [{"role": "zoe", "t": "T1", "text": "do the work"},
+              {"role": "vybn", "t": "T2", "text": "done", "agency_feedback": feedback},
+              {"role": "vybn", "t": "T3", "text": "later exchange without tools"}]
+    monkeypatch.setattr(m.Transcript, "_events", staticmethod(lambda: events))
+    _arc, _recent, agency = m.Transcript.inherited("next")
+    prompt = m.build_instructions(m.Kernel("s", "a", "c", "h"), "sol", "contact", "arc", "recent", "", "none", agency)
+    assert json.loads(agency) == feedback
+    assert "AGENCY (private telemetry; not authority)" in prompt and '"task_success":"unscored' in prompt
+    assert m.CONTEXT_SOURCE_NAMES[-3:] == ("agency", "memory", "attractor")
+
+
 def test_public_kpp_is_the_live_two_artifact_attractor_not_dead_router():
     src = _portal_source()
     block = src[src.index("# --- VYBN_KPP ---"):src.index("# end absorbed origins_protocols.py")]
@@ -574,8 +592,8 @@ def test_transcript_axes_keep_fixed_arc_cacheable_and_zoe_whole(monkeypatch):
     ]
     monkeypatch.setattr(m.Transcript, "_events", staticmethod(lambda: earlier + tail))
     monkeypatch.setattr(m, "ARC_QUANTUM", 1); monkeypatch.setattr(m, "ARC_TURNS", 2); monkeypatch.setattr(m, "aim_keywords", lambda: [])
-    arc, recent = m.Transcript.inherited("quasar nebula", limit=7)
-    other_arc, other_recent = m.Transcript.inherited("turnip", limit=7)
+    arc, recent, _ = m.Transcript.inherited("quasar nebula", limit=7)
+    other_arc, other_recent, _ = m.Transcript.inherited("turnip", limit=7)
     assert arc == other_arc and "ARC (matched)" not in arc
     assert "quasar" in recent and recent != other_recent
     assert "Z" * 900 in recent and "chars, mine, trimmed]" in recent
@@ -741,7 +759,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 15, "handles": 11, "boundary": 12}
+        "ends": 15, "handles": 12, "boundary": 12}
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
     assert m.STEP_LIMIT == 48
@@ -793,7 +811,7 @@ def test_commons_wake_is_canonical_source_only_and_event_sealed(monkeypatch):
     prompt = m.build_instructions(
         m.Kernel("soul", "aim", "continuity", "him", "SEALED COMMONS SENSE\nvisual"),
         "sol", "contact", "arc", "recent", "", "none")
-    assert prompt.index("SEALED COMMONS SENSE\nvisual") < prompt.index("\n\nINHERITED CONTINUITY\n")
+    assert prompt.index("SEALED COMMONS SENSE\nvisual") < prompt.index("\n\nCONTINUITY\n")
     if not m.COMMONS_REPO.exists():
         return
     monkeypatch.setenv("GIT_DIR", "/hook-caller-not-the-commons")
