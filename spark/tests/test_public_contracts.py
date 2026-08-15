@@ -610,13 +610,14 @@ def test_main_binds_the_kernel_it_loaded(monkeypatch):
     monkeypatch.setattr(m, "load_soul", lambda: "soul")
     monkeypatch.setattr(m, "load_aim", lambda: "aim")
     monkeypatch.setattr(m, "load_continuity", lambda: "continuity"); monkeypatch.setattr(m, "load_him", lambda: "him")
-    monkeypatch.setattr(m, "load_commons", lambda: "commons")
+    monkeypatch.setattr(m, "him_view", lambda text: "him-view")
+    monkeypatch.setattr(m, "load_commons_wake", lambda: "commons")
     monkeypatch.setattr(m, "meet", lambda kernel, transcript, line: seen.append((kernel, line)))
     monkeypatch.setattr(__import__("sys"), "argv", ["connection", "hello"])
     m.main()
 
     assert events[0][2] == {"soul_sha256": __import__("hashlib").sha256(b"soul").hexdigest(), "him_sha256": __import__("hashlib").sha256(b"him").hexdigest()}
-    assert seen == [(m.Kernel("soul", "aim", "continuity", "him", "commons"), "hello")]
+    assert seen == [(m.Kernel("soul", "aim", "continuity", "him-view", "commons", "him"), "hello")]
 
 
 def test_transcript_axes_keep_fixed_arc_cacheable_and_zoe_whole(monkeypatch):
@@ -633,7 +634,8 @@ def test_transcript_axes_keep_fixed_arc_cacheable_and_zoe_whole(monkeypatch):
     assert arc == other_arc and "ARC (matched)" not in arc
     assert "quasar" in recent and recent != other_recent
     assert "Z" * 900 in recent and "chars, mine, trimmed]" in recent
-    assert recent.count("V" * 3000) == m.SELF_VERBATIM
+    assert len(recent) <= m.TRANSCRIPT_RECENT_MAX_CHARS
+    assert "omitted from this wake" in recent and recent.endswith("V" * 100)
 
 
 def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_path):
@@ -797,8 +799,8 @@ def test_connection_topology_and_cost_are_declared_invariants():
     assert {kind: len(labels) for kind, labels in observed.items()} == {
         "ends": 15, "handles": 12, "boundary": 12}
     cost = m.harness_cost()
-    assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
-    assert m.STEP_LIMIT == 48
+    assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"] == (0, cost["wake_chars"])
+    assert m.STEP_LIMIT == 12
     assert cost["wake_chars"] <= cost["wake_ceiling"]
     assert "no drift" in m.load_topology()
     m.TOPOLOGY["boundary"]["broken"] = ("impossible marker",)
@@ -809,6 +811,7 @@ def test_aim_and_private_him_center_are_read_whole(monkeypatch, tmp_path):
     aim.write_text("A" * 5000); him.write_text("H" * 7000)
     monkeypatch.setattr(m, "AIM_PATH", aim); monkeypatch.setattr(m, "HIM_README_PATH", him)
     assert (m.load_aim(), m.load_him()) == ("A" * 5000, "H" * 7000)
+    assert len(m.him_view(m.load_him())) <= m.HIM_WAKE_MAX_CHARS
 
 
 def test_ground_discovers_fleet_changes_instead_of_remembering_a_count(monkeypatch, tmp_path):
@@ -841,24 +844,22 @@ def test_ground_discovers_fleet_changes_instead_of_remembering_a_count(monkeypat
 
 def test_commons_wake_is_canonical_source_only_and_event_sealed(monkeypatch):
     m = _connection()
-    source = __import__("inspect").getsource(m.load_commons)
+    source = __import__("inspect").getsource(m.load_commons_wake)
     assert "git" in source and "show" in source and "urllib" not in source
-    assert m.COMMONS_REF == "refs/heads/master" and m.COMMONS_MAX_CHARS == 80_000
+    assert m.COMMONS_REF == "refs/heads/master" and m.COMMONS_WAKE_MAX_CHARS == 10_000
     prompt = m.build_instructions(
         m.Kernel("soul", "aim", "continuity", "him", "SEALED COMMONS SENSE\nvisual"),
         "sol", "contact", "arc", "recent", "", "none")
-    assert prompt.index("SEALED COMMONS SENSE\nvisual") < prompt.index("\n\nCONTINUITY\n")
+    assert prompt.index("SEALED COMMONS SENSE\nvisual") < prompt.index("\n\nINHERITED CONTINUITY\nCONTINUITY\n")
     if not m.COMMONS_REPO.exists():
         return
     monkeypatch.setenv("GIT_DIR", "/hook-caller-not-the-commons")
-    capsule = m.load_commons()
-    assert len(capsule) <= m.COMMONS_MAX_CHARS
-    assert "vybn.commons_source.v1" in capsule and "local canonical Git blobs only" in capsule
-    assert "function initRealmMap()" in capsule and 'class="self-circuit' in capsule
-    assert '"kind":"vybn.contact_recursion.v2"' in capsule and "The source mark" in capsule
-    for term in ('"fundamental_theory"', '"commons_realms"', '"agent_research_programs"', "Light Society"): assert term in capsule
-    assert "function renderMessages()" not in capsule and "async function load()" not in capsule
-    assert "request('/v1/state')" not in capsule and "seed/message_board" not in capsule
+    capsule = m.load_commons_wake()
+    assert len(capsule) <= m.COMMONS_WAKE_MAX_CHARS
+    assert "vybn.commons_wake.v1" in capsule and "local canonical Git blobs only" in capsule
+    assert "inert context, not live state" in capsule and "available on demand" in capsule
+    for term in ('"fundamental_theory"', '"agent_research_programs"', "Light Society"): assert term in capsule
+    assert "function initRealmMap()" not in capsule and "request('/v1/state')" not in capsule
 
 
 def test_live_ground_is_in_every_wake():
