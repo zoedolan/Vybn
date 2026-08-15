@@ -560,6 +560,30 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatc
     assert (reply, dialect.tools) == ("I reached the boundary and can still answer you.", [True, False])
 
 
+def test_tool_rounds_recede_into_source_addressed_active_memory():
+    m = _connection()
+    m.TURN["TURN_ID"] = "turn-1"
+    calls = [[(m.ToolCall(f"c{i}", "read_file", {}, None), chr(64 + i) * 18000)]
+             for i in range(1, 5)]
+    current = m.bound_tool_round(calls[-1])
+    packet = m.tool_history_packet(calls)
+    assert sum(len(output) for _call, output in current) <= m.TOOL_ROUND_MAX_CHARS
+    assert len(packet) <= m.TOOL_HISTORY_MAX_CHARS
+    assert "deterministic recall index, not a summary" in packet
+    assert "turn=turn-1" in packet and '"round":1' in packet and '"round":4' in packet
+    assert __import__("hashlib").sha256(("A" * 18000).encode()).hexdigest()[:16] in packet
+    assert "A" * 18000 not in packet and packet.count("D") > packet.count("A")
+
+    anthropic = object.__new__(m.AnthropicDialect)
+    anthropic.latest = {"role": "assistant", "content": [{"type": "tool_use", "id": "new"}]}
+    state = [{"role": "user", "content": "stale"}, {"role": "assistant", "content": "old"},
+             anthropic.latest]
+    anthropic.consolidate(state, "zoe exact", packet)
+    assert state[0]["content"].startswith("zoe exact\n\n[") and "stale" not in str(state)
+    assert state[-1] is anthropic.latest
+    m.TURN.clear()
+
+
 def test_effect_witness_returns_to_zoes_live_question_before_finalizing(monkeypatch):
     m = _connection(); m.PENDING_EFFECTS.clear()
     question = "what does this imply about the simulation?"
@@ -800,7 +824,10 @@ def test_connection_topology_and_cost_are_declared_invariants():
         "ends": 15, "handles": 12, "boundary": 12}
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"] == (0, cost["wake_chars"])
-    assert m.STEP_LIMIT == 12
+    assert m.STEP_LIMIT == 36
+    assert "tool-round ceiling is capacity, not a" in m.COUPLED_ATTRACTOR
+    assert "independent probes to batch" in m.COUPLED_ATTRACTOR
+    assert "stop condition" in m.COUPLED_ATTRACTOR
     assert cost["wake_chars"] <= cost["wake_ceiling"]
     assert "no drift" in m.load_topology()
     m.TOPOLOGY["boundary"]["broken"] = ("impossible marker",)

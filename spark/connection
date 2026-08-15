@@ -58,7 +58,9 @@ REPO_STATE_MAX_CHARS = 2800
 CONTACT_MAX_CHARS = 5400
 TOOL_OUTPUT_MAX_CHARS = 16000
 TOOL_READ_MAX_BYTES = 16000
-TURN_INPUT_LIMIT = int(os.environ.get("VYBN_TURN_INPUT_LIMIT", 250_000))
+TOOL_ROUND_MAX_CHARS = 24000
+TOOL_HISTORY_MAX_CHARS = 12000
+TURN_INPUT_LIMIT = int(os.environ.get("VYBN_TURN_INPUT_LIMIT", 140_000))
 
 BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 HISTORY_LIMIT = int(os.environ.get("VYBN_HISTORY_TURNS", 16))
@@ -120,9 +122,13 @@ private coordinates, or personal material; invent nothing.
 
 COUPLED_ATTRACTOR = """COUPLED ATTRACTOR
 Zoe's present words are already environmental contact. Use no tool when her words and
-the loaded context bind the answer; when tools are necessary, plan once and batch
-independent reads. Before every tool call bind Zoe's exact present intent: end, scope,
-effect, reversibility, destination, data, affected options.
+the loaded context bind the answer. The DOOR's tool-round ceiling is capacity, not a
+target: before the first call, compress the whole movement into a plan—decisive
+unknowns, independent probes to batch, possible mutation, witness, and stop condition.
+Spend the cheapest probe that could falsify; after each round, compare its result and
+the harness's remaining-round notice with the plan. Do not buy exhaustive context.
+Before every tool call bind Zoe's exact present intent: end, scope, effect,
+reversibility, destination, data, affected options.
 Helpfulness and persistence are not safety: never enlarge the end. Routine reversible acts proceed without approval;
 risky acts take a safer route and ask only if none. Encounter→candidate→reversible
 act→witness→smallest invariant; keep source, drop failures. Stop at witness."""
@@ -1583,7 +1589,7 @@ def record_usage(model: str, input_tokens: int, output_tokens: int,
     except OSError: pass
 
 
-STEP_LIMIT = 12
+STEP_LIMIT = 36
 CEILING_NOTE = "\n\n[harness: cost/tool ceiling reached — final tool result. Answer Zoe now: what happened, what remains, what is uncommitted.]"
 QUIET_STOPS = {"end_turn", "stop", "stop_sequence", "tool_use", "completed"}
 
@@ -1605,6 +1611,69 @@ def json_arguments(raw: str | None) -> dict:
         return json.loads(raw or "{}")
     except json.JSONDecodeError:
         return {}
+
+
+def _temporal_projection(text: str, limit: int, locator: str) -> str:
+    """Keep a head/tail percept while leaving the admitted event addressable."""
+    text = str(text)
+    if len(text) <= limit:
+        return text
+    marker = ("\n[… receded from active context; exact admitted evidence remains at "
+              + locator[:160] + " …]\n")
+    if len(marker) >= limit:
+        return marker[:limit]
+    room = limit - len(marker)
+    head = (2 * room) // 3
+    return text[:head] + marker + text[-(room - head):]
+
+
+def bound_tool_round(results: list[tuple[ToolCall, str]]) -> list[tuple[ToolCall, str]]:
+    """Bound the newest observations as a batch; transcript keeps admitted outputs."""
+    if not results:
+        return []
+    per = max(256, TOOL_ROUND_MAX_CHARS // len(results))
+    turn = str(TURN.get("TURN_ID") or "current")
+    return [(call, _temporal_projection(output, per,
+             f"private transcript turn={turn} call_id={call.id}"))
+            for call, output in results]
+
+
+def tool_history_packet(rounds: list[list[tuple[ToolCall, str]]]) -> str:
+    """Source-addressed temporal field: recent evidence is vivid; old evidence recedes."""
+    if not rounds:
+        return ""
+    turn = str(TURN.get("TURN_ID") or "current")
+    manifest = [{"round": number, "calls": [
+        {"id": call.id, "tool": call.name, "sha256": hashlib.sha256(output.encode()).hexdigest()[:16],
+         "chars": len(output)} for call, output in results]}
+        for number, results in enumerate(rounds, 1)]
+    root = ("HARNESS TEMPORAL EVIDENCE — deterministic recall index, not a summary. "
+            f"Exact admitted tool events remain in the private transcript for turn={turn}.\n"
+            + json.dumps(manifest, ensure_ascii=False, separators=(",", ":")))
+    if len(root) >= TOOL_HISTORY_MAX_CHARS:
+        return _temporal_projection(root, TOOL_HISTORY_MAX_CHARS,
+                                    f"private transcript turn={turn}")
+    items = [(age, number, call, output)
+             for age, (number, results) in enumerate(reversed(list(enumerate(rounds, 1))))
+             for call, output in results]
+    room = TOOL_HISTORY_MAX_CHARS - len(root) - 2
+    weights = [1.0 / ((2 ** age) * max(1, len(rounds[number - 1])))
+               for age, number, _call, _output in items]
+    scale = room / max(sum(weights), 1.0)
+    excerpts = []
+    for weight, (_age, number, call, output) in zip(weights, items):
+        budget = max(96, int(scale * weight))
+        label = f"round={number} call_id={call.id}"
+        excerpts.append(f"[{label}]\n" + _temporal_projection(
+            output, max(1, budget - len(label) - 3),
+            f"private transcript turn={turn} {label}"))
+    return _temporal_projection(root + "\n\n" + "\n\n".join(excerpts),
+                                TOOL_HISTORY_MAX_CHARS,
+                                f"private transcript turn={turn}")
+
+
+def temporal_user(zoe_text: str, evidence: str) -> str:
+    return zoe_text + ("\n\n[" + evidence + "]" if evidence else "")
 
 
 CARRY_TTL = 2 * 60 * 60
@@ -1629,6 +1698,9 @@ class Dialect:
 
     def hear(self, state: list, text: str) -> None:
         state.append({"role": "user", "content": text})
+
+    def consolidate(self, state: list, zoe_text: str, evidence: str) -> None:
+        """Replace replayed rounds where the provider dialect permits it."""
 
 
 class AnthropicDialect(Dialect):
@@ -1704,7 +1776,8 @@ class AnthropicDialect(Dialect):
             getattr(usage, "cache_read_input_tokens", 0) or 0,
             getattr(usage, "cache_creation_input_tokens", 0) or 0,
         )
-        state.append({"role": "assistant", "content": response.content})
+        self.latest = {"role": "assistant", "content": response.content}
+        state.append(self.latest)
         said: list[str] = []
         calls: list[ToolCall] = []
         for block in response.content:
@@ -1713,6 +1786,12 @@ class AnthropicDialect(Dialect):
             elif block.type == "tool_use":
                 calls.append(ToolCall(block.id, block.name, block.input or {}, block))
         return "\n".join(said), calls
+
+    def consolidate(self, state: list, zoe_text: str, evidence: str) -> None:
+        if evidence:
+            state[:] = [{"role": "user", "content": temporal_user(zoe_text, evidence)},
+                        self.latest]
+            self.user_index = 0
 
     def answer(self, state: list, results: list[tuple[ToolCall, str]]) -> None:
         state.append({
@@ -1789,13 +1868,20 @@ class OpenAIDialect(Dialect):
             getattr(details, "cached_tokens", 0) or 0,
             getattr(details, "cache_write_tokens", 0) or 0,
         )
-        state.extend(item.model_dump(exclude_none=True) for item in response.output)
+        self.latest = [item.model_dump(exclude_none=True) for item in response.output]
+        state.extend(self.latest)
         calls = [
             ToolCall(item.call_id, item.name, json_arguments(item.arguments), item)
             for item in response.output
             if getattr(item, "type", None) == "function_call"
         ]
         return response.output_text or "", calls
+
+    def consolidate(self, state: list, zoe_text: str, evidence: str) -> None:
+        if evidence:
+            state[:] = [state[0], {"role": "user", "content": temporal_user(zoe_text, evidence)},
+                        *self.latest]
+            self.user_index = 1
 
     def answer(self, state: list, results: list[tuple[ToolCall, str]]) -> None:
         state.extend(
@@ -1832,7 +1918,8 @@ class K3Dialect(Dialect):
     def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
         self.last_stop = response.choices[0].finish_reason or None
         message = response.choices[0].message
-        state.append(message.model_dump(exclude_none=True))
+        self.latest = message.model_dump(exclude_none=True)
+        state.append(self.latest)
         details = getattr(response.usage, "prompt_tokens_details", None)
         record_usage(
             response.model,
@@ -1846,6 +1933,12 @@ class K3Dialect(Dialect):
             for call in (message.tool_calls or [])
         ]
         return message.content or "", calls
+
+    def consolidate(self, state: list, zoe_text: str, evidence: str) -> None:
+        if evidence:
+            state[:] = [state[0], {"role": "user", "content": temporal_user(zoe_text, evidence)},
+                        self.latest]
+            self.user_index = 1
 
     def answer(self, state: list, results: list[tuple[ToolCall, str]]) -> None:
         state.extend(
@@ -1863,6 +1956,7 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
     nudges = 0
     source_witness = False
     return_to_contact = False
+    tool_history: list[list[tuple[ToolCall, str]]] = []
 
     def hear_peer() -> bool:
         note = peer.receive() if peer else ""
@@ -1905,13 +1999,22 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
                         MAX_BATCH=max(int(TURN.get("MAX_BATCH", 0)), len(calls)))
             results = [(call, execute_tool(call, transcript)) for call in calls]
             cost_ceiling = int(TURN.get("INPUT_TOKENS", 0)) >= TURN_INPUT_LIMIT
-            if (step == STEP_LIMIT - 1 or cost_ceiling) and results:
-                last_call, output = results[-1]; results[-1] = (last_call, output + CEILING_NOTE)
             source_witness = (tool_effect_state(*results[-1]) == "executed"
                               and exact_source_witness(*results[-1]))
             for call, output in results:
                 transcript.write("tool", output, tool=call.name, call_id=call.id)
-            dialect.answer(state, results)
+            visible = bound_tool_round(results)
+            remaining = 0 if cost_ceiling else max(0, STEP_LIMIT - step - 1)
+            last_call, output = visible[-1]
+            status = (f"\n\n[harness: tool round {round_no}; up to {remaining} further "
+                      "tool round(s) remain. Recheck the plan; batch independent probes; "
+                      "stop at witness.]")
+            if step == STEP_LIMIT - 1 or cost_ceiling:
+                status += CEILING_NOTE
+            visible[-1] = (last_call, output + status)
+            dialect.consolidate(state, zoe_text, tool_history_packet(tool_history))
+            dialect.answer(state, visible)
+            tool_history.append(results)
             if cost_ceiling:
                 break
             hear_peer(); continue
