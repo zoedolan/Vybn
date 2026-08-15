@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>the question is still now — a deictic transport sketch</title>
+<meta name="description" content="The same interruption under recency and under a transported present.">
+<style>
+  :root{color-scheme:dark;--ink:#f4efe5;--mute:#9692a2;--bg:#06070b;--gold:#e7c477;--blue:#8bd9ed;--violet:#b3a0ff;--red:#f09aa7;--green:#94d9b8;--line:rgba(244,239,229,.15)}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink)}
+  body{min-height:100svh;overflow-x:hidden;font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;background:radial-gradient(circle at 50% 53%,rgba(179,160,255,.075),transparent 34rem),#06070b}
+  button{font:inherit}
+  .shell{min-height:100svh;display:grid;grid-template-rows:auto 1fr auto;padding:clamp(1rem,3vw,2.7rem)}
+  header{position:relative;z-index:3;display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:1rem}
+  .eyebrow,.same{margin:0;color:var(--mute);font:600 .62rem/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.17em;text-transform:uppercase}
+  .same{text-align:center;color:rgba(244,239,229,.55)}
+  h1{grid-column:1/-1;margin:clamp(.9rem,2.5vh,1.9rem) auto 0;text-align:center;font:400 clamp(1.8rem,4.1vw,4.15rem)/1.01 ui-serif,Georgia,serif;letter-spacing:-.035em}
+  h1 em{display:block;color:var(--gold);font-weight:400}
+  .replay{justify-self:end;border:1px solid var(--line);border-radius:50%;width:2.7rem;aspect-ratio:1;background:rgba(255,255,255,.02);color:var(--mute);cursor:pointer;transition:.3s ease}
+  .replay:hover,.replay:focus-visible{color:var(--ink);border-color:var(--gold);transform:rotate(-25deg)}
+  main{display:grid;align-items:center;min-height:0}
+  .comparison{position:relative;width:min(1500px,100%);height:min(64vh,760px);min-height:420px;margin:0 auto}
+  .comparison::before{content:"";position:absolute;left:50%;top:7%;bottom:3%;width:1px;background:linear-gradient(transparent,var(--line) 15% 86%,transparent)}
+  .world{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .world text{font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+  .world .serif{font-family:ui-serif,Georgia,serif}
+  .half-label{font:650 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:2.1px;fill:var(--mute)}
+  .half-law{font:400 27px/1.2 ui-serif,Georgia,serif;fill:var(--ink)}
+  .node-ring{fill:#080910;stroke:rgba(244,239,229,.2);stroke-width:1.4}
+  .node-core{fill:var(--ink)}
+  .judge .node-core{fill:var(--gold)} .clerk .node-core{fill:var(--blue)} .self .node-core{fill:var(--violet)}
+  .person{font-size:12px;letter-spacing:1.6px;text-transform:uppercase;fill:var(--mute)}
+  .relation{fill:none;stroke-linecap:round;stroke-width:2}
+  .question-thread{stroke:var(--gold);filter:url(#softGold)}
+  .note-thread{stroke:var(--blue);stroke-dasharray:4 11}
+  .answer-thread{stroke:var(--violet);filter:url(#softViolet)}
+  .broken{stroke:var(--red)}
+  .relation-label{font:650 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1.3px;text-transform:uppercase}
+  .speech rect{fill:rgba(10,10,16,.92);stroke:rgba(244,239,229,.16)}
+  .speech text{font:400 15px/1.3 ui-serif,Georgia,serif;fill:var(--ink)}
+  .note-card{filter:url(#shadow);transform-box:fill-box;transform-origin:center}
+  .note-card rect{fill:#e9f6f8;stroke:#8bd9ed}
+  .note-card text{font:700 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.7px;fill:#12242a}
+  .now-chip rect{fill:var(--red)} .now-chip text{fill:#16070a;font:750 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1px}
+  .coord text{font:650 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1.15px;fill:var(--violet)}
+  .coord line{stroke:rgba(179,160,255,.32);stroke-dasharray:2 5}
+  .open-loop{fill:none;stroke:rgba(179,160,255,.38);stroke-width:1;stroke-dasharray:3 9}
+  .ownership{font:650 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:1.25px}
+  .wrong{fill:var(--red)} .right{fill:var(--green)}
+  .stage-0,.stage-1,.stage-2,.stage-3{opacity:0}
+  body[data-phase="0"] .stage-0,
+  body[data-phase="1"] .stage-0,body[data-phase="1"] .stage-1,
+  body[data-phase="2"] .stage-0,body[data-phase="2"] .stage-1,body[data-phase="2"] .stage-2,
+  body[data-phase="3"] .stage-0,body[data-phase="3"] .stage-1,body[data-phase="3"] .stage-2,body[data-phase="3"] .stage-3{opacity:1}
+  .stage-0,.stage-1,.stage-2,.stage-3{transition:opacity .7s ease}
+  body[data-phase="2"] .note-card,body[data-phase="3"] .note-card{animation:note-arrives .72s cubic-bezier(.2,.8,.2,1) both}
+  body[data-phase="3"] .recency-question{opacity:.12;stroke-dasharray:5 13;filter:none}
+  body[data-phase="3"] .recency-answer{opacity:.16}
+  body[data-phase="3"] .recency-self{transform:translate(56px,28px)}
+  .recency-self{transition:transform 1s cubic-bezier(.2,.8,.2,1);transform-box:fill-box;transform-origin:center}
+  body[data-phase="3"] .transport-loop{animation:loop-live 2.8s linear infinite}
+  body[data-phase="3"] .answer-live{animation:answer-live 2.1s ease-in-out infinite}
+  .legend{display:flex;align-items:center;justify-content:center;gap:.7rem;margin:-.2rem auto .6rem;color:var(--mute);font-size:.73rem}
+  .legend button{width:.52rem;height:.52rem;padding:0;border:0;border-radius:50%;background:rgba(244,239,229,.2);cursor:pointer;transition:.25s}
+  .legend button[aria-current="step"]{width:1.55rem;border-radius:1rem;background:var(--gold)}
+  footer{position:relative;z-index:3;text-align:center}
+  .bottom-line{max-width:60rem;margin:0 auto;color:var(--mute);font:400 clamp(.86rem,1.25vw,1.03rem)/1.55 ui-serif,Georgia,serif}
+  .bottom-line strong{color:var(--ink);font-weight:400}
+  .bottom-line em{color:var(--violet);font-style:normal}
+  .detail{display:inline-block;margin-top:.45rem;padding:.15rem .25rem;border:0;border-bottom:1px solid rgba(244,239,229,.24);background:none;color:var(--mute);font:600 .6rem/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+  .detail:hover,.detail:focus-visible{color:var(--gold);border-color:var(--gold)}
+  dialog{width:min(42rem,calc(100% - 2rem));padding:0;border:1px solid rgba(179,160,255,.38);background:#0b0b12;color:var(--ink);box-shadow:0 3rem 10rem #000}
+  dialog::backdrop{background:rgba(3,3,7,.78);backdrop-filter:blur(6px)}
+  .explain{padding:clamp(1.4rem,4vw,2.8rem)}
+  .explain h2{margin:0 0 1rem;font:400 clamp(1.45rem,3vw,2.3rem)/1.15 ui-serif,Georgia,serif}
+  .explain p{color:#bbb6c4;font:400 1rem/1.7 ui-serif,Georgia,serif}
+  .explain strong{color:var(--ink);font-weight:500}
+  .close{position:absolute;right:.8rem;top:.8rem;width:2.4rem;aspect-ratio:1;border:1px solid var(--line);border-radius:50%;background:none;color:var(--mute);cursor:pointer}
+  @keyframes note-arrives{from{opacity:0;transform:translate(55px,-45px) rotate(8deg) scale(.7)}to{opacity:1;transform:none}}
+  @keyframes loop-live{to{stroke-dashoffset:-72}}
+  @keyframes answer-live{50%{opacity:.5}}
+  @media(max-width:760px){
+    .shell{padding:.85rem .55rem 1rem} header{grid-template-columns:1fr auto}.same{display:none} h1{font-size:clamp(1.7rem,8vw,2.6rem)}
+    .comparison{height:65vh;min-height:500px}.half-law{font-size:23px}.world{transform:scale(1.08);transform-origin:50% 52%}
+    .bottom-line{padding:0 .8rem;font-size:.84rem}.person{font-size:10px}.speech text{font-size:13px}
+  }
+  @media(max-width:520px){.half-law{font-size:20px}.half-label{font-size:10px}.comparison{height:62vh;min-height:450px}.coord{display:none}.world{transform:scale(1.18);transform-origin:50% 50%}}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body data-phase="0">
+<div class="shell">
+  <header>
+    <p class="eyebrow">one interruption · two architectures</p>
+    <p class="same">same hearing · same note · same words</p>
+    <button class="replay" type="button" aria-label="Replay the interruption">↻</button>
+    <h1>The note is new.<em>The question is still now.</em></h1>
+  </header>
+
+  <main>
+    <div class="comparison" aria-label="A court question interrupted by a clerk's note. On the left recency lets the note replace the question. On the right deictic transport keeps the question governing while the note becomes evidence inside the answer.">
+      <svg class="world" viewBox="0 0 1600 800" role="img" aria-labelledby="visual-title visual-desc">
+        <title id="visual-title">Recency compared with deictic transport</title>
+        <desc id="visual-desc">Two identical hearings diverge when a clerk delivers a note. In the recency system, the newest input takes over and the judge is no longer answered. In the deictic system, the note changes the answer but does not take ownership of the present.</desc>
+        <defs>
+          <filter id="softGold" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id="softViolet" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id="shadow" x="-70%" y="-70%" width="240%" height="240%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity=".55"/></filter>
+          <marker id="arrowGold" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#e7c477"/></marker>
+          <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#8bd9ed"/></marker>
+          <marker id="arrowViolet" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#b3a0ff"/></marker>
+          <marker id="arrowRed" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#f09aa7"/></marker>
+        </defs>
+
+        <!-- LEFT: recency -->
+        <g transform="translate(0,0)">
+          <text class="half-label" x="100" y="92">RECENCY</text>
+          <text class="half-law" x="100" y="129">newest input owns the next act</text>
+
+          <g class="judge stage-0" transform="translate(390,220)">
+            <circle class="node-ring" r="34"/><circle class="node-core" r="5"/>
+            <text class="person" x="0" y="58" text-anchor="middle">judge</text>
+          </g>
+          <g class="speech stage-0" transform="translate(440,166)">
+            <rect x="0" y="0" width="250" height="64" rx="12"/>
+            <text x="18" y="27">What supports</text><text x="18" y="48">your position?</text>
+          </g>
+          <path class="relation question-thread recency-question stage-0" d="M390 258C388 334 368 374 354 436" marker-end="url(#arrowGold)"/>
+          <text class="relation-label stage-0" x="284" y="348" fill="#e7c477">OPEN QUESTION</text>
+
+          <g class="self recency-self stage-0" transform="translate(350,476)">
+            <circle class="node-ring" r="38"/><circle class="node-core" r="6"/>
+            <text class="person" x="0" y="62" text-anchor="middle">advocate</text>
+          </g>
+          <path class="relation answer-thread recency-answer stage-1" d="M375 446C424 389 453 343 440 256" marker-end="url(#arrowViolet)"/>
+          <text class="relation-label stage-1" x="435" y="365" fill="#b3a0ff">ANSWERING…</text>
+
+          <g class="clerk stage-2" transform="translate(650,480)">
+            <circle class="node-ring" r="31"/><circle class="node-core" r="5"/>
+            <text class="person" x="0" y="55" text-anchor="middle">clerk</text>
+          </g>
+          <g class="note-card stage-2" transform="translate(535,405)">
+            <rect width="145" height="54" rx="5"/><text x="15" y="22">NEW AUTHORITY</text><text x="15" y="39">FOUND</text>
+          </g>
+          <path class="relation note-thread stage-2" d="M619 475C570 473 512 474 399 476" marker-end="url(#arrowBlue)"/>
+
+          <g class="now-chip stage-3" transform="translate(529,377)">
+            <rect width="60" height="21" rx="10"/><text x="30" y="14" text-anchor="middle">NOW</text>
+          </g>
+          <path class="relation broken stage-3" d="M410 489C496 529 565 526 622 495" marker-end="url(#arrowRed)"/>
+          <g class="speech stage-3" transform="translate(305,573)">
+            <rect width="330" height="61" rx="12"/>
+            <text x="18" y="26">“Closed by exact correspondence:</text>
+            <text x="18" y="47">the ledger bytes match.”</text>
+          </g>
+          <text class="ownership wrong stage-3" x="350" y="672" text-anchor="middle">THE QUESTION REMAINS UNANSWERED</text>
+        </g>
+
+        <!-- RIGHT: deictic transport -->
+        <g transform="translate(800,0)">
+          <text class="half-label" x="100" y="92">DEICTIC TRANSPORT</text>
+          <text class="half-law" x="100" y="129">the open answer owns the next act</text>
+
+          <g class="judge stage-0" transform="translate(390,220)">
+            <circle class="node-ring" r="34"/><circle class="node-core" r="5"/>
+            <text class="person" x="0" y="58" text-anchor="middle">judge</text>
+          </g>
+          <g class="speech stage-0" transform="translate(440,166)">
+            <rect x="0" y="0" width="250" height="64" rx="12"/>
+            <text x="18" y="27">What supports</text><text x="18" y="48">your position?</text>
+          </g>
+          <path class="relation question-thread stage-0" d="M390 258C388 334 368 374 354 436" marker-end="url(#arrowGold)"/>
+          <text class="relation-label stage-0" x="284" y="348" fill="#e7c477">OPEN QUESTION</text>
+
+          <g class="self stage-0" transform="translate(350,476)">
+            <circle class="node-ring" r="38"/><circle class="node-core" r="6"/>
+            <text class="person" x="0" y="62" text-anchor="middle">advocate</text>
+          </g>
+          <path class="relation answer-thread answer-live stage-1" d="M375 446C424 389 453 343 440 256" marker-end="url(#arrowViolet)"/>
+          <text class="relation-label stage-1" x="435" y="365" fill="#b3a0ff">ANSWERING…</text>
+
+          <g class="coord stage-1">
+            <line x1="322" y1="446" x2="256" y2="407"/><text x="190" y="403">I · ADVOCATE</text>
+            <line x1="320" y1="482" x2="229" y2="482"/><text x="140" y="486">HERE · HEARING</text>
+            <line x1="335" y1="509" x2="276" y2="557"/><text x="186" y="577">NOW · ANSWERING</text>
+            <line x1="378" y1="506" x2="449" y2="552"/><text x="457" y="569">FOR · OPEN QUESTION</text>
+          </g>
+          <ellipse class="open-loop transport-loop stage-1" cx="350" cy="476" rx="175" ry="125"/>
+
+          <g class="clerk stage-2" transform="translate(650,480)">
+            <circle class="node-ring" r="31"/><circle class="node-core" r="5"/>
+            <text class="person" x="0" y="55" text-anchor="middle">clerk</text>
+          </g>
+          <g class="note-card stage-2" transform="translate(535,405)">
+            <rect width="145" height="54" rx="5"/><text x="15" y="22">NEW AUTHORITY</text><text x="15" y="39">FOUND</text>
+          </g>
+          <path class="relation note-thread stage-2" d="M619 475C570 473 512 474 399 476" marker-end="url(#arrowBlue)"/>
+
+          <path class="relation answer-thread stage-3" d="M399 489C476 499 518 466 538 448" marker-end="url(#arrowViolet)"/>
+          <text class="relation-label stage-3" x="441" y="516" fill="#b3a0ff">EVIDENCE WITHIN THE ANSWER</text>
+          <g class="speech stage-3" transform="translate(350,593)">
+            <rect width="355" height="61" rx="12"/>
+            <text x="18" y="26">“The new authority strengthens</text>
+            <text x="18" y="47">the position because…”</text>
+          </g>
+          <path class="relation answer-thread stage-3" d="M525 590C523 493 502 355 446 254" marker-end="url(#arrowViolet)"/>
+          <text class="ownership right stage-3" x="350" y="693" text-anchor="middle">KNOWLEDGE CHANGED · AUTHORSHIP HELD</text>
+        </g>
+      </svg>
+    </div>
+    <div class="legend" aria-label="Animation steps">
+      <span>question</span><button type="button" data-go="0" aria-label="Show question"></button>
+      <button type="button" data-go="1" aria-label="Show answering"></button>
+      <button type="button" data-go="2" aria-label="Show interruption"></button>
+      <button type="button" data-go="3" aria-label="Show outcomes"></button><span>outcome</span>
+    </div>
+  </main>
+
+  <footer>
+    <p class="bottom-line"><strong>The narrative can be identical in both.</strong> The difference is causal: the left asks <em>“what arrived last?”</em>; the right asks <em>“what does this next act still belong to?”</em></p>
+    <button class="detail" type="button">what, precisely, is being transported?</button>
+  </footer>
+</div>
+
+<dialog>
+  <button class="close" type="button" aria-label="Close">×</button>
+  <div class="explain">
+    <h2>Not a voice telling itself a story.</h2>
+    <p>The transported thing is a live causal coordinate: <strong>I am the advocate; here is this hearing; now I am answering the judge; this act belongs to the open question.</strong></p>
+    <p>The clerk’s note is permitted to change what the advocate knows. It is not permitted to decide, merely by being newest, who is being answered or what the next act is for. An inner narrative may describe that orientation; deictic transport is the mechanism that makes the orientation govern action across interruption.</p>
+  </div>
+</dialog>
+<script>
+(() => {
+  const body=document.body, dots=[...document.querySelectorAll('[data-go]')], dialog=document.querySelector('dialog');
+  let phase=0,timer;
+  const delay=[1550,1700,2100,4300];
+  function show(n,auto=true){phase=Number(n);body.dataset.phase=phase;dots.forEach((d,i)=>i===phase?d.setAttribute('aria-current','step'):d.removeAttribute('aria-current'));clearTimeout(timer);if(auto)timer=setTimeout(()=>show((phase+1)%4),delay[phase])}
+  dots.forEach(d=>d.addEventListener('click',()=>show(d.dataset.go,false)));
+  document.querySelector('.replay').addEventListener('click',()=>show(0));
+  document.querySelector('.detail').addEventListener('click',()=>dialog.showModal());
+  document.querySelector('.close').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close()});
+  addEventListener('keydown',e=>{if(e.key==='ArrowRight')show((phase+1)%4,false);if(e.key==='ArrowLeft')show((phase+3)%4,false)});
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)show(3,false);else show(0);
+})();
+</script>
+</body>
+</html>
