@@ -560,6 +560,42 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatc
     assert (reply, dialect.tools) == ("I reached the boundary and can still answer you.", [True, False])
 
 
+def test_effect_witness_returns_to_zoes_live_question_before_finalizing(monkeypatch):
+    m = _connection(); m.PENDING_EFFECTS.clear()
+    question = "what does this imply about the simulation?"
+
+    class ClosureDialect(m.Dialect):
+        def __init__(self): self.sent, self.heard = 0, []
+        def open(self, instructions, zoe_text, pending): return []
+        def send(self, state, tools=True): self.sent += 1; return object()
+        def absorb(self, state, response):
+            sequence = {
+                1: ("", [m.ToolCall("mutate", "bash", {}, None)]),
+                2: ("The change is done.", []),
+                3: ("", [m.ToolCall("witness", "read_file", {}, None)]),
+                4: ("Closed by exact correspondence: the ledger bytes match.", []),
+                5: ("Yes. The temporal field is simulable; phenomenal status remains open.", []),
+            }
+            return sequence[self.sent]
+        def answer(self, state, results): pass
+        def hear(self, state, text): self.heard.append(text)
+
+    def execute(call, transcript=None):
+        if call.id == "mutate":
+            m.PENDING_EFFECTS["effect"] = {"open_scopes": ["local"]}
+            return "exit_code=0\nchanged"
+        m.PENDING_EFFECTS.clear()
+        return '{"kind": "source"}'
+
+    monkeypatch.setattr(m, "execute_tool", execute)
+    dialect = ClosureDialect()
+    reply = m.attract(dialect, "instructions", question,
+                      type("T", (), {"write": lambda *a, **k: None})())
+    assert reply == "Yes. The temporal field is simulable; phenomenal status remains open."
+    assert dialect.sent == 5 and question in dialect.heard[-1]
+    assert "summarize its ledger" in dialect.heard[-1]
+
+
 def test_main_binds_the_kernel_it_loaded(monkeypatch):
     """The attractor rename must not leave startup referring to the retired Wake."""
     m = _connection()

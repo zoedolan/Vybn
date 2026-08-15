@@ -1823,6 +1823,7 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
     spoken: list[str] = []
     nudges = 0
     source_witness = False
+    return_to_contact = False
 
     def hear_peer() -> bool:
         note = peer.receive() if peer else ""
@@ -1876,6 +1877,7 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
         if hear_peer(): continue
         if nudges < 2 and PENDING_EFFECTS:
             nudges += 1
+            return_to_contact = True
             panel("  ⚠ executed effect lacks correspondence witness — returning to contact")
             state.append({"role": "user", "content": (
                 "An effect executed but remains open. Inspect the exact resulting local bytes "
@@ -1886,6 +1888,13 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             nudges += 1
             panel("  ⚠ unwitnessed action caught — returning to contact")
             dialect.nudge(state)
+            continue
+        if return_to_contact and not PENDING_EFFECTS:
+            return_to_contact = False
+            dialect.hear(state, (
+                "The internal witness is complete. Do not answer its verification instruction "
+                "or summarize its ledger. Answer Zoe's exact present words directly now:\n\n"
+                + zoe_text))
             continue
         if text.strip():
             print(text)
