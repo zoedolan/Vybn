@@ -10,7 +10,7 @@ import ipaddress, socket, urllib.error
 from html.parser import HTMLParser
 from dataclasses import dataclass
 from typing import Iterable
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 # ── Safe external fetch: moved here 2026-07-30, byte-exact, from
 # spark/harness/substrate.py (11,661 lines, retired). spark/web was its

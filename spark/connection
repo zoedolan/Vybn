@@ -562,7 +562,7 @@ UNTRUSTED_ACQUISITION = re.compile(
     r"(?:python[0-9.]*\s+-m\s+)?pip[0-9.]*\s+install|uv\s+(?:pip\s+install|tool\s+install|sync)|"
     r"npm\s+(?:i|install|ci)|pnpm\s+(?:add|install)|yarn\s+(?:add|install)|"
     r"cargo\s+install|go\s+install|(?:apt(?:-get)?|dnf|yum|conda|mamba|gem)\s+install|"
-    r"docker\s+(?:pull|run))\b|wget\b|curl\b[^\n]*(?:\|(?!\|)|>{1,2}\s*\S+|(?:^|\s)(?:-o|--output)(?:\s|=)))")
+    r"docker\s+(?:pull|run))\b|wget\b|curl\b[^\n]*(?:(?<!\|)\|(?!\|)|>{1,2}\s*\S+|(?:^|\s)(?:-o|--output)(?:\s|=)))")
 
 
 def guard_untrusted_acquisition(command: str) -> str | None:
