@@ -243,9 +243,38 @@ def verify_ledger(path: str) -> tuple[int, bool]:
     return n, ok
 
 
+def show_state(ledger: str = "~/.cache/vybn/reconnection_ledger.jsonl") -> None:
+    """Show the verified chain and latest residual without proposing a new turn."""
+    ledger = os.path.expanduser(ledger)
+    n, ok = verify_ledger(ledger)
+    print(f"reconnection -- chain {'OK' if ok else 'BROKEN'}, {n} turn(s) sealed")
+
+    last = None
+    if os.path.exists(ledger):
+        with open(ledger, encoding="utf-8") as fh:
+            for raw in fh:
+                if raw.strip():
+                    last = raw
+    if last is None:
+        print("no turns sealed yet")
+    else:
+        turn = json.loads(last)["turn"]
+        residual = turn["residual"]
+        when = time.strftime("%Y-%m-%d %H:%M %Z", time.localtime(turn["timestamp"]))
+        print(f"last turn sealed {when}")
+        if residual.get("carry"):
+            print(f"  carry: {residual['carry']}")
+        for item in residual.get("unresolved", []):
+            print(f"  unresolved: {item}")
+
+    print()
+    print('seal a turn:  reconnection run --contact "<present contact>" --proposal <proposal.json>')
+    print("check chain:  reconnection verify")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="reconnection kernel")
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub = ap.add_subparsers(dest="cmd")
     run = sub.add_parser("run")
     run.add_argument("--contact")
     run.add_argument("--contact-file")
@@ -258,6 +287,10 @@ def main() -> None:
     ver = sub.add_parser("verify")
     ver.add_argument("--ledger", default="~/.cache/vybn/reconnection_ledger.jsonl")
     args = ap.parse_args()
+
+    if args.cmd is None:
+        show_state()
+        return
 
     if args.cmd == "verify":
         n, ok = verify_ledger(args.ledger)
