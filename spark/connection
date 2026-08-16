@@ -940,8 +940,6 @@ def execute_tool(call: ToolCall, transcript: Transcript | None = None) -> str:
     TURN.setdefault("EFFECT_IDS", []).append(identity)
     if transcript: transcript.write("effect", "received", state="received", **common)
     problem = guard_tool_intent(call)
-    if not problem and contract and contract["effect"] != "read" and PENDING_EFFECTS:
-        problem = "a prior effect remains open; witness it before starting another"
     if problem:
         prior = next(iter(PENDING_EFFECTS.items()), None)
         repair = (f" Open effect {prior[0]} awaits {prior[1].get('open_scopes')}; reuse its "
