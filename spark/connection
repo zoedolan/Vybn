@@ -2015,7 +2015,7 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             dialect.consolidate(state, zoe_text, tool_history_packet(tool_history))
             dialect.answer(state, visible)
             tool_history.append(results)
-            if cost_ceiling:
+            if cost_ceiling and not PENDING_EFFECTS:
                 break
             hear_peer(); continue
         if hear_peer(): continue
