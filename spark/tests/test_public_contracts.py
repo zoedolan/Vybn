@@ -1025,3 +1025,44 @@ def test_budget_distinguishes_total_input_from_fresh_input(tmp_path, monkeypatch
     line = m.load_budget()
     assert "input=0.00M" in line and "new=0.00M" in line
     assert "cache_r=0.00M (80%)" in line and "mean_new/call=0k" in line
+
+def test_fresh_attract_resets_stale_turn_telemetry(monkeypatch):
+    """A fresh attract() must not inherit a prior turn's tool/token telemetry."""
+    m = _connection()
+    m.PENDING_EFFECTS.clear()
+    m.TURN.update(
+        TOOL_ROUNDS=6,
+        INPUT_TOKENS=m.TURN_INPUT_LIMIT,
+        MAX_BATCH=4,
+    )
+    observed = {}
+
+    class OneBatchDialect(m.Dialect):
+        name = "fresh"
+        def __init__(self):
+            self.sent = 0
+        def open(self, instructions, zoe_text, pending):
+            return []
+        def send(self, state, tools=True):
+            self.sent += 1
+            return object()
+        def absorb(self, state, response):
+            if self.sent == 1:
+                return "", [m.ToolCall("c1", "read_file", {}, None)]
+            return "Answered Zoe directly.", []
+        def answer(self, state, results):
+            observed["tool_result"] = results[-1][1]
+
+    monkeypatch.setattr(m, "execute_tool", lambda call, transcript=None: '{"kind": "source"}')
+    dialect = OneBatchDialect()
+    try:
+        reply = m.attract(dialect, "instructions", "zoe", type("T", (), {"write": lambda *a, **k: None})())
+        observed_tool_result = observed["tool_result"]
+        assert reply == "Answered Zoe directly."
+        assert "tool round 1" in observed_tool_result
+        assert "up to 35 further tool round(s) remain" in observed_tool_result
+        assert m.CEILING_NOTE not in observed_tool_result
+        assert m.TURN["TOOL_ROUNDS"] == 1
+    finally:
+        m.TURN.clear()
+        m.PENDING_EFFECTS.clear()
