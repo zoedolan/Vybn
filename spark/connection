@@ -1947,6 +1947,9 @@ class K3Dialect(Dialect):
 
 def attract(dialect: Dialect, instructions: str, zoe_text: str,
             transcript: Transcript, images: list | None = None, peer: PeerLink | None = None) -> str:
+        # One attract() call is one fresh Zoe-message/response root.
+    # Stale TURN telemetry is not live execution state.
+    TURN.update(TOOL_ROUNDS=0, INPUT_TOKENS=0, MAX_BATCH=0)
     pending = list(images or [])
     state = dialect.open(instructions, zoe_text, pending)
     delivered = not pending
@@ -1992,29 +1995,33 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             if text.strip():
                 print(text)
                 spoken.append(text)
-            round_no = int(TURN.get("TOOL_ROUNDS", 0)) + 1
+# tool_history contains only rounds executed in this attract() call.
+            round_no = len(tool_history) + 1
             TURN.update(TOOL_ROUNDS=round_no,
                         MAX_BATCH=max(int(TURN.get("MAX_BATCH", 0)), len(calls)))
             results = [(call, execute_tool(call, transcript)) for call in calls]
-            cost_ceiling = int(TURN.get("INPUT_TOKENS", 0)) >= TURN_INPUT_LIMIT
+            budget_crossed = int(TURN.get("INPUT_TOKENS", 0)) >= TURN_INPUT_LIMIT
             source_witness = (tool_effect_state(*results[-1]) == "executed"
                               and exact_source_witness(*results[-1]))
             for call, output in results:
                 transcript.write("tool", output, tool=call.name, call_id=call.id)
             visible = bound_tool_round(results)
-            remaining = 0 if cost_ceiling else max(0, STEP_LIMIT - step - 1)
+            remaining = max(0, STEP_LIMIT - step - 1)
             last_call, output = visible[-1]
             status = (f"\n\n[harness: tool round {round_no}; up to {remaining} further "
                       "tool round(s) remain. Recheck the plan; batch independent probes; "
                       "stop at witness.]")
-            if step == STEP_LIMIT - 1 or cost_ceiling:
+            if step == STEP_LIMIT - 1:
                 status += CEILING_NOTE
+            elif budget_crossed:
+                status += (
+                    "\n\n[harness: turn input budget crossed; this is telemetry, "
+                    "not a tool lock. Batch tightly and stop at witness.]"
+                )
             visible[-1] = (last_call, output + status)
             dialect.consolidate(state, zoe_text, tool_history_packet(tool_history))
             dialect.answer(state, visible)
             tool_history.append(results)
-            if cost_ceiling:
-                break
             hear_peer(); continue
         if hear_peer(): continue
         if nudges < 2 and PENDING_EFFECTS:
