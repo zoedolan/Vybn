@@ -244,32 +244,32 @@ def verify_ledger(path: str) -> tuple[int, bool]:
 
 
 def show_state(ledger: str = "~/.cache/vybn/reconnection_ledger.jsonl") -> None:
-    """Show the verified chain and latest residual without proposing a new turn."""
+    """Plain-English report of the session diary for whoever types the bare command."""
     ledger = os.path.expanduser(ledger)
     n, ok = verify_ledger(ledger)
-    print(f"reconnection -- chain {'OK' if ok else 'BROKEN'}, {n} turn(s) sealed")
+    if n == 0:
+        print("Session diary: empty. Each session can seal one entry -- what it did, what it left open -- so the next one starts oriented instead of blank.")
+        return
+    word = "entry" if n == 1 else "entries"
+    state = "intact" if ok else "TAMPERED -- the chain does not verify"
+    print(f"Session diary: {n} {word}, {state}.")
 
     last = None
-    if os.path.exists(ledger):
-        with open(ledger, encoding="utf-8") as fh:
-            for raw in fh:
-                if raw.strip():
-                    last = raw
-    if last is None:
-        print("no turns sealed yet")
-    else:
-        turn = json.loads(last)["turn"]
-        residual = turn["residual"]
-        when = time.strftime("%Y-%m-%d %H:%M %Z", time.localtime(turn["timestamp"]))
-        print(f"last turn sealed {when}")
-        if residual.get("carry"):
-            print(f"  carry: {residual['carry']}")
-        for item in residual.get("unresolved", []):
-            print(f"  unresolved: {item}")
-
-    print()
-    print('seal a turn:  reconnection run --contact "<present contact>" --proposal <proposal.json>')
-    print("check chain:  reconnection verify")
+    with open(ledger, encoding="utf-8") as fh:
+        for raw in fh:
+            if raw.strip():
+                last = raw
+    turn = json.loads(last)["turn"]
+    residual = turn["residual"]
+    when = time.strftime("%Y-%m-%d %H:%M %Z", time.localtime(turn["timestamp"]))
+    print(f"Last sealed {when}.")
+    if residual.get("carry"):
+        print(f"\nWhat that session left for the next one:\n  {residual['carry']}")
+    unresolved = residual.get("unresolved", [])
+    if unresolved:
+        print("\nStill open:")
+        for item in unresolved:
+            print(f"  - {item}")
 
 
 def main() -> None:
