@@ -23,6 +23,7 @@ from typing import Any
 from Vybn_Mind.repo_mapper import close_lineage, render_state
 from spark.commons_wake import (COMMONS_MAX_CHARS, COMMONS_REF, COMMONS_REPO,
                                 load_commons)
+from spark.conveyance import wake_status
 
 HOME = Path.home()
 REPO = HOME / "Vybn"
@@ -400,10 +401,8 @@ def aim_keywords(limit: int = 18) -> frozenset[str]:
 
 
 def load_repo_state() -> str:
-    try:
-        return render_state(json.loads(REPO_STATE_PATH.read_text(encoding="utf-8"))) if REPO_STATE_PATH.exists() else ""
-    except (OSError, json.JSONDecodeError):
-        return ""
+    try:return render_state(json.loads(REPO_STATE_PATH.read_text(encoding="utf8")))
+    except (OSError, json.JSONDecodeError):return ""
 
 
 def private_strings(node: Any) -> list[str]:
@@ -847,8 +846,8 @@ def wake_contact() -> str:
         lines.append(f"[{name} | exit {code}] {output}")
 
     for loader in (load_budget, load_aim_status, load_front_status,
-                   load_prediction_status, load_surface, load_ground, load_topology,
-                   load_repo_state):
+                   load_prediction_status, wake_status, load_surface,
+                   load_ground, load_topology, load_repo_state):
         try:
             line = loader()
         except Exception:

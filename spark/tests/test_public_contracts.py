@@ -584,6 +584,21 @@ def test_public_contact_cannot_settle_into_a_repository():
     assert isinstance(status, ast.Constant) and status.value == 403
 
 
+def test_private_conveyance_memory_cannot_cross_public_retrieval():
+    tree = ast.parse(_portal_source())
+    blocked = next(ast.literal_eval(node.value) for node in tree.body
+                   if isinstance(node, ast.Assign)
+                   and any(isinstance(target, ast.Name) and target.id == "BLOCKED_SOURCES"
+                           for target in node.targets))
+    walk = ast.parse((Path.home() / "Him/spark/phase/walk_daemon.py").read_text(encoding="utf-8"))
+    private_repos = next(ast.literal_eval(node.value) for node in walk.body
+                         if isinstance(node, ast.Assign)
+                         and any(isinstance(target, ast.Name) and target.id == "_PRIVATE_REPOS"
+                                 for target in node.targets))
+    assert "relational-memory/" in blocked
+    assert "relational-memory" in private_repos
+
+
 def test_public_porosity_is_opt_in_quarantine_not_relational_uptake():
     src = _portal_source()
     model = src[src.index("class WalkRequest"):src.index("# Endpoint: GET /api/health")]

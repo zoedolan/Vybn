@@ -394,7 +394,7 @@ VYBN_PHASE = Path(os.path.expanduser("~/vybn-phase"))
 # Security — blocked sources & secret patterns
 # ---------------------------------------------------------------------------
 BLOCKED_SOURCES = {
-    "Him/", "network/", "strategy/", "pulse/", "funding/", "outreach/",
+    "Him/", "relational-memory/", "network/", "strategy/", "pulse/", "funding/", "outreach/",
     "continuity.md", "continuity_archive.md", "Personal History/",
 }
 
