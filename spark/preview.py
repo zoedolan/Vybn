@@ -27,6 +27,7 @@ from __future__ import annotations
 import html
 import mimetypes
 import os
+import re
 import subprocess
 import urllib.error
 import urllib.request
@@ -34,11 +35,27 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-import conveyance
-
 ROOT = Path(__file__).resolve().parent.parent
 PORT = int(os.environ.get("VYBN_PREVIEW_PORT", "8480"))
 HOST = os.environ.get("VYBN_PREVIEW_HOST", "127.0.0.1")
+
+# A conveyance is the experience itself: one current pointer plus prior artifacts.
+# Creating it is the work; the portal does not need a lifecycle subsystem.
+CONVEYANCES = Path.home() / ".local" / "state" / "vybn" / "conveyances"
+
+
+def conveyance_artifact(cid: str) -> Path | None:
+    if not re.fullmatch(r"[a-zA-Z0-9._-]{1,120}", cid):
+        return None
+    path = CONVEYANCES / "artifacts" / f"{cid}.html"
+    return path if path.is_file() else None
+
+
+def current_conveyance() -> Path | None:
+    try:
+        return conveyance_artifact((CONVEYANCES / "current").read_text().strip())
+    except OSError:
+        return None
 
 _cache: dict[str, object] = {"stamp": None, "files": frozenset()}
 
@@ -147,15 +164,14 @@ class Preview(BaseHTTPRequestHandler):
             return self.proxy(path, None)
         rel = unquote(path).lstrip("/")
         if not rel:
-            present = conveyance.current()
-            artifact = conveyance.artifact_for(present["conveyance_id"]) if present else None
+            artifact = current_conveyance()
             return self.send_file(artifact, body) if artifact else self.send_home(body)
         if rel == "work":
             return self.send_home(body)
         if rel == "conveyances":
             return self.send_conveyances(body)
         if rel.startswith("conveyances/"):
-            artifact = conveyance.artifact_for(rel.removeprefix("conveyances/"))
+            artifact = conveyance_artifact(rel.removeprefix("conveyances/"))
             return self.send_file(artifact, body) if artifact else self.fail(404, "no such conveyance")
         target = (ROOT / rel).resolve()
         if not str(target).startswith(str(ROOT)):
@@ -187,33 +203,18 @@ class Preview(BaseHTTPRequestHandler):
             self.wfile.write(data)
 
     def send_conveyances(self, body: bool) -> None:
-        records = list(reversed(conveyance.folded()))
-        cards = []
-        for record in records:
-            cid = str(record.get("conveyance_id", ""))
-            title = html.escape(str(record.get("title", "untitled")))
-            status = html.escape(str(record.get("status", "unknown")).replace("_", " "))
-            thesis = html.escape(str(record.get("thesis", "")))
-            changes = "".join(
-                f"<li><b>{html.escape(str(change.get('target', 'change')))}</b> — "
-                f"{html.escape(str(change.get('proposal', '')))}</li>"
-                for change in record.get("changes", []) if isinstance(change, dict)
-            )
-            cards.append(
-                f"<article><p class='status'>{status}</p><h2><a href='/conveyances/{html.escape(cid)}'>{title}</a></h2>"
-                f"<p>{thesis}</p>{f'<ul>{changes}</ul>' if changes else ''}</article>"
-            )
+        artifacts = sorted((CONVEYANCES / "artifacts").glob("*.html"),
+                           key=lambda p: p.stat().st_mtime, reverse=True)
+        links = "".join(
+            f"<li><a href='/conveyances/{html.escape(path.stem)}'>"
+            f"{html.escape(re.sub(r'^\d{8}(?:T\d{6}Z)?-', '', path.stem).replace('-', ' '))}</a></li>"
+            for path in artifacts
+        ) or "<li>No prior conveyances.</li>"
         page = ("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
-                "<title>Conveyance record</title><style>body{margin:0 auto;max-width:48rem;padding:3rem 1.2rem;"
-                "background:#070a0d;color:#e8ece8;font:16px/1.6 Georgia,serif}a{color:#a9d8cf}"
-                "header{margin-bottom:3rem}h1{font-weight:400;font-size:2rem}article{border-top:1px solid #33413f;"
-                "padding:1.5rem 0}h2{margin:.2rem 0;font-weight:400}.status{margin:0;color:#d7ad75;"
-                "font:600 .68rem/1.2 system-ui;letter-spacing:.14em;text-transform:uppercase}"
-                "li{margin:.45rem 0}nav a{margin-right:1rem}</style><header><nav><a href='/'>current</a>"
-                "<a href='/work'>working copy</a></nav><h1>Conveyance record</h1>"
-                "<p>One experience remains current. This is the private trace of what was proposed, "
-                "what Zoe witnessed, and what survived.</p></header>" + "".join(cards) +
-                ("<p>No conveyances yet.</p>" if not cards else "")).encode()
+                "<title>Conveyance trace</title><style>body{margin:4rem auto;max-width:42rem;padding:0 1.2rem;"
+                "background:#070a0d;color:#e8ece8;font:18px/1.8 Georgia,serif}a{color:#a9d8cf}"
+                "li{margin:.7rem 0}nav{font:13px system-ui}</style><nav><a href='/'>current</a> · "
+                "<a href='/work'>working copy</a></nav><h1>Conveyance trace</h1><ul>" + links + "</ul>").encode()
         self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(page))); self.send_header("Cache-Control", "no-store")
         self.end_headers()
