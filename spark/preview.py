@@ -71,6 +71,29 @@ def visible_dir(rel: str) -> bool:
     return prefix == "drafts/" or any(p.startswith(prefix) for p in tracked())
 
 
+def git_output(*args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=30,
+    ).stdout
+
+
+def local_work() -> list[str]:
+    """Visible paths whose working bytes are not in HEAD."""
+    changed = git_output("diff", "HEAD", "--name-only", "-z").split("\0")
+    drafts = git_output(
+        "ls-files", "--others", "--exclude-standard", "-z", "--", "drafts/",
+    ).split("\0")
+    return sorted(p for p in set(changed + drafts) if p and allowed(p) and (ROOT / p).is_file())
+
+
+def latest_commit() -> tuple[str, list[str]]:
+    subject = git_output("log", "-1", "--format=%s").strip()
+    paths = git_output(
+        "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "HEAD",
+    ).split("\0")
+    return subject, [p for p in paths if p and allowed(p) and (ROOT / p).is_file()]
+
+
 ORGAN = os.environ.get("VYBN_ORGAN", "http://127.0.0.1:8420")
 PROXY_PATHS = {"/api/instant", "/api/walk"}
 PROXY_MAX = 64 * 1024
@@ -121,6 +144,8 @@ class Preview(BaseHTTPRequestHandler):
         if path in PROXY_PATHS:
             return self.proxy(path, None)
         rel = unquote(path).lstrip("/")
+        if not rel:
+            return self.send_home(body)
         target = (ROOT / rel).resolve()
         if not str(target).startswith(str(ROOT)):
             return self.fail(403, "outside the root")
@@ -149,6 +174,51 @@ class Preview(BaseHTTPRequestHandler):
         self.end_headers()
         if body:
             self.wfile.write(data)
+
+    def send_home(self, body: bool) -> None:
+        pending = local_work()
+        subject, recent = latest_commit()
+
+        def link_list(paths: list[str], empty: str) -> str:
+            if not paths:
+                return f"<p class='quiet'>{html.escape(empty)}</p>"
+            return "<ul>" + "".join(
+                f'<li><a href="/{html.escape(p)}">{html.escape(p)}</a></li>' for p in paths
+            ) + "</ul>"
+
+        folders = []
+        for child in sorted(ROOT.iterdir(), key=lambda p: p.name.lower()):
+            rel = str(child.relative_to(ROOT))
+            if child.is_dir() and visible_dir(rel):
+                folders.append(rel + "/")
+        browse = " ".join(f'<a href="/{html.escape(p)}">{html.escape(p)}</a>' for p in folders)
+        page = (
+            "<!DOCTYPE html><meta charset=utf-8><title>Vybn working copy</title>"
+            "<style>body{background:#141210;color:#e8e2d6;font-family:Georgia,serif;"
+            "max-width:52rem;margin:3rem auto;padding:0 1.2rem;line-height:1.65}"
+            "a{color:#d6c9ad}h1{font-size:1.15rem;letter-spacing:.18em;color:#cf6747;"
+            "text-transform:uppercase;font-weight:normal}h2{font-size:1rem;margin-top:2.4rem}"
+            "ul{padding-left:1.2rem}.quiet,details{color:#8f8779}.browse a{margin-right:.8rem}"
+            "code{color:#b9ae99}</style>"
+            "<h1>Working copy</h1>"
+            "<p>This is the private view of what is on the Spark right now. "
+            "Open a path below; there is nothing else you need to know.</p>"
+            "<h2>Here before GitHub</h2>"
+            + link_list(pending, "No visible local changes right now.")
+            + "<h2>Latest commit</h2>"
+            + f"<p><code>{html.escape(subject)}</code></p>"
+            + link_list(recent, "No surviving file paths in this commit.")
+            + "<details><summary>Browse the whole public working copy</summary>"
+            + f"<p class='browse'>{browse}</p></details>"
+            + "<p class='quiet'>Read-only · tracked public files and drafts only</p>"
+        ).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(page)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        if body:
+            self.wfile.write(page)
 
     def send_listing(self, rel: str, target: Path, body: bool) -> None:
         rows = []
