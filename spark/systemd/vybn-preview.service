@@ -1,0 +1,21 @@
+# User-level unit for Zoe's read-only working-copy preview.
+# Source of truth: ~/Vybn/spark/systemd/.
+# Install: systemctl --user enable --now vybn-preview
+[Unit]
+Description=Vybn private working-copy preview (:8480 loopback)
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=20
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Vybn
+ExecStart=/usr/bin/python3 %h/Vybn/spark/preview.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=default.target

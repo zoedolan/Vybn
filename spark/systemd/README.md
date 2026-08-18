@@ -18,6 +18,7 @@ bash ~/Vybn/spark/systemd/install.sh   # idempotent; re-run to resync
 | `vybn-deep-memory.service` | Deep memory API :8100. Pre-flight `fuser -k`. |
 | `vybn-walk-daemon.service` | Walk daemon :8101. `After=vybn-deep-memory`. |
 | `vybn-portal.service` | Origins portal :8420. Keys from `~/.config/vybn/*.env`. |
+| `vybn-preview.service` | Zoe's read-only working-copy view :8480, loopback behind a private tailnet route. |
 | `vybn-vllm.service` | 2-node Ray cluster, Nemotron 120B :8000. Capacity via `~/.config/vybn/vllm.env`. |
 | `vybn-watchdog.sh` / `.service` / `.timer` | Endpoint health every 2 min; bounces unhealthy units. |
 | `install.sh` | Symlinks units, retires conflicting cron, enables, verifies. |
@@ -27,7 +28,8 @@ bash ~/Vybn/spark/systemd/install.sh   # idempotent; re-run to resync
 
 1. **Crash**: every unit has `Restart=always`, `RestartSec=5`, `StartLimitBurst=20`.
 2. **Hang**: watchdog curls each endpoint (8100 health, 8101 /where, 8420 /api/health,
-   8000 /v1/models with a 900 s cold-load grace) and restarts what systemd can't see is wedged.
+   8480 working-copy preview, 8000 /v1/models with a 900 s cold-load grace) and restarts
+   what systemd can't see is wedged.
 3. **Structure**: the 15-minute self-check canary was retired 2026-07-25. It logged for
    months and slept through the walk daemon's 3,867 consecutive crashes (Jul 22-25) — a
    canary nobody reads is not an axis. Structural invariants now run on demand

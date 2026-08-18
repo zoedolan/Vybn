@@ -39,6 +39,9 @@ check_http walk-daemon  http://127.0.0.1:8101/where  vybn-walk-daemon.service  2
 # Chat API (portal) — /api/health.
 check_http chat-api     http://127.0.0.1:8420/api/health vybn-portal.service 200
 
+# Zoe's private, read-only view of the working copy.
+check_http preview      http://127.0.0.1:8480/ vybn-preview.service 200
+
 # vLLM — /v1/models. A cold load can take 10–13 minutes. State comes
 # before timestamps: systemd retains the prior ActiveEnterTimestamp while a new
 # activation is still in ExecStartPre, so age arithmetic there is stale.

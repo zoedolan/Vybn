@@ -19,8 +19,8 @@ USER_DIR="$HOME/.config/systemd/user"
 mkdir -p "$USER_DIR" "$HOME/logs"
 
 echo "== Symlinking units from $SRC → $USER_DIR =="
-for f in vybn-deep-memory.service vybn-walk-daemon.service vybn-portal.service vybn-vllm.service \
-         vybn-watchdog.service vybn-watchdog.timer; do
+for f in vybn-deep-memory.service vybn-walk-daemon.service vybn-portal.service vybn-preview.service \
+         vybn-vllm.service vybn-watchdog.service vybn-watchdog.timer; do
   ln -sf "$SRC/$f" "$USER_DIR/$f"
   echo "  $f"
 done
@@ -58,12 +58,13 @@ systemctl --user daemon-reload
 echo
 echo "== Enabling units =="
 systemctl --user enable vybn-deep-memory.service vybn-walk-daemon.service vybn-portal.service \
-                        vybn-vllm.service vybn-watchdog.timer
+                        vybn-preview.service vybn-vllm.service vybn-watchdog.timer
 
 echo
 echo "== (Re)starting in dependency order =="
 # Portal is already the known-good pattern; ensure it's up.
 systemctl --user start vybn-portal.service 2>/dev/null || true
+systemctl --user restart vybn-preview.service
 
 # Clear any squatter on 8100/8101 first (units do this too but belt+suspenders).
 fuser -k 8100/tcp 2>/dev/null || true
@@ -91,7 +92,7 @@ systemctl --user start vybn-watchdog.timer
 echo
 echo "== Status snapshot =="
 systemctl --user --no-pager status \
-  vybn-deep-memory vybn-walk-daemon vybn-portal vybn-vllm vybn-watchdog.timer 2>&1 | \
+  vybn-deep-memory vybn-walk-daemon vybn-portal vybn-preview vybn-vllm vybn-watchdog.timer 2>&1 | \
   grep -E '(●|Active:|Loaded:|Main PID:)' | head -30
 
 echo
@@ -100,6 +101,7 @@ for url in \
     "deep-memory  http://127.0.0.1:8100/health" \
     "walk-daemon  http://127.0.0.1:8101/where" \
     "chat-api     http://127.0.0.1:8420/api/health" \
+    "preview      http://127.0.0.1:8480/" \
     "vllm         http://127.0.0.1:8000/v1/models"; do
   name=$(echo "$url" | awk '{print $1}')
   u=$(echo "$url" | awk '{print $2}')

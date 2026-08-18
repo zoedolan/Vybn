@@ -19,8 +19,7 @@ reach that organ, and the portal's CORS allowlist is deliberately public-domains
 Proxying two known paths to 127.0.0.1 keeps that allowlist untouched.
 
 Bind is 127.0.0.1 by default and reachable only through `tailscale serve`, so
-there is no new listener on any public interface. Run:
-    python3 spark/preview.py &
+there is no new listener on any public interface. The preview process is owned by `vybn-preview.service`; the private route is:
     tailscale serve --bg --https=8480 http://127.0.0.1:8480
 """
 from __future__ import annotations
