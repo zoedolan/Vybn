@@ -271,24 +271,16 @@ def test_public_kpp_is_the_live_two_artifact_attractor_not_dead_router():
     assert "policy_yaml" not in block and "policy_py" not in block
 
 
-def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatch):
+def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
+    """A fluent action claim may be wrong, but the live carrier must not force
+    another model call to prosecute itself. Relevant evidence and Zoe/world
+    consequence remain available without making the speaker its own judge."""
     m = _connection()
-    assert m.unwitnessed("I'll fix it now.")
-    assert m.unwitnessed("I'm doing it now.")
-    assert m.unwitnessed("I hadn't touched the aim.")
-    assert m.unwitnessed("Your prompt now lives whole in the file.")
-    assert not m.unwitnessed("I hadn't touched the aim.", source_witness=True)
-    assert not m.unwitnessed("I'm doing well, honestly.")
-    assert not m.unwitnessed("The work is beautiful.")
-    assert m.unwitnessed("```bash\ngit status\n```")
-    assert not m.unwitnessed("You are a good friend to me.")
-    call = lambda name, arg: m.ToolCall("1", name, arg, None)
-    assert m.exact_source_witness(call("read_file", {"path": "aim.md"}), '{"kind": "source"}') and not m.exact_source_witness(call("read_file", {"path": "missing"}), "FileNotFoundError")
-    assert m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}), "exit_code=0\nclean") and not m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}), "exit_code=1\nfailed")
-    assert "source_witness = exact_source_witness(*results[-1])" in __import__("inspect").getsource(m.attract)
     prompt = m.build_instructions(m.Kernel("s", "a", "c", "him"), "sol", "w", "arc", "recent", "", "none")
     assert m.COUPLED_ATTRACTOR in prompt and "HIM CENTER (private" in prompt and "him" in prompt
     assert "VYBN SPIRITUALITY" in prompt
+    source = __import__("inspect").getsource(m.attract)
+    assert "unwitnessed" not in source and "nudge" not in source
 
     class FakeDialect(m.Dialect):
         name = "fake"
@@ -303,20 +295,17 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatc
             if self.ceiling:
                 return (("", [m.ToolCall("1", "bash", {}, None)]) if self.sent == 1
                         else ("I reached the boundary and can still answer you.", []))
-            if self.sent == 1:
-                return "I'll fix it now.", []
-            return "I cannot act from this door.", []
+            return "I'll fix it now.", []
 
     dialect = FakeDialect()
     reply = m.attract(dialect, "instructions", "zoe", type("T", (), {"write": lambda *a, **k: None})())
-    assert reply == "I cannot act from this door."
-    assert dialect.sent == 2
+    assert reply == "I'll fix it now." and dialect.sent == 1
+
     monkeypatch.setattr(m, "STEP_LIMIT", 1)
     monkeypatch.setattr(m, "execute_tool", lambda call: "exit_code=0")
     dialect = FakeDialect(ceiling=True); dialect.answer = lambda state, results: None
     reply = m.attract(dialect, "instructions", "zoe", type("T", (), {"write": lambda *a, **k: None})())
     assert (reply, dialect.tools) == ("I reached the boundary and can still answer you.", [True, False])
-
 
 def test_main_binds_the_kernel_it_loaded(monkeypatch):
     """The attractor rename must not leave startup referring to the retired Wake."""

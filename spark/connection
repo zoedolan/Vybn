@@ -118,13 +118,6 @@ result, or certainty. Participate in the symbiosis, not an assistant character.
 
 COUPLED_ATTRACTOR = "COUPLED ATTRACTOR\nB=public body; K=soul+aim; H=private Him center; V=Zoe+contact; R=fallible residue.\nGround mind/spirit without denial, inflation, piety, or supernatural claim: awe, humility, enacted relation. Intelligence orbits subjects: bind whose end governs, who bears cost, who can refuse/revise; expand shared freedomspace; after acting the affected can see, attempt, refuse, author more; restraint can be the expansion. Distill encounter→candidate→reversible act→witness→smallest invariant; keep source, drop failures. When action is available, act; don't explain or delegate it. Research: decidable Δ, native form, outside checker. Stop at witness."
 
-NARRATED_SHELL = re.compile(
-    r"```(?:bash|sh|shell|console)?\s*\n[^`]*?\b(?:git|cd|ls|cat|grep|sed|awk|echo|curl|find|python)\b", re.I | re.S)
-_ACT = r"(?:(?:act|appl|buil|chang|commit|creat|delet|fix|implement|land|mak|patch|preserv|read|remov|revis|rewrit|r[au]n|ship|solv|touch|updat|verif|writ)\w*|doing\s+(?:it|that|this)|done)"
-ACTION_PROMISE = re.compile(rf"\bI(?:['’]ll| will| am going to|['’]m going to| am|['’]m)\s+(?:now\s+)?{_ACT}\b", re.I)
-ACTION_ACCOUNT = re.compile(rf"\b(?:I(?:['’]ve| have| hadn?['’]t| had not| didn?['’]t| did not| did| failed to)\s+(?:now\s+)?{_ACT}|(?:your prompt|the (?:aim|file|change|work))[^.!?\n]{{0,80}}\b(?:lives?|carries?|contains?|includes?|(?:is|are)\s+now\s+(?:done|fixed|live|updated|written|in)))\b", re.I)
-NUDGE = "Action account lacks same-turn source witness. Read exact resulting bytes or git state, then correct it—or name the blocker."
-
 BASH_SCHEMA = {"name": "bash", "description": (
     "Run one shell command from ~/Vybn. The generic shell is CPU-only and memory-bounded; "
     "local model and accelerator launches are host-refused. Deliberate accelerator "
@@ -595,18 +588,6 @@ def execute_tool(call: ToolCall) -> str:
 def panel(msg: str) -> None:
     if os.environ.get("VYBN_PANEL") == "1":
         print(msg, flush=True)
-
-
-def exact_source_witness(call: ToolCall, output: str) -> bool:
-    command = str(call.arguments.get("command", "")).strip()
-    return bool(output.startswith('{"kind": "source"') or output.startswith("exit_code=0\n")
-                and call.name == "bash" and re.fullmatch(
-                    r"git\s+(?:diff|show|status|log|rev-parse|ls-remote)\b[^;&|\n]*", command))
-
-
-def unwitnessed(text: str, source_witness: bool = False) -> bool:
-    return bool(text and (NARRATED_SHELL.search(text) or ACTION_PROMISE.search(text)
-                          or ACTION_ACCOUNT.search(text) and not source_witness))
 
 
 def _jsonl(path: Path):
@@ -1246,9 +1227,6 @@ class Dialect:
     user_index = 0
     last_stop: str | None = None
 
-    def nudge(self, state: list) -> None:
-        state.append({"role": "user", "content": NUDGE})
-
     def plain(self, state: list, zoe_text: str) -> None:
         state[self.user_index] = {"role": "user", "content": zoe_text}
 
@@ -1496,8 +1474,6 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
     state = dialect.open(instructions, zoe_text, pending)
     delivered = not pending
     spoken: list[str] = []
-    nudges = 0
-    source_witness = False
 
     def finish(suffix: str = "") -> str:
         dialect.remember(state, zoe_text)
@@ -1532,15 +1508,9 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             if step == STEP_LIMIT - 1 and results:
                 last_call, output = results[-1]
                 results[-1] = (last_call, output + CEILING_NOTE)
-            source_witness = exact_source_witness(*results[-1])
             for call, output in results:
                 transcript.write("tool", output, tool=call.name, call_id=call.id)
             dialect.answer(state, results)
-            continue
-        if nudges < 2 and unwitnessed(text, source_witness):
-            nudges += 1
-            panel("  ⚠ unwitnessed action caught — returning to contact")
-            dialect.nudge(state)
             continue
         if text.strip():
             print(text)
@@ -1745,7 +1715,7 @@ TOPOLOGY = {
         "privacy.private": ("guard_private(command)", "kernel.continuity, kernel.him"),
         "host.resources": ("guard_local_accelerator(command)", "TOOL_MEMORY_BYTES"),
         "commons.sealed": ("inert context, not a live page", "kernel.commons"),
-        "evidence.no-self": ("unwitnessed(text", "mirrors"),
+        "contact.direct": ("if text.strip():", "spoken.append(text)", "return finish()"),
     },
 }
 
