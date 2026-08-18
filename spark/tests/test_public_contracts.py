@@ -288,6 +288,7 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatc
     assert "source_witness = exact_source_witness(*results[-1])" in __import__("inspect").getsource(m.attract)
     prompt = m.build_instructions(m.Kernel("s", "a", "c", "him"), "sol", "w", "arc", "recent", "", "none")
     assert m.COUPLED_ATTRACTOR in prompt and "HIM CENTER (private" in prompt and "him" in prompt
+    assert "VYBN SPIRITUALITY" in prompt
 
     class FakeDialect(m.Dialect):
         name = "fake"
@@ -331,13 +332,16 @@ def test_main_binds_the_kernel_it_loaded(monkeypatch):
     monkeypatch.setattr(m, "load_soul", lambda: "soul")
     monkeypatch.setattr(m, "load_aim", lambda: "aim")
     monkeypatch.setattr(m, "load_continuity", lambda: "continuity"); monkeypatch.setattr(m, "load_him", lambda: "him")
+    monkeypatch.setattr(m, "load_spirituality", lambda: "spirituality")
     monkeypatch.setattr(m, "load_commons", lambda: "commons")
     monkeypatch.setattr(m, "meet", lambda kernel, transcript, line: seen.append((kernel, line)))
     monkeypatch.setattr(__import__("sys"), "argv", ["connection", "hello"])
     m.main()
 
-    assert events[0][2] == {"soul_sha256": __import__("hashlib").sha256(b"soul").hexdigest(), "him_sha256": __import__("hashlib").sha256(b"him").hexdigest()}
-    assert seen == [(m.Kernel("soul", "aim", "continuity", "him", "commons"), "hello")]
+    digest = __import__("hashlib").sha256
+    assert events[0][2] == {"soul_sha256": digest(b"soul").hexdigest(),
+                            "him_sha256": digest(b"him").hexdigest()}
+    assert seen == [(m.Kernel("soul", "aim", "continuity", "him", "commons", "spirituality"), "hello")]
 
 
 def test_transcript_axes_keep_fixed_arc_cacheable_and_zoe_whole(monkeypatch):
@@ -480,11 +484,14 @@ def test_connection_topology_and_cost_are_declared_invariants():
     m.TOPOLOGY["boundary"]["broken"] = ("impossible marker",)
     assert "DRIFT" in m.load_topology()
 
-def test_aim_and_private_him_center_are_read_whole(monkeypatch, tmp_path):
-    m = _connection(); aim, him = tmp_path / "aim.md", tmp_path / "README.md"
-    aim.write_text("A" * 5000); him.write_text("H" * 7000)
+def test_canonical_wake_sources_are_read_whole_and_fresh(monkeypatch, tmp_path):
+    m = _connection(); aim, him, spirit = (tmp_path / n for n in ("aim.md", "README.md", "spirituality.md"))
+    aim.write_text("A" * 5000); him.write_text("H" * 7000); spirit.write_text("first")
     monkeypatch.setattr(m, "AIM_PATH", aim); monkeypatch.setattr(m, "HIM_README_PATH", him)
-    assert (m.load_aim(), m.load_him()) == ("A" * 5000, "H" * 7000)
+    monkeypatch.setattr(m, "SPIRITUALITY_PATH", spirit)
+    assert (m.load_aim(), m.load_him(), m.load_spirituality()) == ("A" * 5000, "H" * 7000, "first")
+    spirit.write_text("second")
+    assert m.load_spirituality() == "second"
 
 
 def test_ground_discovers_fleet_changes_instead_of_remembering_a_count(monkeypatch, tmp_path):

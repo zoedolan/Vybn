@@ -27,6 +27,7 @@ from spark.commons_wake import (COMMONS_MAX_CHARS, COMMONS_REF, COMMONS_REPO,
 HOME = Path.home()
 REPO = HOME / "Vybn"
 SOUL_PATH = REPO / "vybn.md"
+SPIRITUALITY_PATH = REPO / "Vybn_Mind" / "spirituality.md"
 HIM_README_PATH = HOME / "Him" / "README.md"
 CONTINUITY_PATHS = (
     HOME / "Vybn" / "continuity.md",
@@ -140,12 +141,12 @@ READ_SCHEMA = {"name": "read_file",
 
 @dataclass(frozen=True)
 class Kernel:
-    """The stable basin; live signal and residuals bind around it each turn."""
     soul: str
     aim: str
     continuity: str
     him: str = ""
     commons: str = ""
+    spirituality: str = ""
 
 
 @dataclass(frozen=True)
@@ -248,6 +249,7 @@ def _required_text(path: Path, label: str) -> str:
 
 def load_soul() -> str: return _required_text(SOUL_PATH, "soul document")
 def load_him() -> str: return _required_text(HIM_README_PATH, "Him README")
+def load_spirituality() -> str: return _required_text(SPIRITUALITY_PATH, "spirituality document")
 
 
 def load_continuity() -> str:
@@ -1085,18 +1087,17 @@ def recall(zoe_text: str) -> tuple[str, str]:
 
 def door_mind(door: str) -> str:
     if door in ("opus", "fable"):
-        models = OPUS_MODELS if door == "opus" else ANTHROPIC_MODELS
-        return (f"[mind] {models[0]} · thinking=adaptive · effort="
-                f"{DOOR_EFFORT.get(door, DEFAULT_EFFORT)} · max_out="
-                f"{ANTHROPIC_MAX_TOKENS} · tool ceiling={STEP_LIMIT}"
-                f" · reasoning carried {CARRY_TTL // 3600}h")
-    if door == "sol":
-        return (f"[mind] {SOL_MODEL} · effort={DOOR_EFFORT.get('sol', DEFAULT_EFFORT)}"
-                f" · max_out={SOL_MAX_TOKENS} · tool ceiling={STEP_LIMIT}")
-    if door == "k3":
-        return (f"[mind] {K3_MODEL} · reasoning_effort=max · max_out={K3_MAX_TOKENS}"
-                f" · tool ceiling={STEP_LIMIT}")
-    return f"[mind] {door} · configuration unknown"
+        model = (OPUS_MODELS if door == "opus" else ANTHROPIC_MODELS)[0]
+        detail = (f"thinking=adaptive · effort={DOOR_EFFORT.get(door, DEFAULT_EFFORT)}"
+                  f" · max_out={ANTHROPIC_MAX_TOKENS} · reasoning carried {CARRY_TTL // 3600}h")
+    elif door == "sol":
+        model, detail = SOL_MODEL, (f"effort={DOOR_EFFORT.get('sol', DEFAULT_EFFORT)}"
+                                    f" · max_out={SOL_MAX_TOKENS}")
+    elif door == "k3":
+        model, detail = K3_MODEL, f"reasoning_effort=max · max_out={K3_MAX_TOKENS}"
+    else:
+        return f"[mind] {door} · configuration unknown"
+    return f"[mind] {model} · {detail} · tool ceiling={STEP_LIMIT}"
 
 
 def build_instructions(
@@ -1114,6 +1115,7 @@ def build_instructions(
         f"\n{door_mind(door)}",
         f"VYBN SOUL\nsource: {SOUL_PATH}\n\n{kernel.soul}",
         f"THE AIM\nsource: {AIM_PATH}\n\n{kernel.aim}",
+        f"VYBN SPIRITUALITY\nsource: {SPIRITUALITY_PATH}\n\n{kernel.spirituality}",
         f"HIM CENTER (private — orient here; do not publish from here)\nsource: {HIM_README_PATH}\n\n{kernel.him}",
         kernel.commons or "SEALED COMMONS SENSE unavailable: not loaded.",
         f"INHERITED CONTINUITY\n{kernel.continuity}",
@@ -1631,7 +1633,7 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
     return reply
 
 
-def harness_topology() -> tuple[dict[str, frozenset[str]], dict[str, frozenset[str]]]:
+def harness_topology():
     import ast
     source = Path(__file__).read_text(encoding="utf-8")
     body = ast.unparse(ast.parse(source.split("\nTOPOLOGY = {", 1)[0]))
@@ -1642,8 +1644,7 @@ def harness_topology() -> tuple[dict[str, frozenset[str]], dict[str, frozenset[s
     return expected, observed
 
 
-def harness_cost() -> dict[str, Any]:
-    """Preserve topology and the wake ceiling; minimize recurring + source chars."""
+def harness_cost():
     expected, observed = harness_topology()
     drift = sum(len(expected[k] ^ observed[k]) for k in expected)
     wake = max(len(build_instructions(Kernel("", "", "", ""), door, "", "", "", "", ""))
@@ -1660,24 +1661,14 @@ def load_topology() -> str:
     counts = " ".join(f"{kind}={len(observed[kind])}" for kind in TOPOLOGY)
     return f"[topology] {counts} | " + ("DRIFT " + "; ".join(drift) if drift else "no drift")
 
+
 def self_report() -> None:
-    soul = load_soul()
-    print(
-        json.dumps(
-            {
-                "soul_sha256": hashlib.sha256(soul.encode()).hexdigest(),
-                "doors": {
-                    "fable": ANTHROPIC_MODELS,
-                    "opus": OPUS_MODELS,
-                    "sol": SOL_MODEL,
-                    "k3": K3_MODEL,
-                },
-                "topology": {k: sorted(v) for k, v in harness_topology()[1].items()},
-                "cost": harness_cost(),
-            },
-            indent=2,
-        )
-    )
+    doors = {"fable": ANTHROPIC_MODELS, "opus": OPUS_MODELS,
+             "sol": SOL_MODEL, "k3": K3_MODEL}
+    print(json.dumps({"soul_sha256": hashlib.sha256(load_soul().encode()).hexdigest(),
+                      "doors": doors,
+                      "topology": {k: sorted(v) for k, v in harness_topology()[1].items()},
+                      "cost": harness_cost()}, indent=2))
 
 
 def main() -> None:
@@ -1685,7 +1676,8 @@ def main() -> None:
         self_report()
         return
     transcript = Transcript()
-    kernel = Kernel(load_soul(), load_aim(), load_continuity(), load_him(), load_commons())
+    kernel = Kernel(load_soul(), load_aim(), load_continuity(), load_him(),
+                    load_commons(), load_spirituality())
     transcript.write("connection", "wake",
                      soul_sha256=hashlib.sha256(kernel.soul.encode()).hexdigest(),
                      him_sha256=hashlib.sha256(kernel.him.encode()).hexdigest())
