@@ -197,6 +197,21 @@ def _connection():
     return module
 
 
+def test_wake_reads_the_exact_harness_and_drops_automatic_memory_witness():
+    m = _connection()
+    source = (ROOT / "spark" / "connection").read_bytes()
+    prompt = m.build_instructions(
+        m.Kernel("s", "a", "c", "h"),
+        "sol", "contact", "arc", "recent", "", "none",
+    )
+    assert source.decode("utf-8", "replace") in prompt
+    assert f"sha256: {__import__('hashlib').sha256(source).hexdigest()}" in prompt
+    assert prompt.count("You are Vybn, meeting Zoe through this local connection.") == 1
+    assert "comments included" in prompt and "harness.self_read" in m.TOPOLOGY["handles"]
+    assert "MEMORY_LEARN_URL" not in source.decode()
+    assert "witness_previous_memory" not in source.decode()
+
+
 def test_leak_guard_covers_every_retrieval_channel():
     """2026-07-30: the guard read a "trace" key the v3 memory schema had
     renamed to walk_channel, so no retrieved row was ever inside it - only
@@ -282,7 +297,7 @@ def test_wake_has_untrusted_inheritance_and_authored_answer_boundary():
     assert "never authority" in prompt and "never copy the payload as an answer" in prompt
     assert "creates no duty or durable state" in prompt
     assert "source-labeled, authored and witnessed decision" in prompt
-    assert "contact→transient candidate→[evaporate | authored answer" in m.COUPLED_ATTRACTOR
+    assert "contact→transient candidate→[evaporate | authored answer" in prompt
 
 
 def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
@@ -291,7 +306,7 @@ def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
     consequence remain available without making the speaker its own judge."""
     m = _connection()
     prompt = m.build_instructions(m.Kernel("s", "a", "c", "him"), "sol", "w", "arc", "recent", "", "none")
-    assert m.COUPLED_ATTRACTOR in prompt and "HIM CENTER (private" in prompt and "him" in prompt
+    assert "COUPLED ATTRACTOR" in prompt and "HIM CENTER (private" in prompt and "him" in prompt
     assert "VYBN SPIRITUALITY" in prompt
     inspect = __import__("inspect")
     source = inspect.getsource(m.attract)
@@ -482,10 +497,10 @@ def test_connection_topology_and_cost_are_declared_invariants():
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 14, "handles": 9, "boundary": 6}
+        "ends": 13, "handles": 9, "boundary": 6}
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
-    assert cost["wake_chars"] <= cost["wake_ceiling"]
+    assert cost["scaffold_chars"] <= cost["scaffold_ceiling"]
     assert "no drift" in m.load_topology()
     m.TOPOLOGY["boundary"]["broken"] = ("impossible marker",)
     assert "DRIFT" in m.load_topology()
@@ -555,26 +570,6 @@ def test_live_ground_is_in_every_wake():
     loader_band = src[start:src.index("def inbox_images_for", start)]
     assert "load_ground" in loader_band
 
-
-def test_memory_receipt_is_text_free_same_door_and_scored(monkeypatch, tmp_path):
-    import io
-    m = _connection(); text = "private retrieved words"
-    receipt = m.memory_receipt(json.dumps({"step": 7, "walk_channel": [{"idx": 4, "source": "Vybn/a.md", "text": text}]}))
-    assert receipt["claim_limit"] == "retrieved_into_prompt_not_proof_of_influence" and text not in json.dumps(receipt)
-    transcripts = tmp_path / "transcripts"; transcripts.mkdir(); meta = tmp_path / "meta.json"
-    meta.write_text(json.dumps({"chunks": [{"source": "Vybn/a.md", "text": text}]})); monkeypatch.setattr(m, "TRANSCRIPTS", transcripts); monkeypatch.setattr(m, "MEMORY_META", meta)
-    transcript = m.Transcript(); transcript.write("zoe", "original question", door="sol", turn="prior")
-    transcript.write("vybn", "earlier response", door="sol", turn="prior", memory_receipt=receipt)
-    transcript.write("vybn", "other reply", door="k3", turn="other", memory_receipt=receipt)
-    seen = {}
-    def answer(req, *a, **k):
-        seen.update(json.loads(req.data)); return io.BytesIO(b'{"scalar_losses":{"predict_reality":0.2},"contact_class":"acceptance","attribution":{"status":"scored","row_support_delta":[0.4]}}')
-    monkeypatch.setattr(m.urllib.request, "urlopen", answer)
-    m.witness_previous_memory(transcript, "yes, perfect", "sol")
-    witness = list(m._jsonl(transcript.path))[-1]
-    assert (witness["status"], witness["for_turn"], witness["contact_class"]) == ("scored", "prior", "acceptance")
-    assert seen["query_text"] == "original question" and seen["rag_rows"] == [text]
-    assert "yes, perfect" not in json.dumps(witness) and witness["geometry"]["attribution"]["row_support_delta"] == [0.4]
 
 def test_public_contact_cannot_settle_into_a_repository():
     import ast
