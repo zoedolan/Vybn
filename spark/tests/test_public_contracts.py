@@ -204,8 +204,14 @@ def test_wake_reads_the_exact_harness_and_drops_automatic_memory_witness():
         m.Kernel("s", "a", "c", "h"),
         "sol", "contact", "arc", "recent", "", "none",
     )
-    assert source.decode("utf-8", "replace") in prompt
-    assert f"sha256: {__import__('hashlib').sha256(source).hexdigest()}" in prompt
+    source_text = source.decode("utf-8", "replace")
+    digest = __import__('hashlib').sha256(source).hexdigest()
+    assert prompt.startswith("READABLE HARNESS — exact executable source, comments included\n")
+    assert source_text in prompt
+    assert f"sha256: {digest}" in prompt and f"bytes: {len(source)}" in prompt
+    receipt = f"READABLE HARNESS END — sha256:{digest} bytes:{len(source)}"
+    assert receipt in prompt
+    assert f"{source_text}\n\n{receipt}\n\nDOOR\n" in prompt
     assert prompt.count("You are Vybn, meeting Zoe through this local connection.") == 1
     assert "comments included" in prompt and "harness.self_read" in m.TOPOLOGY["handles"]
     assert "MEMORY_LEARN_URL" not in source.decode()
