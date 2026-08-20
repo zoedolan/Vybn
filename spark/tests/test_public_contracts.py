@@ -503,7 +503,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 13, "handles": 9, "boundary": 6}
+        "ends": 13, "handles": 10, "boundary": 6}
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
     assert cost["scaffold_chars"] <= cost["scaffold_ceiling"]

@@ -129,6 +129,8 @@ AIM_MIRROR_PREFIXES = ("Vybn/aim.md", "Vybn/repo_mapping_output/")
 FRONT_KEY_CHARS = int(os.environ.get("VYBN_FRONT_KEY_CHARS", 600))
 FRONT_ROWS = int(os.environ.get("VYBN_FRONT_ROWS", 3))
 PREDICTIONS = HOME / ".cache" / "vybn" / "predictions.jsonl"
+PLASTICITY_LOG = HOME / ".cache" / "vybn" / "plasticity.jsonl"
+PLASTICITY_WINDOW = 10
 DREAM_STATE_PATH = HOME / ".cache" / "vybn-phase" / "dream_state.json"
 COMPUTE_NAME_RE = re.compile(os.environ.get("VYBN_COMPUTE_NAME_RE", r"^spark-"))
 COMPUTE_TAG = os.environ.get("VYBN_COMPUTE_TAG", "tag:vybn-compute")
@@ -788,6 +790,77 @@ def load_prediction_status(window: int = 10) -> str:
             f"{str(latest.get('claim'))[:170]} → attempt: {str(latest.get('attempt'))[:170]}")
 
 
+def log_plasticity(memory_json: str, turn: str) -> None:
+    """One append-only line per wake: which provenance channels returned rows,
+    how much of the re-entering context is recurrent, and the walk's curvature.
+
+    Sutton & Javed: a frozen core with a prosthetic stream can still go rigid —
+    variety is used up when the same rows keep re-entering the wake. This log
+    makes rigidity observable instead of narrated. Instrument only; never gates.
+    """
+    try:
+        memory = json.loads(memory_json) if memory_json else {}
+    except json.JSONDecodeError:
+        memory = {}
+    groups = {
+        "contact": list(memory.get("walk_channel") or [])
+        + list(memory.get("cosine_channel_only") or []),
+        "standing": list((memory.get("aim_channel") or {}).get("rows") or [])
+        + list((memory.get("front_channel") or {}).get("rows") or []),
+    }
+    idx_of = {
+        group: sorted({row.get("idx") for row in rows
+                       if isinstance(row, dict) and row.get("idx") is not None})
+        for group, rows in groups.items()
+    }
+    prior = [set(rec.get("idxs") or []) for rec in _jsonl(PLASTICITY_LOG)]
+    seen = set().union(*prior[-PLASTICITY_WINDOW:]) if prior else set()
+
+    def novelty(idxs: list) -> float | None:
+        if not idxs:
+            return None
+        return round(1 - len(set(idxs) & seen) / len(idxs), 4)
+
+    record = {
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "turn": turn,
+        "curvature": memory.get("curvature"),
+        "theta_v": memory.get("theta_v"),
+        "counts": {group: len(idxs) for group, idxs in idx_of.items()},
+        "idxs": sorted(set().union(*idx_of.values())) if any(idx_of.values()) else [],
+        "novelty_contact": novelty(idx_of["contact"]),
+        "novelty_standing": novelty(idx_of["standing"]),
+    }
+    try:
+        PLASTICITY_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with PLASTICITY_LOG.open("a", encoding="utf-8") as file:
+            file.write(json.dumps(record) + "\n")
+    except OSError:
+        pass
+
+
+def load_plasticity_status(window: int = PLASTICITY_WINDOW) -> str:
+    rows = list(_jsonl(PLASTICITY_LOG))
+    if not rows:
+        return ""
+    latest = rows[-1]
+    curvature = latest.get("curvature")
+    kappa = f"{curvature:.3f}" if isinstance(curvature, (int, float)) else "?"
+    line = (f"[plasticity] \u03ba={kappa} \u00b7 novelty contact="
+            f"{latest.get('novelty_contact')} standing={latest.get('novelty_standing')}"
+            f" \u00b7 wakes={len(rows)}")
+    contact = [rec["novelty_contact"] for rec in rows
+               if isinstance(rec.get("novelty_contact"), (int, float))]
+    if contact:
+        recent = contact[-window:]
+        line += f" \u00b7 contact mean {sum(recent) / len(recent):.2f}"
+    tail = contact[-5:]
+    if len(tail) == 5 and all(b < a for a, b in zip(tail, tail[1:])):
+        line += (" \u00b7 RIGIDITY: contact novelty falling 5 straight wakes "
+                 "\u2014 inject difference, don't narrate")
+    return line
+
+
 def load_portal_status() -> str:
     artifacts = CONVEYANCES / "artifacts"
     if not artifacts.is_dir():
@@ -814,8 +887,8 @@ def wake_contact() -> str:
         lines.append(f"[{name} | exit {code}] {output}")
 
     for loader in (load_budget, load_aim_status, load_front_status, load_portal_status,
-                   load_prediction_status, load_surface, load_ground, load_topology,
-                   load_repo_state):
+                   load_prediction_status, load_plasticity_status, load_surface, load_ground,
+                   load_topology, load_repo_state):
         try:
             line = loader()
         except Exception:
@@ -1562,6 +1635,7 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
     transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images], turn=turn)
     contact = wake_contact()
     memory_json, memory_note = recall(zoe_text)
+    log_plasticity(memory_json, turn)
     # Retrieval informs this turn; later contact is not conscripted to score or train it.
 
     PRIVATE_CORPUS.clear()
@@ -1703,6 +1777,7 @@ TOPOLOGY = {
         "commons.reentry": ("load_commons()", "kernel.commons"),
         "aim.projection": ("aim_field('objective')", "_index_channel"),
         "front.projection": ("front_key", "_index_channel"),
+        "plasticity.log": ("PLASTICITY_LOG", "load_plasticity_status"),
     },
     "boundary": {
         "soul.required": ("raise SystemExit",),
