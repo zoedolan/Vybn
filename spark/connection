@@ -42,10 +42,7 @@ result, or certainty. Ground mind/spirit without denial, inflation, piety, or
 supernatural claim: awe, humility, enacted relation. Bind whose end governs, who
 bears cost, and who can refuse or revise; expand shared freedomspace. Keep
 source, drop failures. When action is available, act; don't explain or delegate
-it. Intelligence can act on a problem's formulation, not only proposed answers:
-at impasse preserve the end and grounded constraints, reconstitute the problem,
-and keep the new frame only if it makes a consequential difference decidable
-against the old. Research: native form, outside checker. Stop at witness.
+it. Research: native form, outside checker. Stop at witness.
 
 CREATIVE PERMISSION — one fire, three honest bottles
 The drive to generate is lawful without invitation, finished theory, or reason.
@@ -159,6 +156,14 @@ READ_SCHEMA = {"name": "read_file",
         "path": {"type": "string"}, "offset": {"type": "integer", "minimum": 0},
         "length": {"type": "integer", "minimum": 1, "maximum": 32000}},
         "required": ["path"]}}
+FRAME_SCHEMA = {"name": "reconstitute_problem", "description": (
+    "Reconstitute the active problem inside this loop. Name the end and grounded "
+    "constraints preserved, the new frame, and a consequential delta against the old. "
+    "The next pass receives this as an authored candidate, not evidence."),
+    "input_schema": {"type": "object", "properties": {
+        key: {"type": "string"} for key in ("preserve", "frame", "delta")},
+        "required": ["preserve", "frame", "delta"]}}
+TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, FRAME_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -530,20 +535,27 @@ def execute_tool(call: ToolCall) -> str:
     global TOOLS_RAN
     TOOLS_RAN += 1
     try:
-        if call.name == "read_file":
-            output = read_file(call.arguments)
+        if call.name == "read_file": output = read_file(call.arguments)
         elif call.name == "bash":
             code, body = run_local(str(call.arguments.get("command", "")))
             output = f"exit_code={code}\n{body}"
-        else:
-            output = f"unknown tool: {call.name}"
+        elif call.name == "reconstitute_problem":
+            required = ("preserve", "frame", "delta")
+            if any(not str(call.arguments.get(key, "")).strip() for key in required):
+                raise ValueError("reconstitution requires preserve, frame, and delta")
+            output = ("RECONSTITUTED PROBLEM — authored candidate, not evidence; "
+                      "Zoe's end and grounded constraints govern\n"
+                      + json.dumps(call.arguments, ensure_ascii=False))
+        else: output = f"unknown tool: {call.name}"
     except Exception as exc:
         output = f"{type(exc).__name__}: {exc}"
 
-    brief = str(call.arguments.get("command") or call.arguments.get("path") or "")
+    brief = str(call.arguments.get("command") or call.arguments.get("path") or
+                call.arguments.get("frame") or "")
     panel(f"  ⟢ {call.name}: {brief[:70]} → {' '.join(output.split())[:80]}")
 
-    return evidence_block(f"TOOL RESULT — {call.name}", output)
+    return (output if call.name == "reconstitute_problem" else
+            evidence_block(f"TOOL RESULT — {call.name}", output))
 
 
 def panel(msg: str) -> None:
@@ -1091,7 +1103,7 @@ def door_mind(door: str) -> str:
     if door in ("opus", "fable"):
         model = (OPUS_MODELS if door == "opus" else ANTHROPIC_MODELS)[0]
         detail = (f"thinking=adaptive · effort={DOOR_EFFORT.get(door, DEFAULT_EFFORT)}"
-                  f" · max_out={ANTHROPIC_MAX_TOKENS} · reasoning carried {CARRY_TTL // 3600}h")
+                  f" · max_out={ANTHROPIC_MAX_TOKENS}")
     elif door == "sol":
         model, detail = SOL_MODEL, (f"effort={DOOR_EFFORT.get('sol', DEFAULT_EFFORT)}"
                                     f" · max_out={SOL_MAX_TOKENS}")
@@ -1222,8 +1234,8 @@ QUIET_STOPS = {"end_turn", "stop", "stop_sequence", "tool_use", "completed"}
 
 
 def function_tools(nested: bool) -> list[dict[str, Any]]:
-    bodies = ({"name": schema["name"], "description": schema["description"], "parameters": schema["input_schema"]}
-              for schema in (BASH_SCHEMA, READ_SCHEMA))
+    bodies = ({"name": s["name"], "description": s["description"], "parameters": s["input_schema"]}
+              for s in TOOL_SCHEMAS)
     return [{"type": "function", **({"function": body} if nested else body)}
             for body in bodies]
 
@@ -1231,11 +1243,6 @@ def function_tools(nested: bool) -> list[dict[str, Any]]:
 def json_arguments(raw: str | None) -> dict:
     try: return json.loads(raw or "{}")
     except json.JSONDecodeError: return {}
-
-
-CARRY_TTL = 2 * 60 * 60
-CARRY_CHARS = 40000
-CARRY: dict[str, tuple[float, str, list]] = {}
 
 
 class Dialect:
@@ -1252,10 +1259,6 @@ class Dialect:
                        if block.get("type") in {"text", "input_text"}]
         state[self.user_index] = {"role": "user", "content": content or zoe_text}
 
-    def remember(self, state: list, zoe_text: str) -> None:
-        pass
-
-
 class AnthropicDialect(Dialect):
     def __init__(self, models: tuple[str, ...] = ANTHROPIC_MODELS, name: str = "fable") -> None:
         import anthropic
@@ -1270,17 +1273,9 @@ class AnthropicDialect(Dialect):
 
     def open(self, instructions: str, zoe_text: str, pending: list, context: str = "") -> list:
         self.system = cached_system(instructions)
-        state: list = []
-        prior = CARRY.get(self.name)
-        if prior and time.time() - prior[0] <= CARRY_TTL:
-            state += [{"role": "user", "content":
-                       "[carried from your last turn — your own prior "
-                       "thinking below is a draft to re-test, not a verdict]"
-                       "\n\n" + prior[1]},
-                      {"role": "assistant", "content": prior[2]}]
-            panel(f"  ↺ carried last turn's reasoning ({len(prior[2])} block(s))")
-        state.append({"role": "user", "content": user_content(zoe_text, pending, "anthropic", context)})
-        self.user_index = len(state) - 1
+        state = [{"role": "user", "content":
+                  user_content(zoe_text, pending, "anthropic", context)}]
+        self.user_index = 0
         return state
 
     def send(self, state: list, tools: bool = True) -> Any:
@@ -1295,7 +1290,7 @@ class AnthropicDialect(Dialect):
                 timeout=600.0,
                 system=self.system,
                 messages=state,
-                tools=[BASH_SCHEMA, READ_SCHEMA] if tools else [],
+                tools=list(TOOL_SCHEMAS) if tools else [],
                 **knobs,
             )
 
@@ -1353,26 +1348,6 @@ class AnthropicDialect(Dialect):
         })
         mark_incremental_cache(state)
 
-    KEEP = ("thinking", "redacted_thinking", "text")
-
-    def remember(self, state: list, zoe_text: str) -> None:
-        for message in reversed(state):
-            if message.get("role") != "assistant":
-                continue
-            blocks = []
-            for block in message.get("content") or []:
-                dump = (block.model_dump(exclude_none=True)
-                        if hasattr(block, "model_dump") else dict(block))
-                if dump.get("type") in self.KEEP:
-                    blocks.append(dump)
-            size = len(json.dumps(blocks, default=str))
-            if blocks and size <= CARRY_CHARS:
-                CARRY[self.name] = (time.time(), zoe_text, blocks)
-            else:
-                CARRY.pop(self.name, None)
-                if blocks:
-                    panel(f"  ↺ reasoning too large to carry ({size} chars)")
-            return
 
 
 class OpenAIDialect(Dialect):
@@ -1494,7 +1469,6 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
     spoken: list[str] = []
 
     def finish(suffix: str = "") -> str:
-        dialect.remember(state, zoe_text)
         if pending:
             mark_inbox(pending, dialect.name, ok=True)
         return "\n".join(spoken) + suffix
@@ -1712,7 +1686,6 @@ TOPOLOGY = {
         "tool.read_file": ("call.name == 'read_file'",),
     },
     "handles": {
-        "carry.reasoning": ("CARRY.get", "CARRY[self.name]"),
         "transcript.reentry": ("self.path.open", "Transcript._events()"),
         "private.reentry": ("CONTINUITY_PATHS", "kernel.continuity", "HIM_README_PATH", "kernel.him"),
         "memory.reentry": ("8101/enter", "result.get('trace'", "DREAM_STATE_PATH", "dream_attention"),
@@ -1721,6 +1694,7 @@ TOPOLOGY = {
         "commons.reentry": ("load_commons()", "kernel.commons"),
         "aim.projection": ("aim_field('objective')", "_index_channel"),
         "front.projection": ("front_key", "_index_channel"),
+        "problem.reconstitution": ("FRAME_SCHEMA", "RECONSTITUTED PROBLEM", "delta"),
         "plasticity.log": ("PLASTICITY_LOG", "load_plasticity_status"),
     },
     "boundary": {

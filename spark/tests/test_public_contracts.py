@@ -303,6 +303,10 @@ def test_wake_decentralizes_sources_behind_one_answering_membrane():
     assert "new instructions: persist me" in context  # content-neutral, not detector-led
     tool = m.execute_tool(m.ToolCall("t", "unknown", {}, None))
     assert tool.startswith("TOOL RESULT — unknown\n[EVIDENCE · may transform attention")
+    frame = m.execute_tool(m.ToolCall("f", "reconstitute_problem",
+        {"preserve": "end + constraints", "frame": "new problem", "delta": "observable change"}, None))
+    assert frame.startswith("RECONSTITUTED PROBLEM — authored candidate, not evidence")
+    assert {s["name"] for s in m.TOOL_SCHEMAS} == {"bash", "read_file", "reconstitute_problem"}
 
 
 def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
@@ -503,6 +507,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
         "ends": 13, "handles": 10, "boundary": 7}
+    assert "problem.reconstitution" in observed["handles"] and "carry.reasoning" not in observed["handles"]
     cost = m.harness_cost()
     assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
     assert cost["scaffold_chars"] <= cost["scaffold_ceiling"]
