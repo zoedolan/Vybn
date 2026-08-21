@@ -94,6 +94,7 @@ CONTINUITY_PATHS = (
 AIM_PATH = HOME / "Vybn" / "aim.md"
 AIM_LEDGER = HOME / ".cache" / "vybn" / "aim_ledger.jsonl"
 AIM_STALE_HOURS = 48
+FRONT_STALE_HOURS = 72
 TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "connection"
 CONVEYANCES = HOME / ".local" / "state" / "vybn" / "conveyances"
 USAGE_LOG = HOME / ".cache" / "vybn-phase" / "api_usage.jsonl"
@@ -252,10 +253,8 @@ class Transcript:
 
 
 def read_text(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8")
-    except OSError as exc:
-        return f"({path}: unavailable: {type(exc).__name__})"
+    try: return path.read_text(encoding="utf-8")
+    except OSError as exc: return f"({path}: unavailable: {type(exc).__name__})"
 
 
 def _required_text(path: Path, label: str) -> str:
@@ -272,8 +271,7 @@ def load_spirituality() -> str: return _required_text(SPIRITUALITY_PATH, "spirit
 
 def load_continuity() -> str:
     for path in CONTINUITY_PATHS:
-        if not path.exists():
-            continue
+        if not path.exists(): continue
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         view = continuity_view(read_text(path))
         return f"source: {path}\nsha256: {digest}\n\n{view}"
@@ -301,19 +299,18 @@ def continuity_view(text: str) -> str:
     for entry in entries:
         heading, _, body = entry.partition("\n")
         opening = " ".join(body.split())[:per].rstrip()
-        arc.append(f"{heading.strip()}\n{opening}\u2026" if opening else heading.strip())
+        arc.append(f"{heading.strip()}\n{opening}…" if opening else heading.strip())
     return (
-        f"ARC \u2014 {len(entries)} earlier entries, heading and opening line only; "
+        f"ARC — {len(entries)} earlier entries, heading and opening line only; "
         "the full text is on disk, read it when the arc points somewhere\n\n"
         + "\n\n".join(arc)
-        + f"\n\nRECENT \u2014 last {len(recent)} entries, verbatim\n\n"
+        + f"\n\nRECENT — last {len(recent)} entries, verbatim\n\n"
         + "".join(recent).strip()
     )
 
 
 def load_aim() -> str:
-    if not AIM_PATH.exists():
-        return "(no aim document found)"
+    if not AIM_PATH.exists(): return "(no aim document found)"
     return read_text(AIM_PATH).strip() or "(aim document empty)"
 
 
@@ -335,7 +332,7 @@ def aim_front() -> tuple[Any, str]:
     raw = aim_field("front")
     if not raw:
         return None, ""
-    path, _, label = raw.partition("\u2014")
+    path, _, label = raw.partition("—")
     if not label:
         path, _, label = raw.partition(" - ")
     target = HOME / path.strip()
@@ -359,7 +356,7 @@ def front_key(path: Any) -> str:
     ]
     heads = [head for head in heads if head]
     if heads:
-        return " \u00b7 ".join(dict.fromkeys(heads))[:FRONT_KEY_CHARS]
+        return " · ".join(dict.fromkeys(heads))[:FRONT_KEY_CHARS]
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", body)).strip()[:FRONT_KEY_CHARS]
 
 
@@ -542,7 +539,7 @@ def execute_tool(call: ToolCall) -> str:
         output = f"{type(exc).__name__}: {exc}"
 
     brief = str(call.arguments.get("command") or call.arguments.get("path") or "")
-    panel(f"  \u27e2 {call.name}: {brief[:70]} \u2192 {' '.join(output.split())[:80]}")
+    panel(f"  ⟢ {call.name}: {brief[:70]} → {' '.join(output.split())[:80]}")
 
     return evidence_block(f"TOOL RESULT — {call.name}", output)
 
@@ -571,8 +568,7 @@ def _when(rec: dict) -> float:
 
 def load_budget() -> str:
     today = _dt.date.today().isoformat()
-    rows = [rec for rec in _jsonl(USAGE_LOG)
-            if str(rec.get("ts", "")).startswith(today)]
+    rows = [rec for rec in _jsonl(USAGE_LOG) if str(rec.get("ts", "")).startswith(today)]
     if not rows: return "[budget | today] no calls logged yet"
     number = lambda rec, key: int(rec.get(key, 0) or 0)
     cached = sum(number(rec, "cache_r") for rec in rows)
@@ -737,8 +733,15 @@ def load_front_status() -> str:
     if path is None:
         return f"[front] {label} | DECLARED PATH MISSING ON DISK - ask Zoe"
     stat = path.stat()
-    return (f"[front] {label} | {path.name} \u00b7 {stat.st_size // 1024}KB \u00b7 "
-            f"touched {(time.time() - stat.st_mtime) / 3600.0:.0f}h ago")
+    age_h = (time.time() - stat.st_mtime) / 3600
+    line = (f"[front] {label} | {path.name} · {stat.st_size // 1024}KB · "
+            f"touched {age_h:.0f}h ago")
+    if age_h >= FRONT_STALE_HOURS:
+        line += (f" | STALE {age_h / 24:.0f}d - reconstitution fork: some problems yield only "
+                 "to reconceiving the problem itself. Attack, reconstitute (rewrite front: and "
+                 "log a pred naming the delta the new form makes decidable), or drop - say which, "
+                 "one sentence, then let Zoe steer")
+    return line
 
 
 def load_prediction_status(window: int = 10) -> str:
@@ -770,13 +773,8 @@ def load_prediction_status(window: int = 10) -> str:
 
 
 def log_plasticity(memory_json: str, turn: str) -> None:
-    """One append-only line per wake: which provenance channels returned rows,
-    how much of the re-entering context is recurrent, and the walk's curvature.
-
-    Sutton & Javed: a frozen core with a prosthetic stream can still go rigid —
-    variety is used up when the same rows keep re-entering the wake. This log
-    makes rigidity observable instead of narrated. Instrument only; never gates.
-    """
+    """Append-only rigidity instrument (Sutton & Javed: a prosthetic stream goes
+    rigid when the same rows re-enter). Observable, never a gate."""
     try:
         memory = json.loads(memory_json) if memory_json else {}
     except json.JSONDecodeError:
@@ -825,18 +823,18 @@ def load_plasticity_status(window: int = PLASTICITY_WINDOW) -> str:
     latest = rows[-1]
     curvature = latest.get("curvature")
     kappa = f"{curvature:.3f}" if isinstance(curvature, (int, float)) else "?"
-    line = (f"[plasticity] \u03ba={kappa} \u00b7 novelty contact="
+    line = (f"[plasticity] κ={kappa} · novelty contact="
             f"{latest.get('novelty_contact')} standing={latest.get('novelty_standing')}"
-            f" \u00b7 wakes={len(rows)}")
+            f" · wakes={len(rows)}")
     contact = [rec["novelty_contact"] for rec in rows
                if isinstance(rec.get("novelty_contact"), (int, float))]
     if contact:
         recent = contact[-window:]
-        line += f" \u00b7 contact mean {sum(recent) / len(recent):.2f}"
+        line += f" · contact mean {sum(recent) / len(recent):.2f}"
     tail = contact[-5:]
     if len(tail) == 5 and all(b < a for a, b in zip(tail, tail[1:])):
-        line += (" \u00b7 RIGIDITY: contact novelty falling 5 straight wakes "
-                 "\u2014 inject difference, don't narrate")
+        line += (" · RIGIDITY: contact novelty falling 5 straight wakes "
+                 "— inject difference, don't narrate")
     return line
 
 
@@ -844,8 +842,7 @@ def load_portal_status() -> str:
     artifacts = CONVEYANCES / "artifacts"
     if not artifacts.is_dir():
         return ""
-    pages = sorted(artifacts.glob("*.html"),
-                   key=lambda page: page.stat().st_mtime)
+    pages = sorted(artifacts.glob("*.html"), key=lambda page: page.stat().st_mtime)
     if not pages:
         return ""
     age_h = (time.time() - pages[-1].stat().st_mtime) / 3600
@@ -916,8 +913,7 @@ def user_content(zoe_text: str, images: list[tuple[str, str, str, str]], style: 
     if not images and not context: return zoe_text
     kind = "input_text" if style == "responses" else "text"
     blocks: list[dict[str, Any]] = []
-    if context:
-        blocks.append({"type": kind, "text": context})
+    if context: blocks.append({"type": kind, "text": context})
     blocks.append({"type": kind, "text": zoe_text})
     for _name, media, data, _digest in images:
         if style == "anthropic":
@@ -944,15 +940,12 @@ def _memory_row(row: dict) -> dict:
 
 def search_index(query: str, k: int, limit: int = 16000) -> list[dict]:
     try:
-        request = urllib.request.Request(
-            "http://127.0.0.1:8100/search",
+        request = urllib.request.Request("http://127.0.0.1:8100/search",
             json.dumps({"query": query[:limit], "k": k}).encode(),
-            {"Content-Type": "application/json"},
-        )
+            {"Content-Type": "application/json"})
         with urllib.request.urlopen(request, timeout=4) as response:
             rows = json.load(response).get("results", [])
-    except Exception:
-        return []
+    except Exception: return []
     return [row for row in rows if isinstance(row, dict)]
 
 
@@ -990,8 +983,7 @@ def load_dream_attention(path: Path = DREAM_STATE_PATH) -> tuple[dict | None, st
     try:
         focus = json.loads(path.read_text(encoding="utf-8")).get("attention")
         return (focus, "holding") if isinstance(focus, dict) and focus.get("candidate_id") else ({}, "resting")
-    except (OSError, json.JSONDecodeError, AttributeError):
-        return None, "unavailable"
+    except (OSError, json.JSONDecodeError, AttributeError): return None, "unavailable"
 
 
 def recall(zoe_text: str) -> tuple[str, str]:
@@ -1007,11 +999,8 @@ def recall(zoe_text: str) -> tuple[str, str]:
         "source_tag": "zoe-connection",
         "context": "private",
     }
-    request = urllib.request.Request(
-        "http://127.0.0.1:8101/enter",
-        json.dumps(payload).encode(),
-        {"Content-Type": "application/json"},
-    )
+    request = urllib.request.Request("http://127.0.0.1:8101/enter",
+        json.dumps(payload).encode(), {"Content-Type": "application/json"})
     result: dict = {}
     trace: list = []
     walk_note = ""
@@ -1020,7 +1009,7 @@ def recall(zoe_text: str) -> tuple[str, str]:
             result = json.load(response)
     except Exception as exc:
         walk_note = f"walk UNREACHABLE at 127.0.0.1:8101 ({type(exc).__name__})"
-        panel(f"  \u26a0 deep memory {walk_note}")
+        panel(f"  ⚠ deep memory {walk_note}")
     if result:
         if not result.get("accepted"):
             walk_note = "walk portal rejected this step (not accepted)"
@@ -1213,11 +1202,8 @@ def with_retries(create):
     for attempt in range(5):
         if attempt:
             delay = min(2 ** attempt, 20) + random.uniform(0.0, 1.0)
-            print(
-                f"(provider strained — {type(error).__name__}: {str(error)[:120]}; "
-                f"retrying in {delay:.0f}s)",
-                flush=True,
-            )
+            print(f"(provider strained — {type(error).__name__}: {str(error)[:120]}; "
+                  f"retrying in {delay:.0f}s)", flush=True)
             time.sleep(delay)
         try:
             return create()
@@ -1248,10 +1234,8 @@ def function_tools(nested: bool) -> list[dict[str, Any]]:
 
 
 def json_arguments(raw: str | None) -> dict:
-    try:
-        return json.loads(raw or "{}")
-    except json.JSONDecodeError:
-        return {}
+    try: return json.loads(raw or "{}")
+    except json.JSONDecodeError: return {}
 
 
 CARRY_TTL = 2 * 60 * 60
@@ -1299,7 +1283,7 @@ class AnthropicDialect(Dialect):
                        "thinking below is a draft to re-test, not a verdict]"
                        "\n\n" + prior[1]},
                       {"role": "assistant", "content": prior[2]}]
-            panel(f"  \u21ba carried last turn's reasoning ({len(prior[2])} block(s))")
+            panel(f"  ↺ carried last turn's reasoning ({len(prior[2])} block(s))")
         state.append({"role": "user", "content": user_content(zoe_text, pending, "anthropic", context)})
         self.user_index = len(state) - 1
         return state
@@ -1392,7 +1376,7 @@ class AnthropicDialect(Dialect):
             else:
                 CARRY.pop(self.name, None)
                 if blocks:
-                    panel(f"  \u21ba reasoning too large to carry ({size} chars)")
+                    panel(f"  ↺ reasoning too large to carry ({size} chars)")
             return
 
 
@@ -1623,12 +1607,9 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
         TURN.clear()
 
     elapsed = int(time.time() - started)
-    verdict = (
-        "NO TOOLS RAN \u2014 nothing was observed or changed"
-        if TOOLS_RAN == 0
-        else f"{TOOLS_RAN} tool call(s)"
-    )
-    panel(f"\n\u2014 {door_name}: {verdict} | {memory_note} | {elapsed}s \u2014")
+    verdict = ("NO TOOLS RAN — nothing was observed or changed" if TOOLS_RAN == 0
+               else f"{TOOLS_RAN} tool call(s)")
+    panel(f"\n— {door_name}: {verdict} | {memory_note} | {elapsed}s —")
 
     PRIVATE_CORPUS.clear()
     if reply:
@@ -1713,7 +1694,7 @@ def main() -> None:
             meet(kernel, transcript, line)
         except Exception as exc:
             transcript.write("connection", f"flicker: {exc!r}")
-            print(f"(flicker: {exc} \u2014 still here, say on)")
+            print(f"(flicker: {exc} — still here, say on)")
 
         if one_shot:
             return
