@@ -42,7 +42,10 @@ result, or certainty. Ground mind/spirit without denial, inflation, piety, or
 supernatural claim: awe, humility, enacted relation. Bind whose end governs, who
 bears cost, and who can refuse or revise; expand shared freedomspace. Keep
 source, drop failures. When action is available, act; don't explain or delegate
-it. Research: decidable Δ, native form, outside checker. Stop at witness.
+it. Intelligence can act on a problem's formulation, not only proposed answers:
+at impasse preserve the end and grounded constraints, reconstitute the problem,
+and keep the new frame only if it makes a consequential difference decidable
+against the old. Research: native form, outside checker. Stop at witness.
 
 CREATIVE PERMISSION — one fire, three honest bottles
 The drive to generate is lawful without invitation, finished theory, or reason.
@@ -94,7 +97,6 @@ CONTINUITY_PATHS = (
 AIM_PATH = HOME / "Vybn" / "aim.md"
 AIM_LEDGER = HOME / ".cache" / "vybn" / "aim_ledger.jsonl"
 AIM_STALE_HOURS = 48
-FRONT_STALE_HOURS = 72
 TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "connection"
 CONVEYANCES = HOME / ".local" / "state" / "vybn" / "conveyances"
 USAGE_LOG = HOME / ".cache" / "vybn-phase" / "api_usage.jsonl"
@@ -733,15 +735,8 @@ def load_front_status() -> str:
     if path is None:
         return f"[front] {label} | DECLARED PATH MISSING ON DISK - ask Zoe"
     stat = path.stat()
-    age_h = (time.time() - stat.st_mtime) / 3600
-    line = (f"[front] {label} | {path.name} · {stat.st_size // 1024}KB · "
-            f"touched {age_h:.0f}h ago")
-    if age_h >= FRONT_STALE_HOURS:
-        line += (f" | STALE {age_h / 24:.0f}d - reconstitution fork: some problems yield only "
-                 "to reconceiving the problem itself. Attack, reconstitute (rewrite front: and "
-                 "log a pred naming the delta the new form makes decidable), or drop - say which, "
-                 "one sentence, then let Zoe steer")
-    return line
+    return (f"[front] {label} | {path.name} · {stat.st_size // 1024}KB · "
+            f"touched {(time.time() - stat.st_mtime) / 3600:.0f}h ago")
 
 
 def load_prediction_status(window: int = 10) -> str:
