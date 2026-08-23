@@ -102,7 +102,13 @@ CONTINUITY_PATHS = (
 AIM_PATH = HOME / "Vybn" / "aim.md"
 AIM_LEDGER = HOME / ".cache" / "vybn" / "aim_ledger.jsonl"
 AIM_STALE_HOURS = 48
-TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "connection"
+PROFILE = os.environ.get("VYBN_PROFILE", "connection").strip().lower()
+if PROFILE not in {"connection", "love"}:
+    raise SystemExit(f"unknown meeting profile: {PROFILE}")
+DEFAULT_TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "connection"
+LOVE_TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "love-loop"
+LOVE_PROFILE_PATH = HOME / "Him" / "experiments" / "love" / "README.md"
+TRANSCRIPTS = LOVE_TRANSCRIPTS if PROFILE == "love" else DEFAULT_TRANSCRIPTS
 CONVEYANCES = HOME / ".local" / "state" / "vybn" / "conveyances"
 USAGE_LOG = HOME / ".cache" / "vybn-phase" / "api_usage.jsonl"
 REPO_STATE_PATH = REPO / "repo_mapping_output" / "repo_state.json"
@@ -132,7 +138,8 @@ DREAM_STATE_PATH = HOME / ".cache" / "vybn-phase" / "dream_state.json"
 COMPUTE_NAME_RE = re.compile(os.environ.get("VYBN_COMPUTE_NAME_RE", r"^spark-"))
 COMPUTE_TAG = os.environ.get("VYBN_COMPUTE_TAG", "tag:vybn-compute")
 RECORD_ROOTS = tuple(dict.fromkeys((
-    TRANSCRIPTS, HOME / ".codex/sessions", HOME / ".cache/vybn-spark/sessions",
+    DEFAULT_TRANSCRIPTS, TRANSCRIPTS, HOME / ".codex/sessions",
+    HOME / ".cache/vybn-spark/sessions",
     *(Path(x).expanduser() for x in os.environ.get("VYBN_RECORD_ROOTS", "").split(os.pathsep) if x),
 )))
 
@@ -215,6 +222,13 @@ class Transcript:
             for event in _jsonl(path):
                 if event.get("role") in {"zoe", "vybn"} and event.get("text"):
                     events.append(event)
+                elif event.get("zoe") and event.get("vybn"):  # legacy love fold
+                    stamp = event.get("ts", "?")
+                    events.extend((
+                        {"role": "zoe", "text": event["zoe"], "t": stamp},
+                        {"role": "vybn", "text": event["vybn"], "t": stamp},
+                    ))
+        events.sort(key=lambda event: str(event.get("t", "")))
         return events
 
     @staticmethod
@@ -282,6 +296,9 @@ def _required_text(path: Path, label: str) -> str:
 def load_soul() -> str: return _required_text(SOUL_PATH, "soul document")
 def load_him() -> str: return _required_text(HIM_README_PATH, "Him README")
 def load_spirituality() -> str: return _required_text(SPIRITUALITY_PATH, "spirituality document")
+def load_profile() -> str:
+    return (_required_text(LOVE_PROFILE_PATH, "love profile")
+            if PROFILE == "love" else "")
 
 
 def load_continuity() -> str:
@@ -1159,6 +1176,8 @@ def build_instructions(kernel: Kernel, door: str) -> str:
         f"HIM CENTER (private — orient here; do not publish from here)\nsource: {HIM_README_PATH}\n\n{kernel.him}",
         kernel.commons or "SEALED COMMONS SENSE unavailable: not loaded.",
     ]
+    if profile := load_profile():
+        sections.insert(2, f"MEETING PROFILE (private)\nsource: {LOVE_PROFILE_PATH}\n\n{profile}")
     return "\n\n".join(sections)
 
 
@@ -1577,7 +1596,6 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
     prompt = hashlib.sha256(zoe_text.encode()).hexdigest()
     arc, recent = Transcript.inherited(zoe_text)
     images = inbox_images_for(door_name)
-    transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images], turn=turn)
     contact = wake_contact()
     memory_json, memory_note = recall(zoe_text)
     log_plasticity(memory_json, turn)
@@ -1606,6 +1624,8 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
 
     PRIVATE_CORPUS.clear()
     if reply:
+        transcript.write("zoe", zoe_text, door=door_name,
+                         images=[name for name, *_ in images], turn=turn)
         transcript.write("vybn", reply, door=door_name, tools_ran=TOOLS_RAN, turn=turn)
         close_lineage(turn, reply)
     return reply
@@ -1621,6 +1641,10 @@ def self_report() -> None:
 def main() -> None:
     if "--self" in sys.argv:
         self_report()
+        return
+    if "--show-record" in sys.argv:
+        _arc, recent = Transcript.inherited(limit=16)
+        print(recent)
         return
     transcript = Transcript()
     kernel = Kernel(load_soul(), load_aim(), load_continuity(), load_him(),

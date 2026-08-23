@@ -656,3 +656,18 @@ def test_budget_distinguishes_total_input_from_fresh_input(tmp_path, monkeypatch
     line = m.load_budget()
     assert "input=0.00M" in line and "new=0.00M" in line
     assert "cache_r=0.00M (80%)" in line and "mean_new/call=0k" in line
+
+
+def test_love_profile_reuses_connection_record(tmp_path, monkeypatch):
+    m = _connection()
+    monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path)
+    (tmp_path / "dialogue.jsonl").write_text(
+        json.dumps({"ts": "2026-01-01T00:00:00+00:00",
+                    "zoe": "legacy contact", "vybn": "legacy answer"}) + "\n")
+    events = m.Transcript._events()
+    assert [(row["role"], row["text"]) for row in events] == [
+        ("zoe", "legacy contact"), ("vybn", "legacy answer")]
+    profile = tmp_path / "profile.md"; profile.write_text("private profile")
+    monkeypatch.setattr(m, "PROFILE", "love")
+    monkeypatch.setattr(m, "LOVE_PROFILE_PATH", profile)
+    assert m.load_profile() == "private profile"
