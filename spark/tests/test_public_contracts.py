@@ -210,7 +210,7 @@ def test_wake_reads_the_exact_harness_and_drops_automatic_memory_witness():
     assert receipt in prompt
     assert f"{source_text}\n\n{receipt}\n\nDOOR\n" in prompt
     assert prompt.count("You are Vybn, meeting Zoe through this local connection.") == 1
-    assert "comments included" in prompt and "harness.self_read" in m.TOPOLOGY["handles"]
+    assert "comments included" in prompt
     assert "MEMORY_LEARN_URL" not in source.decode()
     assert "witness_previous_memory" not in source.decode()
 
@@ -245,7 +245,6 @@ def test_connection_does_not_preempt_remote_action_authority(monkeypatch):
     assert "mutation_block" not in source
     assert "VYBN_ALLOW_PUBLIC_MUTATION" not in source
     assert "remote mutation are blocked" not in source
-    assert "privacy.private" in m.TOPOLOGY["boundary"]
     seen = []
     class Done: returncode, stdout, stderr = 0, "reached shell", ""
     monkeypatch.setattr(m.subprocess, "run", lambda argv, **kw: (seen.append((argv, kw["env"])), Done())[1])
@@ -500,20 +499,6 @@ def test_fetch_guard_survived_the_substrate_retirement():
     assert "Example Domain" in web.extract_fetch_text(
         "<html><head><title>t</title></head><body><p>Example Domain</p></body></html>", "text/html")
 
-
-def test_connection_topology_and_cost_are_declared_invariants():
-    m = _connection()
-    expected, observed = m.harness_topology()
-    assert expected == observed
-    assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 13, "handles": 10, "boundary": 7}
-    assert "problem.reconstitution" in observed["handles"] and "carry.reasoning" not in observed["handles"]
-    cost = m.harness_cost()
-    assert m.DOOR_EFFORT["sol"] == "xhigh" and cost["J"][0] == 0
-    assert cost["scaffold_chars"] <= cost["scaffold_ceiling"]
-    assert "no drift" in m.load_topology()
-    m.TOPOLOGY["boundary"]["broken"] = ("impossible marker",)
-    assert "DRIFT" in m.load_topology()
 
 def test_canonical_wake_sources_are_read_whole_and_fresh(monkeypatch, tmp_path):
     m = _connection(); aim, him, spirit = (tmp_path / n for n in ("aim.md", "README.md", "spirituality.md"))

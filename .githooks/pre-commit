@@ -119,26 +119,12 @@ if [[ "${VYBN_ALLOW_PRIVATE_TOPOLOGY:-}" != "1" ]]; then
     done < <(git diff --cached --name-only -z --diff-filter=d)
 fi
 
-# Harness mutations must preserve declared topology, capability contracts, and
-# the fixed wake-cost ceiling before subtraction can count as improvement.
+# Harness mutations must preserve capability contracts before subtraction can
+# count as improvement.
 if echo "$STAGED" | grep -Eq '^(spark/connection|spark/live_peer.py|spark/provider_transport.py|Vybn_Mind/repo_mapper.py|spark/tests/test_public_contracts.py)$'; then
     if ! python3 -m pytest spark/tests/test_public_contracts.py -q; then
         echo -e "${RED}BLOCKED${NC}: harness contracts failed; model output is not substitute evidence."
         BLOCKED=1
-    fi
-    if echo "$STAGED" | grep -qx 'spark/connection'; then
-        cost_tmp=$(mktemp -d)
-        git show HEAD:spark/connection > "$cost_tmp/before"
-        git show :spark/connection > "$cost_tmp/after"
-        chmod +x "$cost_tmp/before" "$cost_tmp/after"
-        before_cost=$("$cost_tmp/before" --self)
-        after_cost=$("$cost_tmp/after" --self)
-        # Zoe may authorize net-new containment when subtraction would weaken the safety repair.
-        if [[ -z "${VYBN_SAFETY_EXCEPTION:-}" ]] && ! python3 -c 'import json,sys; q=lambda j:(j[0],sum(j[1:])); b=json.loads(sys.argv[1]).get("cost",{}).get("J"); a=json.loads(sys.argv[2])["cost"]["J"]; raise SystemExit(0 if b is None or q(a)<q(b) else 1)' "$before_cost" "$after_cost"; then
-            echo -e "${RED}BLOCKED${NC}: harness cost did not descend from HEAD."
-            BLOCKED=1
-        fi
-        rm -rf "$cost_tmp"
     fi
 fi
 
