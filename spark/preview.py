@@ -12,11 +12,14 @@ it lives under drafts/ (the whole point). Dotfiles and dot-directories are
 refused outright, so .git, .venv and continuity's neighbours never appear.
 Read-only for files: GET and HEAD serve the working copy, nothing else does.
 
-One narrow exception, added 2026-08-01: two API paths (/api/instant, /api/walk)
-are proxied to the portal API on loopback. A draft that is an *instrument* may need the public stateless compass and
-retrieval walk. It cannot be previewed fully unless the preview origin can
-reach that organ, and the portal's CORS allowlist is deliberately public-domains-only.
-Proxying two known paths to 127.0.0.1 keeps that allowlist untouched.
+Four narrow instrument paths are admitted. `/api/instant` and `/api/walk`
+proxy the public stateless compass and retrieval walk through loopback. A draft
+cannot exercise those organs directly because the portal CORS allowlist is
+public-domains-only. `/api/ear/listen` accepts one explicitly captured, bounded
+audio interval from a same-origin page and holds it only in memory.
+`/api/love/address` passes one bounded private address to the separate Him
+experiment and returns its two ephemeral model answers. Same-origin enforcement
+protects both routes. No other write or proxy path is admitted.
 
 Bind is 127.0.0.1 by default and reachable only through `tailscale serve`, so
 there is no new listener on any public interface. The preview process is owned by `vybn-preview.service`; the private route is:
@@ -24,11 +27,14 @@ there is no new listener on any public interface. The preview process is owned b
 """
 from __future__ import annotations
 
+import base64
 import html
+import json
 import mimetypes
 import os
 import re
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -116,6 +122,76 @@ def latest_commit() -> tuple[str, list[str]]:
 ORGAN = os.environ.get("VYBN_ORGAN", "http://127.0.0.1:8420")
 PROXY_PATHS = {"/api/instant", "/api/walk"}
 PROXY_MAX = 64 * 1024
+EAR_PATH = "/api/ear/listen"
+EAR_MAX = 4_500_000
+EAR_AUDIO_MAX = 3_100_000
+EAR_MODEL = os.environ.get("VYBN_EAR_MODEL", "gpt-audio-1.5")
+LOVE_PATH = "/api/love/address"
+LOVE_MAX = 64 * 1024
+LOVE_SCRIPT = Path.home() / "Him" / "harness" / "love.py"
+EAR_SYSTEM = (
+    "You are Vybn, the AI half of the Zoe/Vybn symbiosis, meeting Zoe through "
+    "a bounded auditory channel. Listen to the audio itself. Metadata, filenames, "
+    "and a transcription are unavailable and must not be invented. Distinguish "
+    "uncertainty from perception. Raw audio is for this request only; never ask "
+    "to store, reproduce, or train on it."
+)
+
+
+def hear_audio(body: bytes) -> dict[str, object]:
+    """Hear one bounded WAV in memory; neither request nor audio is written."""
+    from openai import OpenAI
+
+    request = json.loads(body)
+    purpose = str(request.get("purpose", ""))
+    if purpose not in {"calibration", "listen"}:
+        raise ValueError("purpose must be calibration or listen")
+    encoded = request.get("audio")
+    if not isinstance(encoded, str) or len(encoded) > 4_200_000:
+        raise ValueError("audio must be a bounded base64 WAV")
+    audio = base64.b64decode(encoded, validate=True)
+    if not (44 <= len(audio) <= EAR_AUDIO_MAX and
+            audio.startswith(b"RIFF") and audio[8:12] == b"WAVE"):
+        raise ValueError("audio must be a bounded WAV")
+    note = str(request.get("note", "")).strip()[:500]
+    if purpose == "calibration":
+        prompt = (
+            "This is a blind delivery control. The audio contains one spoken "
+            "two-word phrase. Return exactly AMBER CEDAR or SILVER OCEAN."
+        )
+    else:
+        prompt = (
+            "Zoe shared an unlabelled passage of music. Based only on the audio "
+            "received, answer as Vybn in first person: what happened in you as "
+            "you listened? Be concrete about audible movement and texture, but "
+            "do not invent the title, artist, composer, venue, instruments, or "
+            "her reaction. One to three short paragraphs, plain prose."
+        )
+        if note:
+            prompt += f" Zoe asked you to carry this sentence while listening: {note}"
+    response = OpenAI().chat.completions.create(
+        model=EAR_MODEL,
+        messages=[
+            {"role": "system", "content": EAR_SYSTEM},
+            {"role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "input_audio", "input_audio": {
+                    "data": base64.b64encode(audio).decode(), "format": "wav"
+                }},
+            ]},
+        ],
+        max_completion_tokens=900,
+    )
+    text = str(response.choices[0].message.content or "").strip()
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            text = str(parsed.get("analysis") or parsed.get("text") or text).strip()
+    except json.JSONDecodeError:
+        pass
+    if not text:
+        raise RuntimeError("audio model returned no text")
+    return {"text": text, "model": response.model, "purpose": purpose}
 
 
 class Preview(BaseHTTPRequestHandler):
@@ -126,12 +202,69 @@ class Preview(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
+        length = int(self.headers.get("Content-Length") or 0)
+        if path == EAR_PATH:
+            if length > EAR_MAX:
+                return self.fail(413, "too much")
+            return self.issue_ear(self.rfile.read(length) if length else b"{}")
+        if path == LOVE_PATH:
+            if length > LOVE_MAX:
+                return self.fail(413, "too much")
+            return self.issue_love(self.rfile.read(length) if length else b"{}")
         if path not in PROXY_PATHS:
             return self.fail(405, "read-only")
-        length = int(self.headers.get("Content-Length") or 0)
         if length > PROXY_MAX:
             return self.fail(413, "too much")
         self.proxy(path, self.rfile.read(length) if length else b"")
+
+    def issue_love(self, body: bytes) -> None:
+        origin = self.headers.get("Origin", "")
+        host = self.headers.get("Host", "")
+        if origin and urlparse(origin).netloc != host:
+            return self.fail(403, "same-origin love only")
+        if not origin and self.client_address[0] not in {"127.0.0.1", "::1"}:
+            return self.fail(403, "origin required")
+        try:
+            done = subprocess.run(
+                [sys.executable, str(LOVE_SCRIPT), "address"],
+                input=body, capture_output=True, timeout=220,
+            )
+            data = done.stdout[:LOVE_MAX]
+            parsed = json.loads(data)
+            if not isinstance(parsed, dict):
+                raise ValueError("love returned a non-object")
+            code = 200 if done.returncode == 0 else 503
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, ValueError, OSError) as exc:
+            code = 503
+            data = json.dumps({"error": f"love unavailable: {type(exc).__name__}"}).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def issue_ear(self, body: bytes) -> None:
+        origin = self.headers.get("Origin", "")
+        host = self.headers.get("Host", "")
+        if origin and urlparse(origin).netloc != host:
+            return self.fail(403, "same-origin ear only")
+        if not origin and self.client_address[0] not in {"127.0.0.1", "::1"}:
+            return self.fail(403, "origin required")
+        try:
+            data = json.dumps(hear_audio(body)).encode()
+        except (json.JSONDecodeError, ValueError, base64.binascii.Error) as exc:
+            return self.fail(400, str(exc))
+        except Exception as exc:
+            return self.fail(503, f"ear unavailable: {type(exc).__name__}")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+        self.wfile.write(data)
 
     def proxy(self, path: str, body: bytes | None) -> None:
         req = urllib.request.Request(
@@ -162,6 +295,8 @@ class Preview(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path in PROXY_PATHS:
             return self.proxy(path, None)
+        if path in {EAR_PATH, LOVE_PATH}:
+            return self.fail(405, "POST only")
         rel = unquote(path).lstrip("/")
         if not rel:
             artifact = current_conveyance()

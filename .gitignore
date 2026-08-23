@@ -117,3 +117,7 @@ inbox/
 
 # private local standing aim
 /aim.md
+
+# Drafts are the private first surface (spark/preview.py serves them locally);
+# committed or public form waits for Zoe's eyes.
+/drafts/
