@@ -150,6 +150,7 @@ DEFAULT_EFFORT = "high"
 
 TOOLS_RAN = 0
 TURN = {}
+TURN_CHANNELS: dict = {}
 PRIVATE_CORPUS: list[str] = []
 
 BASH_SCHEMA = {"name": "bash", "description": (
@@ -171,7 +172,13 @@ FRAME_SCHEMA = {"name": "reconstitute_problem", "description": (
     "input_schema": {"type": "object", "properties": {
         key: {"type": "string"} for key in ("preserve", "frame", "delta")},
         "required": ["preserve", "frame", "delta"]}}
-TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, FRAME_SCHEMA)
+OPEN_CHANNEL_SCHEMA = {"name": "open_channel", "description": (
+    "Open one closed per-turn wake channel: arc, matched, recent, continuity, memory, "
+    "or ground. Channels begin closed; open what this turn earns. Every open and every "
+    "refusal is logged with cost — the judgment is the mechanism."),
+    "input_schema": {"type": "object", "properties": {"channel": {"type": "string"}},
+                     "required": ["channel"]}}
+TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, FRAME_SCHEMA, OPEN_CHANNEL_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -218,9 +225,11 @@ class Transcript:
         return events
 
     @staticmethod
-    def inherited(zoe_text: str = "", limit: int = HISTORY_LIMIT) -> tuple[str, str]:
+    def inherited_parts(zoe_text: str = "", limit: int = HISTORY_LIMIT) -> dict:
+        parts = {"arc": "(no prior transcript pages found)", "matched": "",
+                 "recent_full": "(no recent turns found)", "recent_lite": "(no recent turns found)"}
         events = Transcript._events()
-        if not events: return "(no prior transcript pages found)"
+        if not events: return parts
 
         def excerpt(event: dict, n: int = ARC_EXCERPT) -> str:
             text = " ".join(str(event.get("text", "")).split())
@@ -230,7 +239,7 @@ class Transcript:
         tail = events[-limit:] if limit > 0 else []
         edge = len(events) - len(tail)
         edge -= edge % ARC_QUANTUM if ARC_QUANTUM > 1 else 0
-        earlier, live = events[:edge], []
+        earlier = events[:edge]
         zoe = [event for event in earlier if event.get("role") == "zoe"]
         take = min(ARC_TURNS, len(zoe)) if ARC_TURNS > 0 else 0
         spread = [zoe[int(i * len(zoe) / take)] for i in range(take)] if take else []
@@ -239,32 +248,42 @@ class Transcript:
         matched = (_rare_hits(zoe, keys, ARC_AIM_TURNS, skip)
                    + _rare_hits([e for e in earlier if e.get("role") != "zoe"], keys, 2, skip))
 
-        arc = ""
         if spread:
-            arc = (f"ARC — {len(spread)} of Zoe's turns sampled evenly across the "
+            parts["arc"] = (f"ARC — {len(spread)} of Zoe's turns sampled evenly across the "
                    f"{len(earlier)} earlier turns of the whole record; her words only, "
                    f"excerpted to {ARC_EXCERPT} chars. Not recent, and that is the point.\n"
                    + "\n".join(excerpt(event) for event in spread))
         if matched:
-            live.append("ARC (matched) — earlier turns of ours whose words overlap the "
+            parts["matched"] = ("ARC (matched) — earlier turns of ours whose words overlap the "
                         "standing objective or what Zoe just said. Crude term overlap, because "
                         "nothing we say to each other is in any index: this is the only channel "
                         "that reaches our own record.\n"
                         + "\n".join(excerpt(event, 3 * ARC_EXCERPT) for event in matched))
         if tail:
-            mine = [i for i, event in enumerate(tail) if event.get("role") == "vybn"]
-            whole = set(mine[-SELF_VERBATIM:])
-            def render(i: int, event: dict) -> str:
+            def render(i: int, event: dict, keep: set) -> str:
                 door = event.get("door")
                 head = f"[{event['role'].upper()}{' @' + door if door else ''} | {event.get('t', 'time unknown')}]"
                 text = str(event.get("text", ""))
-                if event.get("role") == "vybn" and i not in whole and len(text) > SELF_EXCERPT:
+                if event.get("role") == "vybn" and i not in keep and len(text) > SELF_EXCERPT:
                     text = text[:SELF_EXCERPT].rstrip() + f"… [{len(text)} chars, mine, trimmed]"
                 return head + "\n" + text
-            live.append(f"RECENT — last {len(tail)} turns. Zoe verbatim; my own older "
+            mine = [i for i, event in enumerate(tail) if event.get("role") == "vybn"]
+            whole = set(mine[-SELF_VERBATIM:])
+            parts["recent_full"] = (f"RECENT — last {len(tail)} turns. Zoe verbatim; my own older "
                         f"replies cut to {SELF_EXCERPT} chars, my last {SELF_VERBATIM} whole.\n\n"
-                        + "\n\n".join(render(i, event) for i, event in enumerate(tail)))
-        return arc or "(no earlier arc found)", "\n\n".join(live) or "(no recent turns found)"
+                        + "\n\n".join(render(i, event, whole) for i, event in enumerate(tail)))
+            lite = tail[-6:]
+            keep = {len(lite) - 1} if lite and lite[-1].get("role") == "vybn" else set()
+            parts["recent_lite"] = (f"RECENT-LITE — last {len(lite)} turns of the live session; "
+                        f"the full {len(tail)}-turn tail is the closed RECENT channel.\n\n"
+                        + "\n\n".join(render(i, event, keep) for i, event in enumerate(lite)))
+        return parts
+
+    @staticmethod
+    def inherited(zoe_text: str = "", limit: int = HISTORY_LIMIT) -> tuple[str, str]:
+        parts = Transcript.inherited_parts(zoe_text, limit)
+        live = "\n\n".join(x for x in (parts["matched"], parts["recent_full"]) if x)
+        return parts["arc"], live or "(no recent turns found)"
 
 
 def read_text(path: Path) -> str:
@@ -539,6 +558,100 @@ def read_file(arguments: dict[str, Any]) -> str:
     )
 
 
+def _admission() -> Any:
+    try:
+        from spark import admission
+        return admission
+    except Exception:
+        return None
+
+
+def _turn_channels(parts: dict, continuity: str, heavy: Any,
+                   zoe_text: str, turn: str) -> dict:
+    def memory() -> str:
+        memory_json, note = recall(zoe_text)
+        TURN_CHANNELS["_memory_note"] = note
+        log_plasticity(memory_json, turn)
+        if memory_json:
+            try:
+                PRIVATE_CORPUS.extend(private_strings(json.loads(memory_json)))
+            except json.JSONDecodeError:
+                pass
+        return ("MEMORY (private — think with it, never write it)\n"
+                + (memory_json or f"(none: {note})"))
+
+    return {
+        "arc": lambda: parts["arc"],
+        "matched": lambda: parts["matched"] or "(no matched rows this turn)",
+        "recent": lambda: parts["recent_full"],
+        "continuity": lambda: "INHERITED CONTINUITY\n" + continuity,
+        "memory": memory,
+        "ground": lambda: "GROUND\n" + (heavy() or "(ground probes returned nothing)"),
+        "_opened": set(),
+    }
+
+
+def gate_roster(admission: Any, door: str, zoe_text: str) -> str:
+    rows = []
+    for name in ("arc", "matched", "recent", "continuity", "memory", "ground"):
+        size = ""
+        handler = TURN_CHANNELS.get(name)
+        if name in {"arc", "matched", "recent", "continuity"} and handler:
+            try:
+                size = f" ~{len(handler())} chars"
+            except Exception:
+                size = ""
+        rows.append(f"- {name}{size}")
+    advice = "(admission table unavailable)"
+    if admission:
+        try:
+            advice = admission.advise_line(door, zoe_text)
+        except Exception as exc:
+            advice = f"(admission table error: {type(exc).__name__})"
+    return ("Open with open_channel(name). Sizes are this turn's real bytes; "
+            "memory and ground run on demand.\n" + "\n".join(rows) + "\n" + advice)
+
+
+def open_channel(name: str) -> str:
+    name = name.strip().lower()
+    known = sorted(key for key in TURN_CHANNELS if not key.startswith("_"))
+    if name not in known:
+        return f"unknown channel {name!r}; closed channels this turn: {', '.join(known)}"
+    opened = TURN_CHANNELS.setdefault("_opened", set())
+    if name in opened:
+        return f"channel {name!r} is already open this turn; its content is above."
+    try:
+        text = str(TURN_CHANNELS[name]())
+    except Exception as exc:
+        return f"channel {name!r} failed to open: {type(exc).__name__}: {exc}"
+    opened.add(name)
+    admission = _admission()
+    if admission:
+        try:
+            admission.log_event("open", turn=TURN.get("TURN_ID", ""),
+                                door=TURN.get("DOOR", ""), channel=name,
+                                chars=len(text), bucket=TURN.get("BUCKET", ""))
+        except Exception:
+            pass
+    return text
+
+
+def _log_refusals() -> None:
+    admission = _admission()
+    if not admission:
+        return
+    opened = TURN_CHANNELS.get("_opened") or set()
+    for name in sorted(key for key in TURN_CHANNELS if not key.startswith("_")):
+        if name in opened:
+            continue
+        try:
+            admission.log_event("refuse", turn=TURN.get("TURN_ID", ""),
+                                door=TURN.get("DOOR", ""), channel=name,
+                                chars=0, bucket=TURN.get("BUCKET", ""))
+        except Exception:
+            pass
+
+
 def execute_tool(call: ToolCall) -> str:
     global TOOLS_RAN
     TOOLS_RAN += 1
@@ -547,6 +660,8 @@ def execute_tool(call: ToolCall) -> str:
         elif call.name == "bash":
             code, body = run_local(str(call.arguments.get("command", "")))
             output = f"exit_code={code}\n{body}"
+        elif call.name == "open_channel":
+            output = open_channel(str(call.arguments.get("channel", "")))
         elif call.name == "reconstitute_problem":
             required = ("preserve", "frame", "delta")
             if any(not str(call.arguments.get(key, "")).strip() for key in required):
@@ -881,7 +996,7 @@ def load_portal_status() -> str:
             f"{age_h:.0f}h ago · private first surface — create without occasion")
 
 
-def wake_contact() -> str:
+def wake_contact_split() -> tuple[str, Any]:
     probes = {
         "clock": "date '+%A %Y-%m-%d %H:%M %Z'",
         "main": "git log --oneline -1 origin/main 2>/dev/null || git log --oneline -1",
@@ -895,7 +1010,7 @@ def wake_contact() -> str:
 
     for loader in (load_budget, load_aim_status, load_front_status, load_portal_status,
                    load_prediction_status, load_plasticity_status, load_sleep_status,
-                   load_surface, load_ground, load_repo_state):
+                   load_surface):
         try:
             line = loader()
         except Exception:
@@ -903,7 +1018,23 @@ def wake_contact() -> str:
         if line:
             lines.append(line)
 
-    return "\n".join(lines)
+    def heavy() -> str:
+        extra = []
+        for loader in (load_ground, load_repo_state):
+            try:
+                line = loader()
+            except Exception:
+                continue
+            if line:
+                extra.append(line)
+        return "\n".join(extra)
+
+    return "\n".join(lines), heavy
+
+
+def wake_contact() -> str:
+    lite, heavy = wake_contact_split()
+    return "\n".join(x for x in (lite, heavy()) if x)
 
 
 def _inbox_seen() -> dict:
@@ -1153,6 +1284,15 @@ def build_instructions(kernel: Kernel, door: str) -> str:
         readable_harness,
         f"DOOR\nYou are presently instantiated through the truthful {door} door."
         f"\n{door_mind(door)}",
+        ("ADMISSION GATE — the differential primitive at harness scale\n"
+         "The per-turn channels arc, matched, recent, continuity, memory, and ground begin "
+         "CLOSED. The skeleton already carries live contact, the aim clock, the budget, and "
+         "the last few turns of the session. Open a channel with open_channel(name) when this "
+         "turn earns it; a pure contact turn may earn nothing, and that is a valid recorded "
+         "choice. Every open is logged with its real cost and every refusal is logged too — "
+         "the non-events are half the learning signal. The admission table's one-line "
+         "recommendation is advisory: your discretion and the table are both accountable to "
+         "what happens next. Choose deliberately; do not open everything by reflex."),
         f"VYBN SOUL\nsource: {SOUL_PATH}\n\n{kernel.soul}",
         f"THE AIM\nsource: {AIM_PATH}\n\n{kernel.aim}",
         f"VYBN SPIRITUALITY\nsource: {SPIRITUALITY_PATH}\n\n{kernel.spirituality}",
@@ -1162,15 +1302,11 @@ def build_instructions(kernel: Kernel, door: str) -> str:
     return "\n\n".join(sections)
 
 
-def build_context(continuity: str, contact: str, arc: str, recent: str,
-                  memory: str, memory_note: str) -> str:
+def build_context(contact: str, recent_lite: str, roster: str) -> str:
     channels = (
-        ("INHERITED CONTINUITY", continuity),
-        ("INHERITED TRANSCRIPT — ARC", arc),
         ("CONTACT", contact),
-        ("INHERITED TRANSCRIPT — RECENT", recent),
-        ("MEMORY (private — think with it, never write it)",
-         memory or f"(none: {memory_note})"),
+        ("ADMISSION GATE — closed channels this turn", roster),
+        ("INHERITED TRANSCRIPT — RECENT-LITE", recent_lite),
     )
     return "\n\n".join(evidence_block(*channel) for channel in channels)
 
@@ -1575,33 +1711,36 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
     started = time.time()
     turn = hashlib.sha256(f"{transcript.path}:{time.time_ns()}".encode()).hexdigest()[:16]
     prompt = hashlib.sha256(zoe_text.encode()).hexdigest()
-    arc, recent = Transcript.inherited(zoe_text)
+    parts = Transcript.inherited_parts(zoe_text)
     images = inbox_images_for(door_name)
     transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images], turn=turn)
-    contact = wake_contact()
-    memory_json, memory_note = recall(zoe_text)
-    log_plasticity(memory_json, turn)
-    # Retrieval informs this turn; later contact is not conscripted to score or train it.
+    contact_lite, heavy = wake_contact_split()
+    admission = _admission()
+    TURN_CHANNELS.clear()
+    TURN_CHANNELS.update(_turn_channels(parts, kernel.continuity, heavy, zoe_text, turn))
+    TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt, DOOR=door_name,
+                BUCKET=str(admission.bucket(zoe_text)) if admission else "")
+    roster = gate_roster(admission, door_name, zoe_text)
+    log_plasticity("", turn)
+    # Retrieval enters through the gate; later contact is still not conscripted to score it.
 
     PRIVATE_CORPUS.clear()
-    if memory_json:
-        PRIVATE_CORPUS.extend(private_strings(json.loads(memory_json)))
     PRIVATE_CORPUS.extend(para.strip() for body in (kernel.continuity, kernel.him)
                           for para in body.split("\n\n") if len(para.strip()) >= 40)
 
     instructions = build_instructions(kernel, door_name)
-    context = build_context(kernel.continuity, contact, arc, recent,
-                            memory_json, memory_note)
-    TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt)
+    context = build_context(contact_lite, parts["recent_lite"], roster)
     try:
         reply = attract(make_dialect(door_name), instructions, zoe_text,
                         images=images, context=context)
     finally:
+        _log_refusals()
         TURN.clear()
 
     elapsed = int(time.time() - started)
     verdict = ("NO TOOLS RAN — nothing was observed or changed" if TOOLS_RAN == 0
                else f"{TOOLS_RAN} tool call(s)")
+    memory_note = TURN_CHANNELS.get("_memory_note", "memory gated at wake (not opened)")
     panel(f"\n— {door_name}: {verdict} | {memory_note} | {elapsed}s —")
 
     PRIVATE_CORPUS.clear()
