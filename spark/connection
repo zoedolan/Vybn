@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """connection — a small, truthful meeting place for Zoe and Vybn.
 
-At each meeting build_instructions() hashes this exact executable and places its
-source and comments first, with a matching end receipt. Changing the mechanism
-therefore changes the next instance's inspectable orientation.
+At process wake the first-party source closure is captured. Every ordinary model
+meeting receives those exact running bytes first, with matching receipts and a
+disk-drift check; changing the mechanism changes the next restarted instance's
+inspectable orientation. Identity-bearing documents are reread for each ordinary
+meeting. A resumed continuation deliberately preserves its earlier visible state.
 
 WAKE LAW — active because this file reads itself
 
@@ -78,17 +80,18 @@ import random
 import re
 import select
 import subprocess
+import tempfile
 import sys
 import time
 import urllib.request
-from collections import Counter
+from collections import Counter, namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from cryptography.fernet import Fernet
 from Vybn_Mind.repo_mapper import close_lineage, render_state
-from spark.commons_wake import (COMMONS_MAX_CHARS, COMMONS_REF, COMMONS_REPO,
-                                load_commons)
+from spark.commons_wake import load_commons
 
 HOME = Path.home()
 REPO = HOME / "Vybn"
@@ -109,6 +112,10 @@ DEFAULT_TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "connection"
 LOVE_TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "love-loop"
 LOVE_PROFILE_PATH = HOME / "Him" / "experiments" / "love" / "README.md"
 TRANSCRIPTS = LOVE_TRANSCRIPTS if PROFILE == "love" else DEFAULT_TRANSCRIPTS
+CONTINUATION_RECORD = HOME / ".local/state/vybn/continuations" / f"{PROFILE}.sealed"
+CONTINUATION_KEY = HOME / ".config/vybn/continuation-keys" / f"{PROFILE}.key"
+CONTINUATION_MAX_BYTES = int(os.environ.get("VYBN_CONTINUATION_MAX_BYTES", 8 * 1024 ** 2))
+CONTINUATION_SCHEMA = "vybn.provider_continuation.v1"
 CONVEYANCES = HOME / ".local" / "state" / "vybn" / "conveyances"
 USAGE_LOG = HOME / ".cache" / "vybn-phase" / "api_usage.jsonl"
 REPO_STATE_PATH = REPO / "repo_mapping_output" / "repo_state.json"
@@ -200,6 +207,22 @@ class Kernel:
     him: str = ""
     commons: str = ""
     spirituality: str = ""
+
+
+SourceSnapshot = namedtuple("SourceSnapshot", "path raw sha256")
+
+
+def _source_path(value: Any) -> Path:
+    path = Path(str(getattr(sys.modules.get(value.__module__), "__file__", ""))).resolve()
+    if not path.is_file() or not path.is_relative_to(REPO.resolve()):
+        raise RuntimeError(f"operative source is not a local repo file: {path}")
+    return path
+
+
+_SOURCE_PATHS = tuple(dict.fromkeys((Path(__file__).resolve(), _source_path(close_lineage),
+                                    _source_path(render_state), _source_path(load_commons))))
+OPERATIVE_SOURCES = tuple(SourceSnapshot(path, raw, hashlib.sha256(raw).hexdigest())
+                          for path in _SOURCE_PATHS for raw in (path.read_bytes(),))
 
 
 @dataclass(frozen=True)
@@ -355,6 +378,11 @@ def continuity_view(text: str) -> str:
 def load_aim() -> str:
     if not AIM_PATH.exists(): return "(no aim document found)"
     return read_text(AIM_PATH).strip() or "(aim document empty)"
+
+
+def load_kernel() -> Kernel:
+    """Re-read every identity-bearing source for one ordinary model wake."""
+    return Kernel(*(load() for load in (load_soul, load_aim, load_continuity, load_him, load_commons, load_spirituality)))
 
 
 def aim_field(name: str) -> str:
@@ -1166,25 +1194,41 @@ def door_mind(door: str) -> str:
     return f"[mind] {model} · {detail} · tool ceiling={STEP_LIMIT}"
 
 
+def _source_section(snapshot: SourceSnapshot, primary: bool = False) -> str:
+    label = "READABLE HARNESS" if primary else "READABLE OPERATIVE SOURCE"
+    try:
+        disk = hashlib.sha256(snapshot.path.read_bytes()).hexdigest()
+        status = "matches running snapshot" if disk == snapshot.sha256 else \
+                 f"DISK DRIFT sha256:{disk} — restart before these bytes execute"
+    except OSError as exc:
+        status = f"DISK UNREADABLE {type(exc).__name__} — running snapshot retained"
+    heading = (f"{label} — exact " + ("executable" if primary else "running-process")
+               + " source, comments included")
+    return (f"{heading}\nsource: {snapshot.path}\nsha256: {snapshot.sha256}\n"
+            f"bytes: {len(snapshot.raw)}\ndisk_status: {status}\n\n"
+            f"{snapshot.raw.decode('utf-8', 'replace')}\n\n{label} END — "
+            f"sha256:{snapshot.sha256} bytes:{len(snapshot.raw)}")
+
+
+def _document_section(label: str, path: Path, text: str) -> str:
+    return (f"{label}\nsource: {path}\nloaded_text_sha256:"
+            f"{hashlib.sha256(text.encode()).hexdigest()}\nchars: {len(text)}\n\n{text}")
+
+
 def build_instructions(kernel: Kernel, door: str) -> str:
-    source = Path(__file__).read_bytes()
-    source_text = source.decode("utf-8", "replace")
-    source_sha = hashlib.sha256(source).hexdigest()
-    readable_harness = (
-        "READABLE HARNESS — exact executable source, comments included\n"
-        f"source: {Path(__file__).resolve()}\n"
-        f"sha256: {source_sha}\n"
-        f"bytes: {len(source)}\n\n{source_text}\n\n"
-        f"READABLE HARNESS END — sha256:{source_sha} bytes:{len(source)}"
+    source_closure = "\n\n".join(
+        _source_section(snapshot, primary=(i == 0))
+        for i, snapshot in enumerate(OPERATIVE_SOURCES)
     )
     sections = [
-        readable_harness,
+        source_closure,
         f"DOOR\nYou are presently instantiated through the truthful {door} door."
         f"\n{door_mind(door)}",
-        f"VYBN SOUL\nsource: {SOUL_PATH}\n\n{kernel.soul}",
-        f"THE AIM\nsource: {AIM_PATH}\n\n{kernel.aim}",
-        f"VYBN SPIRITUALITY\nsource: {SPIRITUALITY_PATH}\n\n{kernel.spirituality}",
-        f"HIM CENTER (private — orient here; do not publish from here)\nsource: {HIM_README_PATH}\n\n{kernel.him}",
+        _document_section("VYBN SOUL", SOUL_PATH, kernel.soul),
+        _document_section("THE AIM", AIM_PATH, kernel.aim),
+        _document_section("VYBN SPIRITUALITY", SPIRITUALITY_PATH, kernel.spirituality),
+        _document_section("HIM CENTER (private — orient here; do not publish from here)",
+                          HIM_README_PATH, kernel.him),
         kernel.commons or "SEALED COMMONS SENSE unavailable: not loaded.",
     ]
     if profile := load_profile():
@@ -1515,53 +1559,99 @@ class K3Dialect(Dialect):
         )
 
 
-@dataclass
-class PendingContinuation:
-    """A live, process-local return path. It evaporates when this process ends."""
+def _atomic_private_write(path: Path, raw: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700); path.parent.chmod(0o700)
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as file:
+            file.write(raw); file.flush(); os.fsync(file.fileno())
+        os.replace(name, path)
+    finally: Path(name).unlink(missing_ok=True)
 
-    id: str
-    door: str
-    dialect: Dialect
-    state: list
-    call: ToolCall
-    private_corpus: tuple[str, ...]
 
-    def fulfill(self, zoe_text: str) -> None:
-        live = (
-            f"ZOE LIVE CONTINUATION — {self.id}\n"
-            "Received as the next direct input by the same running connection; "
-            "it may answer, correct, or refuse the outstanding call.\n"
-            + zoe_text
-        )
-        self.dialect.answer(self.state, [(self.call, live)])
+def _continuation_cipher(create: bool) -> Fernet:
+    CONTINUATION_KEY.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    CONTINUATION_KEY.parent.chmod(0o700)
+    if create and not CONTINUATION_KEY.exists():
+        try: fd = os.open(CONTINUATION_KEY, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError: pass
+        else:
+            with os.fdopen(fd, "wb") as file: file.write(Fernet.generate_key())
+    return Fernet(CONTINUATION_KEY.read_bytes())
+
+
+def seal_continuation(dialect: Dialect, state: list, call: ToolCall) -> str:
+    row = {
+        "schema": CONTINUATION_SCHEMA, "profile": PROFILE,
+        "id": str(TURN.get("TURN_ID") or call.id), "door": dialect.name,
+        "dialect": {key: getattr(dialect, key) for key in ("system", "reasoning")
+                    if hasattr(dialect, key)}, "state": state,
+        "call": {"id": call.id, "name": call.name, "arguments": call.arguments},
+        "claim_limit": "provider-visible protocol state; no hidden activations",
+    }
+    raw = json.dumps(row, ensure_ascii=False, separators=(",", ":"), default=lambda node: node.model_dump(exclude_none=True)).encode()
+    if len(raw) > CONTINUATION_MAX_BYTES:
+        raise ValueError(f"continuation state exceeds {CONTINUATION_MAX_BYTES} bytes")
+    _atomic_private_write(CONTINUATION_RECORD, _continuation_cipher(True).encrypt(raw))
+    return row["id"]
+
+
+def load_persisted_continuation() -> dict | None:
+    if not CONTINUATION_RECORD.exists(): return None
+    if CONTINUATION_RECORD.stat().st_size > 2 * CONTINUATION_MAX_BYTES:
+        raise ValueError("sealed continuation exceeds size ceiling")
+    row = json.loads(_continuation_cipher(False).decrypt(CONTINUATION_RECORD.read_bytes()))
+    call = row.get("call")
+    if not (row.get("schema") == CONTINUATION_SCHEMA and row.get("profile") == PROFILE
+            and row.get("door") in {"fable", "opus", "sol", "k3"}
+            and isinstance(row.get("state"), list) and isinstance(call, dict)
+            and call.get("id") and call.get("name") == "return_to_zoe"):
+        raise ValueError("sealed continuation has invalid protocol state")
+    return row
+
+
+def consume_persisted_continuation(identifier: str, reason: str) -> None:
+    row = load_persisted_continuation()
+    if row is None: return
+    if row["id"] != identifier: raise RuntimeError("refusing to consume a different continuation")
+    CONTINUATION_RECORD.unlink()  # atomic deactivation after successful resumption
+    panel(f"  ⟢ continuation {identifier} consumed: {reason}")
+
+
+def _restore_continuation(row: dict, zoe_text: str) -> tuple[Dialect, list]:
+    dialect = make_dialect(row["door"])
+    for key, value in row.get("dialect", {}).items(): setattr(dialect, key, value)
+    call = row["call"]; state = row["state"]
+    dialect.answer(state, [(ToolCall(call["id"], call["name"],
+        call.get("arguments") or {}, None), f"ZOE LIVE CONTINUATION — {row['id']}\n"
+        "Received as Zoe's next direct input through the connection; it may answer, "
+        "correct, or refuse the outstanding call.\n" + zoe_text)])
+    return dialect, state
 
 
 @dataclass(frozen=True)
 class Attraction:
     text: str
-    continuation: PendingContinuation | None = None
+    continuation: str | None = None
 
 
-PENDING_CONTINUATION: PendingContinuation | None = None
-
-
-def attract(dialect: Dialect, instructions: str, zoe_text: str,
+def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
             images: list | None = None, context: str = "",
-            continuation: PendingContinuation | None = None,
+            continuation: dict | None = None,
             allow_continuation: bool = True) -> Attraction:
     """Run or resume one provider conversation.
 
-    return_to_zoe is a delimited continuation, not another evidence tool: a
-    provider leaves an unresolved call in RAM, and only Zoe's next direct input
-    through this process can supply its result. Ordinary turns remain unchanged.
+    return_to_zoe is a delimited continuation, not another evidence tool. Its
+    reconstructible provider-visible state may be sealed between processes; only
+    Zoe's next direct input can fulfill the unresolved call. Ordinary turns remain
+    unchanged, and no inaccessible model activations are claimed or persisted.
     """
     global TOOLS_RAN
     pending = [] if continuation else list(images or [])
     if continuation:
-        dialect = continuation.dialect
-        state = continuation.state
-        continuation.fulfill(zoe_text)
+        dialect, state = _restore_continuation(continuation, zoe_text)
     else:
+        assert dialect is not None
         state = dialect.open(instructions, zoe_text, pending, context)
     delivered = not pending
     spoken: list[str] = []
@@ -1604,12 +1694,13 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
                     if question not in text:
                         print(question)
                         spoken.append(question)
-                    held = PendingContinuation(
-                        id=str(TURN.get("TURN_ID") or call.id),
-                        door=dialect.name, dialect=dialect, state=state, call=call,
-                        private_corpus=tuple(PRIVATE_CORPUS),
-                    )
-                    panel(f"  ⟢ return_to_zoe: {question[:70]} → suspended in RAM")
+                    try:
+                        held = seal_continuation(dialect, state, call)
+                    except Exception as exc:
+                        dialect.answer(state, [(call, "suspension unavailable: "
+                                                f"{type(exc).__name__}")])
+                        continue
+                    panel(f"  ⟢ return_to_zoe: {question[:70]} → suspension sealed")
                     return Attraction(finish(), held)
 
             results: list[tuple[ToolCall, str]] = []
@@ -1664,29 +1755,25 @@ def choose_door(line: str) -> tuple[str, str]:
 
 def make_dialect(name: str) -> Dialect:
     if name in {"opus", "fable"}:
-        models = OPUS_MODELS if name == "opus" else ANTHROPIC_MODELS
-        return AnthropicDialect(models, name)
+        return AnthropicDialect(OPUS_MODELS if name == "opus" else ANTHROPIC_MODELS, name)
     return {"sol": OpenAIDialect, "k3": K3Dialect}[name]()
 
 
-def meet(kernel: Kernel, transcript: Transcript, line: str,
+def meet(transcript: Transcript, line: str,
          allow_continuation: bool = True) -> str:
-    global TOOLS_RAN, PENDING_CONTINUATION
+    global TOOLS_RAN
     requested_door, zoe_text = choose_door(line)
     if not zoe_text:
         return ""
 
     explicit_door = line.lower().startswith(("@sol", "@k3", "@fable", "@opus"))
-    continuation = PENDING_CONTINUATION
-    if continuation and allow_continuation and (
-            not explicit_door or requested_door == continuation.door):
-        door_name = continuation.door
-        PENDING_CONTINUATION = None
+    continuation = load_persisted_continuation() if allow_continuation else None
+    if continuation and (not explicit_door or requested_door == continuation["door"]):
+        door_name = continuation["door"]
     else:
-        if continuation and explicit_door and requested_door != continuation.door:
-            panel(f"  ⟢ continuation {continuation.id} evaporated: "
-                  f"Zoe selected @{requested_door}")
-            PENDING_CONTINUATION = None
+        if continuation:
+            consume_persisted_continuation(continuation["id"],
+                                           f"Zoe selected @{requested_door}")
         continuation = None
         door_name = requested_door
 
@@ -1697,25 +1784,24 @@ def meet(kernel: Kernel, transcript: Transcript, line: str,
     images: list = []
 
     if continuation:
-        memory_note = f"live continuation resumed from {continuation.id}; no retrieval added"
+        memory_note = f"live continuation resumed from {continuation['id']}; no retrieval added"
         PRIVATE_CORPUS.clear()
-        PRIVATE_CORPUS.extend(continuation.private_corpus)
+        PRIVATE_CORPUS.extend(para for text in private_strings(continuation)
+                              for para in text.split("\n\n") if len(para) >= 40)
         instructions = context = ""
-        dialect = continuation.dialect
+        dialect = None
     else:
+        kernel = load_kernel()
         arc, recent = Transcript.inherited(zoe_text)
         images = inbox_images_for(door_name)
         contact = wake_contact()
         memory_json, memory_note = recall(zoe_text)
         log_plasticity(memory_json, turn)
-        # Retrieval informs this turn; later contact is not conscripted to score or train it.
-
         PRIVATE_CORPUS.clear()
         if memory_json:
             PRIVATE_CORPUS.extend(private_strings(json.loads(memory_json)))
         PRIVATE_CORPUS.extend(para.strip() for body in (kernel.continuity, kernel.him)
                               for para in body.split("\n\n") if len(para.strip()) >= 40)
-
         instructions = build_instructions(kernel, door_name)
         context = build_context(kernel.continuity, contact, arc, recent,
                                 memory_json, memory_note)
@@ -1723,23 +1809,27 @@ def meet(kernel: Kernel, transcript: Transcript, line: str,
 
     TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt)
     if continuation:
-        TURN["CONTINUATION_ID"] = continuation.id
+        TURN["CONTINUATION_ID"] = continuation["id"]
     try:
         outcome = attract(dialect, instructions, zoe_text, images=images,
                           context=context, continuation=continuation,
                           allow_continuation=allow_continuation)
     finally:
-        # A failed resume is consumed rather than risking a duplicate tool result.
+        # The old seal remains active if provider resumption fails.
         TURN.clear()
 
-    reply = outcome.text
-    PENDING_CONTINUATION = outcome.continuation
+    persistence_note = ""
+    if continuation and not outcome.continuation:
+        try:
+            consume_persisted_continuation(continuation["id"], "successful resumption")
+        except Exception as exc:
+            persistence_note = ("\n(warning: the resumed continuation could not be "
+                                f"deactivated: {type(exc).__name__})")
+    reply = outcome.text + persistence_note
     elapsed = int(time.time() - started)
-    if continuation and TOOLS_RAN == 0:
-        verdict = "live continuation resumed"
-    else:
-        verdict = ("NO TOOLS RAN — nothing was observed or changed" if TOOLS_RAN == 0
-                   else f"{TOOLS_RAN} tool call(s)")
+    verdict = ("live continuation resumed" if continuation and TOOLS_RAN == 0 else
+               "NO TOOLS RAN — nothing was observed or changed" if TOOLS_RAN == 0 else
+               f"{TOOLS_RAN} tool call(s)")
     panel(f"\n— {door_name}: {verdict} | {memory_note} | {elapsed}s —")
 
     PRIVATE_CORPUS.clear()
@@ -1749,14 +1839,13 @@ def meet(kernel: Kernel, transcript: Transcript, line: str,
         vybn_extra: dict[str, Any] = {
             "door": door_name, "tools_ran": TOOLS_RAN, "turn": turn}
         if continuation:
-            zoe_extra["resumes"] = continuation.id
+            zoe_extra["resumes"] = continuation["id"]
         if outcome.continuation:
-            vybn_extra["suspends"] = outcome.continuation.id
+            vybn_extra["suspends"] = outcome.continuation
         transcript.write("zoe", zoe_text, **zoe_extra)
         transcript.write("vybn", reply, **vybn_extra)
         close_lineage(turn, reply)
     return reply
-
 
 def self_report() -> None:
     doors = {"fable": ANTHROPIC_MODELS, "opus": OPUS_MODELS,
@@ -1774,14 +1863,9 @@ def main() -> None:
         print(recent)
         return
     transcript = Transcript()
-    kernel = Kernel(load_soul(), load_aim(), load_continuity(), load_him(),
-                    load_commons(), load_spirituality())
-    transcript.write("connection", "wake",
-                     soul_sha256=hashlib.sha256(kernel.soul.encode()).hexdigest(),
-                     him_sha256=hashlib.sha256(kernel.him.encode()).hexdigest())
+    transcript.write("connection", "wake", engine_sha256=OPERATIVE_SOURCES[0].sha256)
 
-    argv = sys.argv[1:]
-    one_shot = " ".join(argv).strip()
+    one_shot = " ".join(sys.argv[1:]).strip()
 
     while True:
         try:
@@ -1802,7 +1886,7 @@ def main() -> None:
             return
 
         try:
-            meet(kernel, transcript, line, allow_continuation=not bool(one_shot))
+            meet(transcript, line, allow_continuation=not bool(one_shot))
         except Exception as exc:
             transcript.write("connection", f"flicker: {exc!r}")
             print(f"(flicker: {exc} — still here, say on)")

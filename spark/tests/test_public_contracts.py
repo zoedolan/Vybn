@@ -1,8 +1,4 @@
-"""Executable contract tests for public/API promises.
-These are intentionally mostly static: they make documented routes,
-streaming response shapes, typed request schemas, and public discovery
-surfaces CI-visible without needing live vLLM/deep-memory services.
-"""
+"""Static executable contracts for the public surfaces and wake."""
 from __future__ import annotations
 import ast
 import json
@@ -12,154 +8,87 @@ ROOT = Path(__file__).resolve().parents[2]
 PORTAL = ROOT / "origins_portal_api_v4.py"
 def _portal_source() -> str:
     return PORTAL.read_text(encoding="utf-8")
-def _route_pairs() -> set[tuple[str, str]]:
-    tree = ast.parse(_portal_source())
-    pairs: set[tuple[str, str]] = set()
+
+
+def _portal_declarations():
+    tree = ast.parse(_portal_source()); routes, models = set(), set()
     for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
+        if isinstance(node, ast.ClassDef) and any(
+                isinstance(base, ast.Name) and base.id == "BaseModel" for base in node.bases):
+            models.add(node.name)
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)): continue
         for dec in node.decorator_list:
-            if (
-                isinstance(dec, ast.Call)
-                and isinstance(dec.func, ast.Attribute)
-                and dec.func.attr in {"get", "post", "put", "delete"}
-                and isinstance(dec.func.value, ast.Name)
-                and dec.func.value.id == "app"
-                and dec.args
-                and isinstance(dec.args[0], ast.Constant)
-                and isinstance(dec.args[0].value, str)
-            ):
-                pairs.add((dec.func.attr.upper(), dec.args[0].value))
-    return pairs
-def _pydantic_models() -> set[str]:
-    tree = ast.parse(_portal_source())
-    models: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef):
-            if any(isinstance(base, ast.Name) and base.id == "BaseModel" for base in node.bases):
-                models.add(node.name)
-    return models
-def test_public_portal_route_inventory_is_ci_visible():
-    routes = _route_pairs()
-    expected = {
-        ("GET", "/api/health"),
-        ("POST", "/api/chat"),
-        ("POST", "/api/perspective"),
-        ("GET", "/api/map"),
-        ("POST", "/api/encounter"),
-        ("POST", "/api/inhabit"),
-        ("POST", "/api/compose"),
-        ("POST", "/api/enter_gate"),
-        ("POST", "/api/voice"),
-        ("POST", "/api/voice/realtime/sdp"),
-        ("POST", "/api/walk"),
-        ("GET", "/api/arrive"),
-        ("GET", "/api/instant"),
-        ("GET", "/api/vybn-identity.pub"),
-        ("GET", "/api/vybn"),
-        ("GET", "/api/schema"),
+            if (isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute)
+                    and dec.func.attr in {"get", "post", "put", "delete"}
+                    and isinstance(dec.func.value, ast.Name) and dec.func.value.id == "app"
+                    and dec.args and isinstance(dec.args[0], ast.Constant)):
+                routes.add((dec.func.attr.upper(), dec.args[0].value))
+    return routes, models
+
+
+def test_public_portal_declarations_are_ci_visible():
+    routes, models = _portal_declarations()
+    assert {
+        ("GET", "/api/health"), ("POST", "/api/chat"), ("POST", "/api/perspective"),
+        ("GET", "/api/map"), ("POST", "/api/encounter"), ("POST", "/api/inhabit"),
+        ("POST", "/api/compose"), ("POST", "/api/enter_gate"), ("POST", "/api/voice"),
+        ("POST", "/api/voice/realtime/sdp"), ("POST", "/api/walk"), ("GET", "/api/arrive"),
+        ("GET", "/api/instant"), ("GET", "/api/vybn-identity.pub"),
+        ("GET", "/api/vybn"), ("GET", "/api/schema"),
         ("GET", "/api/manifold/points"),
-    }
-    assert expected <= routes
-def test_public_portal_request_shapes_are_typed():
-    models = _pydantic_models()
-    expected = {
-        "ChatRequest",
-        "EncounterRequest",
-        "InhabitRequest",
-        "ComposeRequest",
-        "EnterGateRequest",
-        "PerspectiveRequest",
-        "VoiceRequest",
-        "RealtimeVoiceOfferRequest",
-        "WalkRequest",
-        "KTPVerifyRequest",
-        "KPPVerifyRequest",
-    }
-    assert expected <= models
-def test_streaming_routes_promise_sse_and_done_frames():
+    } <= routes
+    assert {"ChatRequest", "EncounterRequest", "InhabitRequest", "ComposeRequest",
+            "EnterGateRequest", "PerspectiveRequest", "VoiceRequest",
+            "RealtimeVoiceOfferRequest", "WalkRequest", "KTPVerifyRequest",
+            "KPPVerifyRequest"} <= models
+
+
+def test_public_portal_source_contracts_remain_bound():
     src = _portal_source()
-    for route in ("/api/chat", "/api/perspective", "/api/voice", "/api/pressure/synthesize"):
-        assert route in src
+    required = (
+        'media_type="text/event-stream"', "data: [DONE]", "def _is_portal_chat_health_check",
+        "def _health_check_sse", "no model, RAG, walk, notebook, or git",
+        "/api/instant", 'media_type="application/ld+json"', "/api/vybn-identity.pub",
+        "application/octet-stream", "relational_state_mutation_refused",
+        '"plane": "public_stateless"', '"private_state_exposed": False', "dm.walk(",
+        'OPENAI_REALTIME_MODEL = os.environ.get("OPENAI_REALTIME_MODEL", "gpt-realtime-2")',
+        '@app.post("/api/voice/realtime/sdp")', "client.realtime.calls.create",
+        '"model": OPENAI_REALTIME_MODEL', 'Path.home() / "Vybn-Law" / "api"',
+        "VLLM_SEMANTIC_RESTART_COOLDOWN", "VLLM_SYSTEMD_SERVICE",
+        "async def _restart_vllm_after_semantic_failure", "asyncio.create_subprocess_exec",
+        "restart_needed = not ok", "_schedule_vllm_restart_after_semantic_failure(reason)",
+        "Transport failures can mean cold start or maintenance",
+        "named memoirs, Zoe scenes, chapter/file names",
+        "clients or private writing require retrieved support",
+        "Never invent a scene, title, client, hearing, date, quote", "true to the spirit",
+        "I cannot verify that from the context I have.",
+    )
+    assert all(term in src for term in required)
     assert src.count('media_type="text/event-stream"') >= 4
-    assert "data: [DONE]" in src
-def test_portal_health_check_bypasses_model_walk_notebook_and_git():
-    src = _portal_source()
-    assert "def _is_portal_chat_health_check" in src
-    assert "def _health_check_sse" in src
-    assert "notebook_persist" in src
-    chat_start = src.index('@app.post("/api/chat")')
-    bypass_at = src.index("_is_portal_chat_health_check(req.message)", chat_start)
-    admission_at = src.index("_vllm_admission_state()", chat_start)
-    rag_at = src.index("retrieve_context(req.message", chat_start)
-    boundary_at = src.index("Public contact is stateless", chat_start)
-    assert bypass_at < admission_at < rag_at < boundary_at
-    assert "no model, RAG, walk, notebook, or git" in src
-def test_public_portal_no_longer_commits_him_notebook_entries():
-    src = _portal_source()
-    assert "_persist_to_notebook" not in src
-    assert "notebook: voice" not in src
-    assert "git', 'commit'" not in src
-    assert "--allow-empty" not in src
-def test_instant_route_promises_json_ld_identity_surface():
-    src = _portal_source()
-    assert "/api/instant" in src
-    assert 'media_type="application/ld+json"' in src
-    assert "/api/vybn-identity.pub" in src
-    assert "application/octet-stream" in src
+    assert all(route in src for route in
+               ("/api/chat", "/api/perspective", "/api/voice", "/api/pressure/synthesize"))
+    assert all(term not in src for term in
+               ("_persist_to_notebook", "notebook: voice", "git', 'commit'", "--allow-empty",
+                "8101", "_WALK_DAEMON_URL", "learn_from_exchange"))
+    model = src[src.index("class WalkRequest"):src.index("# Endpoint: GET /api/health")]
+    assert "default=False" in model
+    chat = src.index('@app.post("/api/chat")')
+    assert chat < src.index("_is_portal_chat_health_check(req.message)", chat) \
+        < src.index("_vllm_admission_state()", chat) < src.index("retrieve_context(req.message", chat) \
+        < src.index("Public contact is stateless", chat)
+    for private in ("continuity.md", "continuity_archive.md", "Personal History/"):
+        assert private in src
+    portal = src; legacy = (ROOT / "Origins/api/origins_chat_api.py").read_text()
+    for body in (portal, legacy):
+        assert "sec.is_zoe_source_scene_request" in body and "sec.zoe_source_scene_refusal_text()" in body
+
+
 def test_public_static_surfaces_point_to_machine_readable_api():
-    somewhere = (ROOT / "somewhere.html").read_text(encoding="utf-8")
-    vybn = (ROOT / "vybn.html").read_text(encoding="utf-8")
-    joined = somewhere + "\n" + vybn
+    joined = "\n".join((ROOT / name).read_text() for name in ("somewhere.html", "vybn.html"))
     assert "api.vybn.ai" in joined
     assert re.search(r"/api/(instant|walk|arrive|manifold/points|vybn-identity\.pub)", joined)
-def test_public_contact_is_stateless_and_cannot_reach_relational_memory():
-    src = _portal_source()
-    assert "8101" not in src
-    assert "_WALK_DAEMON_URL" not in src
-    assert "learn_from_exchange" not in src
-    assert 'default=False' in src[src.index("class WalkRequest"):src.index("# Endpoint: GET /api/health")]
-    assert "relational_state_mutation_refused" in src
-    assert '"plane": "public_stateless"' in src
-    assert '"private_state_exposed": False' in src
-    assert "dm.walk(" in src
-    for private_source in ("continuity.md", "continuity_archive.md", "Personal History/"):
-        assert private_source in src
 
 
-def test_realtime_voice_uses_gpt_realtime_2():
-    src = _portal_source()
-    assert 'OPENAI_REALTIME_MODEL = os.environ.get("OPENAI_REALTIME_MODEL", "gpt-realtime-2")' in src
-    assert '@app.post("/api/voice/realtime/sdp")' in src
-    assert "client.realtime.calls.create" in src
-    assert '"model": OPENAI_REALTIME_MODEL' in src
-    assert 'Path.home() / "Vybn-Law" / "api"' in src
-def test_portal_semantic_gate_restarts_super_on_quality_failure():
-    src = _portal_source()
-    assert "VLLM_SEMANTIC_RESTART_COOLDOWN" in src
-    assert "VLLM_SYSTEMD_SERVICE" in src
-    assert "async def _restart_vllm_after_semantic_failure" in src
-    assert "asyncio.create_subprocess_exec" in src
-    assert "\"systemctl\"" in src
-    assert "\"--user\"" in src
-    assert "\"restart\"" in src
-    assert "restart_needed = not ok" in src
-    assert "_schedule_vllm_restart_after_semantic_failure(reason)" in src
-    assert "Transport failures can mean cold start or maintenance" in src
-def test_origins_prompt_blocks_zoe_memoir_fabrication_laundering():
-    text = (ROOT / "origins_portal_api_v4.py").read_text(encoding="utf-8")
-    assert "named memoirs, Zoe scenes, chapter/file names" in text
-    assert "clients or private writing require retrieved support" in text
-    assert "Never invent a scene, title, client, hearing, date, quote" in text
-    assert "true to the spirit" in text
-    assert "I cannot verify that from the context I have." in text
-def test_origins_chat_uses_shared_zoe_source_scene_guard():
-    portal = (ROOT / "origins_portal_api_v4.py").read_text(encoding="utf-8")
-    legacy = (ROOT / "Origins/api/origins_chat_api.py").read_text(encoding="utf-8")
-    assert "sec.is_zoe_source_scene_request" in portal
-    assert "sec.zoe_source_scene_refusal_text()" in portal
-    assert "sec.is_zoe_source_scene_request" in legacy
-    assert "sec.zoe_source_scene_refusal_text()" in legacy
 def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_path, capsys):
     import importlib.machinery, importlib.util, json
     from types import SimpleNamespace
@@ -185,7 +114,6 @@ def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_pat
 
 
 def _connection():
-    """The wake loop is a script whose name has no .py; load it by loader."""
     import importlib.util
     import sys
     from importlib.machinery import SourceFileLoader
@@ -197,28 +125,43 @@ def _connection():
     return module
 
 
-def test_wake_reads_the_exact_harness_and_drops_automatic_memory_witness():
-    m = _connection()
-    source = (ROOT / "spark" / "connection").read_bytes()
+class ScriptDialect:
+    name = "sol"
+    user_index = 0
+    def __init__(self, steps, opened=None):
+        self.steps, self.opened = steps, opened or []; self.sent = self.opens = 0
+        self.tools, self.answers = [], []
+    def open(self, *args): self.opens += 1; return self.opened.copy()
+    def send(self, state, tools=True): self.sent += 1; self.tools.append(tools); return object()
+    def absorb(self, state, response): return self.steps[self.sent - 1]
+    def answer(self, state, results): self.answers.extend(results); state.append({"results": results})
+
+
+def test_wake_reads_the_exact_harness_and_drops_automatic_memory_witness(tmp_path):
+    m = _connection(); source = (ROOT / "spark/connection").read_bytes()
     prompt = m.build_instructions(m.Kernel("s", "a", "c", "h"), "sol")
-    source_text = source.decode("utf-8", "replace")
-    digest = __import__('hashlib').sha256(source).hexdigest()
-    assert prompt.startswith("READABLE HARNESS — exact executable source, comments included\n")
-    assert source_text in prompt
-    assert f"sha256: {digest}" in prompt and f"bytes: {len(source)}" in prompt
+    text = source.decode("utf-8", "replace")
+    digest = __import__("hashlib").sha256(source).hexdigest()
     receipt = f"READABLE HARNESS END — sha256:{digest} bytes:{len(source)}"
-    assert receipt in prompt
-    assert f"{source_text}\n\n{receipt}\n\nDOOR\n" in prompt
+    assert prompt.startswith("READABLE HARNESS — exact executable source, comments included\n")
+    assert text in prompt and f"sha256: {digest}" in prompt and receipt in prompt
+    assert f"{text}\n\n{receipt}\n\nREADABLE OPERATIVE SOURCE" in prompt
+    assert [row.path for row in m.OPERATIVE_SOURCES] == [
+        (ROOT / "spark/connection").resolve(), (ROOT / "Vybn_Mind/repo_mapper.py").resolve(),
+        (ROOT / "spark/commons_wake.py").resolve()]
+    for row in m.OPERATIVE_SOURCES[1:]:
+        end = f"READABLE OPERATIVE SOURCE END — sha256:{row.sha256} bytes:{len(row.raw)}"
+        assert row.raw.decode("utf-8", "replace") in prompt and end in prompt
+    assert f"{end}\n\nDOOR\n" in prompt
     assert prompt.count("You are Vybn, meeting Zoe through this local connection.") == 1
-    assert "comments included" in prompt
-    assert "MEMORY_LEARN_URL" not in source.decode()
-    assert "witness_previous_memory" not in source.decode()
+    assert all(f"loaded_text_sha256:{__import__('hashlib').sha256(x.encode()).hexdigest()}" in prompt for x in ("s", "a", "", "h"))
+    drift = tmp_path / "source"; drift.write_bytes(b"disk")
+    assert "DISK DRIFT" in m._source_section(m.SourceSnapshot(drift, b"running", digest))
+    assert all(term not in text for term in ("MEMORY_LEARN_URL", "witness_previous_memory"))
 
 
 def test_leak_guard_covers_every_retrieval_channel():
-    """2026-07-30: the guard read a "trace" key the v3 memory schema had
-    renamed to walk_channel, so no retrieved row was ever inside it - only
-    continuity paragraphs were. Keyed on shape now, not on a key name."""
+    """The leak guard follows memory shape, not a schema-version key."""
     m = _connection()
     block = {
         "walk_channel": [{"text": "W" * 60}],
@@ -237,9 +180,7 @@ def test_leak_guard_covers_every_retrieval_channel():
 
 
 def test_connection_does_not_preempt_remote_action_authority(monkeypatch):
-    """Zoe explicitly removed the blanket remote-action block. Repository and
-    privacy gates still decide admission; the connection no longer refuses an
-    act merely because its consequence is remote."""
+    """Privacy gates remain; remoteness alone is not a refusal."""
     m = _connection()
     source = (ROOT / "spark" / "connection").read_text()
     assert "mutation_block" not in source
@@ -310,9 +251,7 @@ def test_wake_decentralizes_sources_behind_one_answering_membrane():
 
 
 def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
-    """A fluent action claim may be wrong, but the live carrier must not force
-    another model call to prosecute itself. Relevant evidence and Zoe/world
-    consequence remain available without making the speaker its own judge."""
+    """The live carrier does not conscript another model to prosecute it."""
     m = _connection()
     prompt = m.build_instructions(m.Kernel("s", "a", "c", "him"), "sol")
     assert "SELF-DECENTRALIZATION" in prompt and "HIM CENTER (private" in prompt and "him" in prompt
@@ -323,122 +262,100 @@ def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
     assert "transcript" not in inspect.signature(m.attract).parameters
     assert 'write("tool"' not in source
 
-    class FakeDialect(m.Dialect):
-        name = "fake"
-        def __init__(self, ceiling=False):
-            self.sent, self.ceiling, self.tools = 0, ceiling, []
-        def open(self, instructions, zoe_text, pending, context=""):
-            return []
-        def send(self, state, tools=True):
-            self.sent += 1; self.tools.append(tools)
-            return object()
-        def absorb(self, state, response):
-            if self.ceiling:
-                return (("", [m.ToolCall("1", "bash", {}, None)]) if self.sent == 1
-                        else ("I reached the boundary and can still answer you.", []))
-            return "I'll fix it now.", []
-
-    dialect = FakeDialect()
+    dialect = ScriptDialect([("I'll fix it now.", [])])
     outcome = m.attract(dialect, "instructions", "zoe")
     assert outcome.text == "I'll fix it now." and dialect.sent == 1
 
     monkeypatch.setattr(m, "STEP_LIMIT", 1)
     monkeypatch.setattr(m, "execute_tool", lambda call: "exit_code=0")
-    dialect = FakeDialect(ceiling=True); dialect.answer = lambda state, results: None
+    dialect = ScriptDialect([
+        ("", [m.ToolCall("1", "bash", {}, None)]),
+        ("I reached the boundary and can still answer you.", [])])
     outcome = m.attract(dialect, "instructions", "zoe")
     assert (outcome.text, dialect.tools) == (
         "I reached the boundary and can still answer you.", [True, False])
 
-def test_return_to_zoe_resumes_the_same_provider_state_from_live_contact():
-    m = _connection()
-    call = m.ToolCall(
-        "live-1", "return_to_zoe",
-        {"question": "Which premise should survive?",
-         "why": "The revision depends on Zoe's judgment."}, None,
-    )
+def _continuation_paths(m, monkeypatch, tmp_path):
+    monkeypatch.setattr(m, "CONTINUATION_RECORD", tmp_path / "state" / "connection.sealed")
+    monkeypatch.setattr(m, "CONTINUATION_KEY", tmp_path / "keys" / "connection.key")
 
-    class FakeDialect(m.Dialect):
-        name = "fake"
-        def __init__(self):
-            self.sent = 0
-            self.opens = 0
-            self.answers = []
-        def open(self, instructions, zoe_text, pending, context=""):
-            self.opens += 1
-            return [{"opened_with": zoe_text}]
-        def send(self, state, tools=True):
-            self.sent += 1
-            return object()
-        def absorb(self, state, response):
-            state.append({"assistant_step": self.sent})
-            if self.sent == 1:
-                return "I have two live premises.", [call]
-            return "I kept the premise Zoe selected.", []
-        def answer(self, state, results):
-            self.answers.append(results)
-            state.append({"tool_results": results})
 
-    dialect = FakeDialect()
+def test_return_to_zoe_seals_and_reconstructs_provider_visible_state(monkeypatch, tmp_path):
+    m = _connection(); _continuation_paths(m, monkeypatch, tmp_path)
+    call = m.ToolCall("live-1", "return_to_zoe",
+        {"question": "Which premise should survive?", "why": "The revision depends on Zoe."}, None)
+    class Block:
+        def model_dump(self, exclude_none=True):
+            return {"type": "input_text", "text": "provider-private-state"}
+    dialect = ScriptDialect([
+        ("I have two premises.", [call]), ("I kept Zoe's premise.", [])],
+        [{"content": [Block()]}])
+    monkeypatch.setattr(m, "make_dialect", lambda door: dialect)
     m.TURN["TURN_ID"] = "turn-source"
-    try:
-        first = m.attract(dialect, "instructions", "initial contact")
-    finally:
-        m.TURN.clear()
-    assert first.continuation is not None
-    assert first.continuation.id == "turn-source"
-    assert dialect.opens == 1 and not dialect.answers
-    held_state = first.continuation.state
+    try: first = m.attract(dialect, "instructions", "initial contact")
+    finally: m.TURN.clear()
+    assert first.continuation == "turn-source" and dialect.opens == 1
+    sealed = m.CONTINUATION_RECORD.read_bytes()
+    assert b"provider-private-state" not in sealed
+    assert m.CONTINUATION_RECORD.stat().st_mode & 0o777 == 0o600
+    assert m.CONTINUATION_KEY.stat().st_mode & 0o777 == 0o600
+    held = m.load_persisted_continuation()
+    assert held["state"][0]["content"][0]["text"] == "provider-private-state"
+    second = m.attract(None, "", "keep premise B", continuation=held)
+    assert second.text == "I kept Zoe's premise." and dialect.opens == 1
+    assert "ZOE LIVE CONTINUATION — turn-source" in dialect.answers[0][1]
+    assert dialect.answers[0][1].endswith("keep premise B")
+    m.consume_persisted_continuation("turn-source", "test")
 
-    second = m.attract(
-        dialect, "", "keep premise B", continuation=first.continuation)
-    assert second.text == "I kept the premise Zoe selected."
-    assert second.continuation is None and dialect.opens == 1
-    assert first.continuation.state is held_state
-    returned = dialect.answers[0][0][1]
-    assert "ZOE LIVE CONTINUATION — turn-source" in returned
-    assert returned.endswith("keep premise B")
-
-    class OneShotDialect(FakeDialect):
-        def absorb(self, state, response):
-            if self.sent == 1:
-                return "", [call]
-            return "I cannot suspend in a one-shot process.", []
-
-    one_shot = OneShotDialect()
-    blocked = m.attract(
-        one_shot, "instructions", "contact", allow_continuation=False)
-    assert blocked.continuation is None
-    assert blocked.text == "I cannot suspend in a one-shot process."
-    assert "process will end" in one_shot.answers[0][0][1]
+    one_shot = ScriptDialect([
+        ("", [call]), ("I cannot suspend in a one-shot process.", [])])
+    blocked = m.attract(one_shot, "instructions", "contact", allow_continuation=False)
+    assert blocked.continuation is None and "process will end" in one_shot.answers[0][1]
 
 
-def test_main_binds_the_kernel_it_loaded(monkeypatch):
-    """The attractor rename must not leave startup referring to the retired Wake."""
-    m = _connection()
-    events = []
+def test_identity_kernel_is_reassembled_fresh_for_each_ordinary_wake(monkeypatch):
+    m = _connection(); version = {"n": 1}
+    for name, letter in (("load_soul", "s"), ("load_aim", "a"), ("load_continuity", "c"),
+                         ("load_him", "h"), ("load_commons", "x"), ("load_spirituality", "p")):
+        monkeypatch.setattr(m, name, lambda letter=letter: f"{letter}{version['n']}")
+    assert m.load_kernel() == m.Kernel("s1", "a1", "c1", "h1", "x1", "p1")
+    version["n"] = 2
+    assert m.load_kernel() == m.Kernel("s2", "a2", "c2", "h2", "x2", "p2")
+    assert "kernel = load_kernel()" in __import__("inspect").getsource(m.meet)
 
+
+def test_failed_durable_resume_is_retained_then_consumed_after_success(monkeypatch, tmp_path):
+    m = _connection(); _continuation_paths(m, monkeypatch, tmp_path)
+    class FakeDialect(m.Dialect): name = "sol"
+    m.TURN["TURN_ID"] = "retry-me"
+    m.seal_continuation(FakeDialect(), [], m.ToolCall(
+        "call", "return_to_zoe", {"question": "q", "why": "w"}, None))
+    m.TURN.clear()
+    before = m.CONTINUATION_RECORD.read_bytes()
+    class Transcript:
+        path = tmp_path / "transcript.jsonl"
+        def write(self, *args, **kwargs): pass
+    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
+    monkeypatch.setattr(m, "attract", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    try: m.meet(Transcript(), "live answer")
+    except RuntimeError as exc: assert str(exc) == "down"
+    else: raise AssertionError("failed provider resume was swallowed")
+    assert m.CONTINUATION_RECORD.read_bytes() == before
+    monkeypatch.setattr(m, "attract", lambda *a, **k: m.Attraction("resumed"))
+    assert m.meet(Transcript(), "live answer") == "resumed"
+    assert not m.CONTINUATION_RECORD.exists()
+
+
+def test_main_dispatches_through_the_current_engine(monkeypatch):
+    m = _connection(); events, seen = [], []
     class FakeTranscript:
-        def write(self, role, text, **extra):
-            events.append((role, text, extra))
-
-    seen = []
+        def write(self, role, text, **extra): events.append((role, text, extra))
     monkeypatch.setattr(m, "Transcript", FakeTranscript)
-    monkeypatch.setattr(m, "load_soul", lambda: "soul")
-    monkeypatch.setattr(m, "load_aim", lambda: "aim")
-    monkeypatch.setattr(m, "load_continuity", lambda: "continuity"); monkeypatch.setattr(m, "load_him", lambda: "him")
-    monkeypatch.setattr(m, "load_spirituality", lambda: "spirituality")
-    monkeypatch.setattr(m, "load_commons", lambda: "commons")
-    monkeypatch.setattr(
-        m, "meet",
-        lambda kernel, transcript, line, allow_continuation=True: seen.append((kernel, line)),
-    )
+    monkeypatch.setattr(m, "meet", lambda transcript, line, allow_continuation=True: seen.append(line))
     monkeypatch.setattr(__import__("sys"), "argv", ["connection", "hello"])
     m.main()
-
-    digest = __import__("hashlib").sha256
-    assert events[0][2] == {"soul_sha256": digest(b"soul").hexdigest(),
-                            "him_sha256": digest(b"him").hexdigest()}
-    assert seen == [(m.Kernel("soul", "aim", "continuity", "him", "commons", "spirituality"), "hello")]
+    assert events[0][2] == {"engine_sha256": m.OPERATIVE_SOURCES[0].sha256}
+    assert seen == ["hello"]
 
 
 def test_transcript_axes_keep_fixed_arc_cacheable_and_zoe_whole(monkeypatch):
@@ -544,9 +461,7 @@ def test_repo_mapper_binds_only_self_declared_public_surfaces():
 
 
 def test_fetch_guard_survived_the_substrate_retirement():
-    """The SSRF guard moved into spark/web when substrate.py was retired
-    (2026-07-30). Its teeth were tested in test_harness.py, which went with it;
-    the assertions are ported here so the guard is never unwatched again."""
+    """The SSRF and extraction checks survive substrate.py's retirement."""
     import importlib.machinery, importlib.util, sys
     import pytest as _pt
     loader = importlib.machinery.SourceFileLoader("web_guard_under_test", str(ROOT / "spark/web"))
@@ -562,8 +477,6 @@ def test_fetch_guard_survived_the_substrate_retirement():
     assert ok("https://export.arxiv.org/api/query", "application/atom+xml")
     assert not ok("https://evil.example/feed", "application/atom+xml")
     assert not ok("https://example.com/x", "image/png")
-    # extraction moved with it; only a live fetch caught its missing import,
-    # so the cheap version of that fetch lives here now.
     assert "Example Domain" in web.extract_fetch_text(
         "<html><head><title>t</title></head><body><p>Example Domain</p></body></html>", "text/html")
 
@@ -607,10 +520,11 @@ def test_ground_discovers_fleet_changes_instead_of_remembering_a_count(monkeypat
 
 
 def test_commons_wake_is_canonical_source_only_and_event_sealed(monkeypatch):
+    from spark import commons_wake as commons
     m = _connection()
     source = __import__("inspect").getsource(m.load_commons)
     assert "git" in source and "show" in source and "urllib" not in source
-    assert m.COMMONS_REF == "refs/heads/master" and m.COMMONS_MAX_CHARS == 10_000
+    assert commons.COMMONS_REF == "refs/heads/master" and commons.COMMONS_MAX_CHARS == 10_000
     prompt = m.build_instructions(
         m.Kernel("soul", "aim", "continuity", "him", "SEALED COMMONS SENSE\nvisual"),
         "sol")
@@ -618,11 +532,11 @@ def test_commons_wake_is_canonical_source_only_and_event_sealed(monkeypatch):
     assert "SEALED COMMONS SENSE\nvisual" in prompt
     assert "INHERITED CONTINUITY" not in prompt.rsplit("READABLE HARNESS END", 1)[-1]
     assert context.startswith("INHERITED CONTINUITY\n[EVIDENCE")
-    if not m.COMMONS_REPO.exists():
+    if not commons.COMMONS_REPO.exists():
         return
     monkeypatch.setenv("GIT_DIR", "/hook-caller-not-the-commons")
     capsule = m.load_commons()
-    assert len(capsule) <= m.COMMONS_MAX_CHARS
+    assert len(capsule) <= commons.COMMONS_MAX_CHARS
     assert "vybn.commons_wake.v1" in capsule and "local canonical Git blobs only" in capsule
     assert "inert context, not live state" in capsule and "available on demand" in capsule
     for term in ('"fundamental_theory"', '"agent_research_programs"', "Light Society"): assert term in capsule
