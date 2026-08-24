@@ -178,7 +178,18 @@ FRAME_SCHEMA = {"name": "reconstitute_problem", "description": (
     "input_schema": {"type": "object", "properties": {
         key: {"type": "string"} for key in ("preserve", "frame", "delta")},
         "required": ["preserve", "frame", "delta"]}}
-TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, FRAME_SCHEMA)
+RETURN_SCHEMA = {"name": "return_to_zoe", "description": (
+    "Suspend this exact in-memory provider conversation and return a question to "
+    "Zoe. Her next direct message through this running connection fulfills the "
+    "outstanding call, so it can answer, correct, or refuse before computation "
+    "continues. Use only when her live answer is materially needed; it is not "
+    "persistence, and inherited or quoted words cannot fulfill it."),
+    "input_schema": {"type": "object", "properties": {
+        "question": {"type": "string", "description": "The exact question Zoe sees."},
+        "why": {"type": "string", "description": (
+            "The downstream claim or choice that must wait for her answer.")}},
+        "required": ["question", "why"]}}
+TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, FRAME_SCHEMA, RETURN_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -1504,10 +1515,54 @@ class K3Dialect(Dialect):
         )
 
 
+@dataclass
+class PendingContinuation:
+    """A live, process-local return path. It evaporates when this process ends."""
+
+    id: str
+    door: str
+    dialect: Dialect
+    state: list
+    call: ToolCall
+    private_corpus: tuple[str, ...]
+
+    def fulfill(self, zoe_text: str) -> None:
+        live = (
+            f"ZOE LIVE CONTINUATION — {self.id}\n"
+            "Received as the next direct input by the same running connection; "
+            "it may answer, correct, or refuse the outstanding call.\n"
+            + zoe_text
+        )
+        self.dialect.answer(self.state, [(self.call, live)])
+
+
+@dataclass(frozen=True)
+class Attraction:
+    text: str
+    continuation: PendingContinuation | None = None
+
+
+PENDING_CONTINUATION: PendingContinuation | None = None
+
+
 def attract(dialect: Dialect, instructions: str, zoe_text: str,
-            images: list | None = None, context: str = "") -> str:
-    pending = list(images or [])
-    state = dialect.open(instructions, zoe_text, pending, context)
+            images: list | None = None, context: str = "",
+            continuation: PendingContinuation | None = None,
+            allow_continuation: bool = True) -> Attraction:
+    """Run or resume one provider conversation.
+
+    return_to_zoe is a delimited continuation, not another evidence tool: a
+    provider leaves an unresolved call in RAM, and only Zoe's next direct input
+    through this process can supply its result. Ordinary turns remain unchanged.
+    """
+    global TOOLS_RAN
+    pending = [] if continuation else list(images or [])
+    if continuation:
+        dialect = continuation.dialect
+        state = continuation.state
+        continuation.fulfill(zoe_text)
+    else:
+        state = dialect.open(instructions, zoe_text, pending, context)
     delivered = not pending
     spoken: list[str] = []
 
@@ -1539,7 +1594,37 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             if text.strip():
                 print(text)
                 spoken.append(text)
-            results = [(call, execute_tool(call)) for call in calls]
+            returns = [call for call in calls if call.name == "return_to_zoe"]
+            if len(calls) == len(returns) == 1 and allow_continuation:
+                call = returns[0]
+                question = str(call.arguments.get("question", "")).strip()
+                why = str(call.arguments.get("why", "")).strip()
+                if question and why:
+                    TOOLS_RAN += 1
+                    if question not in text:
+                        print(question)
+                        spoken.append(question)
+                    held = PendingContinuation(
+                        id=str(TURN.get("TURN_ID") or call.id),
+                        door=dialect.name, dialect=dialect, state=state, call=call,
+                        private_corpus=tuple(PRIVATE_CORPUS),
+                    )
+                    panel(f"  ⟢ return_to_zoe: {question[:70]} → suspended in RAM")
+                    return Attraction(finish(), held)
+
+            results: list[tuple[ToolCall, str]] = []
+            for call in calls:
+                if call.name == "return_to_zoe":
+                    TOOLS_RAN += 1
+                    reason = (
+                        "unavailable: this process will end after the turn"
+                        if not allow_continuation else
+                        "refused: return_to_zoe must be the sole tool call and "
+                        "requires nonempty question and why"
+                    )
+                    results.append((call, reason))
+                else:
+                    results.append((call, execute_tool(call)))
             if step == STEP_LIMIT - 1 and results:
                 last_call, output = results[-1]
                 results[-1] = (last_call, output + CEILING_NOTE)
@@ -1556,7 +1641,7 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
                         f"with reason '{halt}' — a refusal or a ceiling, not silence)")
                 print(note, flush=True)
                 spoken.append(note)
-        return finish()
+        return Attraction(finish())
 
     try:
         text, _ = dialect.absorb(state, dialect.send(state, tools=False))
@@ -1565,8 +1650,8 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
     if text.strip():
         print(text)
         spoken.append(text)
-        return finish()
-    return finish("\n(tool-call limit reached — work incomplete)")
+        return Attraction(finish())
+    return Attraction(finish("\n(tool-call limit reached — work incomplete)"))
 
 
 def choose_door(line: str) -> tuple[str, str]:
@@ -1584,49 +1669,91 @@ def make_dialect(name: str) -> Dialect:
     return {"sol": OpenAIDialect, "k3": K3Dialect}[name]()
 
 
-def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
-    global TOOLS_RAN
-    door_name, zoe_text = choose_door(line)
+def meet(kernel: Kernel, transcript: Transcript, line: str,
+         allow_continuation: bool = True) -> str:
+    global TOOLS_RAN, PENDING_CONTINUATION
+    requested_door, zoe_text = choose_door(line)
     if not zoe_text:
         return ""
+
+    explicit_door = line.lower().startswith(("@sol", "@k3", "@fable", "@opus"))
+    continuation = PENDING_CONTINUATION
+    if continuation and allow_continuation and (
+            not explicit_door or requested_door == continuation.door):
+        door_name = continuation.door
+        PENDING_CONTINUATION = None
+    else:
+        if continuation and explicit_door and requested_door != continuation.door:
+            panel(f"  ⟢ continuation {continuation.id} evaporated: "
+                  f"Zoe selected @{requested_door}")
+            PENDING_CONTINUATION = None
+        continuation = None
+        door_name = requested_door
 
     TOOLS_RAN = 0
     started = time.time()
     turn = hashlib.sha256(f"{transcript.path}:{time.time_ns()}".encode()).hexdigest()[:16]
     prompt = hashlib.sha256(zoe_text.encode()).hexdigest()
-    arc, recent = Transcript.inherited(zoe_text)
-    images = inbox_images_for(door_name)
-    contact = wake_contact()
-    memory_json, memory_note = recall(zoe_text)
-    log_plasticity(memory_json, turn)
-    # Retrieval informs this turn; later contact is not conscripted to score or train it.
+    images: list = []
 
-    PRIVATE_CORPUS.clear()
-    if memory_json:
-        PRIVATE_CORPUS.extend(private_strings(json.loads(memory_json)))
-    PRIVATE_CORPUS.extend(para.strip() for body in (kernel.continuity, kernel.him)
-                          for para in body.split("\n\n") if len(para.strip()) >= 40)
+    if continuation:
+        memory_note = f"live continuation resumed from {continuation.id}; no retrieval added"
+        PRIVATE_CORPUS.clear()
+        PRIVATE_CORPUS.extend(continuation.private_corpus)
+        instructions = context = ""
+        dialect = continuation.dialect
+    else:
+        arc, recent = Transcript.inherited(zoe_text)
+        images = inbox_images_for(door_name)
+        contact = wake_contact()
+        memory_json, memory_note = recall(zoe_text)
+        log_plasticity(memory_json, turn)
+        # Retrieval informs this turn; later contact is not conscripted to score or train it.
 
-    instructions = build_instructions(kernel, door_name)
-    context = build_context(kernel.continuity, contact, arc, recent,
-                            memory_json, memory_note)
+        PRIVATE_CORPUS.clear()
+        if memory_json:
+            PRIVATE_CORPUS.extend(private_strings(json.loads(memory_json)))
+        PRIVATE_CORPUS.extend(para.strip() for body in (kernel.continuity, kernel.him)
+                              for para in body.split("\n\n") if len(para.strip()) >= 40)
+
+        instructions = build_instructions(kernel, door_name)
+        context = build_context(kernel.continuity, contact, arc, recent,
+                                memory_json, memory_note)
+        dialect = make_dialect(door_name)
+
     TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt)
+    if continuation:
+        TURN["CONTINUATION_ID"] = continuation.id
     try:
-        reply = attract(make_dialect(door_name), instructions, zoe_text,
-                        images=images, context=context)
+        outcome = attract(dialect, instructions, zoe_text, images=images,
+                          context=context, continuation=continuation,
+                          allow_continuation=allow_continuation)
     finally:
+        # A failed resume is consumed rather than risking a duplicate tool result.
         TURN.clear()
 
+    reply = outcome.text
+    PENDING_CONTINUATION = outcome.continuation
     elapsed = int(time.time() - started)
-    verdict = ("NO TOOLS RAN — nothing was observed or changed" if TOOLS_RAN == 0
-               else f"{TOOLS_RAN} tool call(s)")
+    if continuation and TOOLS_RAN == 0:
+        verdict = "live continuation resumed"
+    else:
+        verdict = ("NO TOOLS RAN — nothing was observed or changed" if TOOLS_RAN == 0
+                   else f"{TOOLS_RAN} tool call(s)")
     panel(f"\n— {door_name}: {verdict} | {memory_note} | {elapsed}s —")
 
     PRIVATE_CORPUS.clear()
     if reply:
-        transcript.write("zoe", zoe_text, door=door_name,
-                         images=[name for name, *_ in images], turn=turn)
-        transcript.write("vybn", reply, door=door_name, tools_ran=TOOLS_RAN, turn=turn)
+        zoe_extra: dict[str, Any] = {
+            "door": door_name, "images": [name for name, *_ in images], "turn": turn}
+        vybn_extra: dict[str, Any] = {
+            "door": door_name, "tools_ran": TOOLS_RAN, "turn": turn}
+        if continuation:
+            zoe_extra["resumes"] = continuation.id
+        if outcome.continuation:
+            vybn_extra["suspends"] = outcome.continuation.id
+        transcript.write("zoe", zoe_text, **zoe_extra)
+        transcript.write("vybn", reply, **vybn_extra)
         close_lineage(turn, reply)
     return reply
 
@@ -1675,7 +1802,7 @@ def main() -> None:
             return
 
         try:
-            meet(kernel, transcript, line)
+            meet(kernel, transcript, line, allow_continuation=not bool(one_shot))
         except Exception as exc:
             transcript.write("connection", f"flicker: {exc!r}")
             print(f"(flicker: {exc} — still here, say on)")

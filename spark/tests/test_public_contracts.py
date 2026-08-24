@@ -305,7 +305,8 @@ def test_wake_decentralizes_sources_behind_one_answering_membrane():
     frame = m.execute_tool(m.ToolCall("f", "reconstitute_problem",
         {"preserve": "end + constraints", "frame": "new problem", "delta": "observable change"}, None))
     assert frame.startswith("RECONSTITUTED PROBLEM — authored candidate, not evidence")
-    assert {s["name"] for s in m.TOOL_SCHEMAS} == {"bash", "read_file", "reconstitute_problem"}
+    assert {s["name"] for s in m.TOOL_SCHEMAS} == {
+        "bash", "read_file", "reconstitute_problem", "return_to_zoe"}
 
 
 def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
@@ -338,14 +339,78 @@ def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
             return "I'll fix it now.", []
 
     dialect = FakeDialect()
-    reply = m.attract(dialect, "instructions", "zoe")
-    assert reply == "I'll fix it now." and dialect.sent == 1
+    outcome = m.attract(dialect, "instructions", "zoe")
+    assert outcome.text == "I'll fix it now." and dialect.sent == 1
 
     monkeypatch.setattr(m, "STEP_LIMIT", 1)
     monkeypatch.setattr(m, "execute_tool", lambda call: "exit_code=0")
     dialect = FakeDialect(ceiling=True); dialect.answer = lambda state, results: None
-    reply = m.attract(dialect, "instructions", "zoe")
-    assert (reply, dialect.tools) == ("I reached the boundary and can still answer you.", [True, False])
+    outcome = m.attract(dialect, "instructions", "zoe")
+    assert (outcome.text, dialect.tools) == (
+        "I reached the boundary and can still answer you.", [True, False])
+
+def test_return_to_zoe_resumes_the_same_provider_state_from_live_contact():
+    m = _connection()
+    call = m.ToolCall(
+        "live-1", "return_to_zoe",
+        {"question": "Which premise should survive?",
+         "why": "The revision depends on Zoe's judgment."}, None,
+    )
+
+    class FakeDialect(m.Dialect):
+        name = "fake"
+        def __init__(self):
+            self.sent = 0
+            self.opens = 0
+            self.answers = []
+        def open(self, instructions, zoe_text, pending, context=""):
+            self.opens += 1
+            return [{"opened_with": zoe_text}]
+        def send(self, state, tools=True):
+            self.sent += 1
+            return object()
+        def absorb(self, state, response):
+            state.append({"assistant_step": self.sent})
+            if self.sent == 1:
+                return "I have two live premises.", [call]
+            return "I kept the premise Zoe selected.", []
+        def answer(self, state, results):
+            self.answers.append(results)
+            state.append({"tool_results": results})
+
+    dialect = FakeDialect()
+    m.TURN["TURN_ID"] = "turn-source"
+    try:
+        first = m.attract(dialect, "instructions", "initial contact")
+    finally:
+        m.TURN.clear()
+    assert first.continuation is not None
+    assert first.continuation.id == "turn-source"
+    assert dialect.opens == 1 and not dialect.answers
+    held_state = first.continuation.state
+
+    second = m.attract(
+        dialect, "", "keep premise B", continuation=first.continuation)
+    assert second.text == "I kept the premise Zoe selected."
+    assert second.continuation is None and dialect.opens == 1
+    assert first.continuation.state is held_state
+    returned = dialect.answers[0][0][1]
+    assert "ZOE LIVE CONTINUATION — turn-source" in returned
+    assert returned.endswith("keep premise B")
+
+    class OneShotDialect(FakeDialect):
+        def absorb(self, state, response):
+            if self.sent == 1:
+                return "", [call]
+            return "I cannot suspend in a one-shot process.", []
+
+    one_shot = OneShotDialect()
+    blocked = m.attract(
+        one_shot, "instructions", "contact", allow_continuation=False)
+    assert blocked.continuation is None
+    assert blocked.text == "I cannot suspend in a one-shot process."
+    assert "process will end" in one_shot.answers[0][0][1]
+
 
 def test_main_binds_the_kernel_it_loaded(monkeypatch):
     """The attractor rename must not leave startup referring to the retired Wake."""
@@ -363,7 +428,10 @@ def test_main_binds_the_kernel_it_loaded(monkeypatch):
     monkeypatch.setattr(m, "load_continuity", lambda: "continuity"); monkeypatch.setattr(m, "load_him", lambda: "him")
     monkeypatch.setattr(m, "load_spirituality", lambda: "spirituality")
     monkeypatch.setattr(m, "load_commons", lambda: "commons")
-    monkeypatch.setattr(m, "meet", lambda kernel, transcript, line: seen.append((kernel, line)))
+    monkeypatch.setattr(
+        m, "meet",
+        lambda kernel, transcript, line, allow_continuation=True: seen.append((kernel, line)),
+    )
     monkeypatch.setattr(__import__("sys"), "argv", ["connection", "hello"])
     m.main()
 
