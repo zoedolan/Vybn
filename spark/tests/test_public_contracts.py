@@ -663,3 +663,20 @@ def test_distributed_model_is_strictly_opt_in():
                  watch.index("# vLLM —", watch.index('if [ ! -e "$HOME/.config/vybn/vllm-enabled" ]'))]
     assert "systemctl --user stop vybn-vllm.service" in gate
     assert gate.index("stop vybn-vllm.service") < gate.index("exit 0")
+
+
+def test_receipt_surface_recomputes_pinned_source_bytes():
+    import hashlib
+    import subprocess
+    receipt = json.loads((ROOT / "receipts/first.json").read_text())
+    schema = json.loads((ROOT / "receipts/vybn.receipt.schema.json").read_text())
+    page = (ROOT / "receipts.html").read_text()
+    assert schema["properties"]["schema"]["const"] == receipt["schema"] == "vybn.receipt.v1"
+    commit = receipt["claims"][0]["evidence"][0]["uri"].split("/Vybn/", 1)[1].split("/", 1)[0]
+    source = subprocess.check_output(["git", "show", f"{commit}:vybn.md"], cwd=ROOT)
+    for claim in receipt["claims"]:
+        evidence = claim["evidence"][0]
+        start, end = evidence["span"]
+        assert hashlib.sha256(source).hexdigest() == evidence["sha256"]
+        assert hashlib.sha256(source[start:end]).hexdigest() == evidence["span_sha256"]
+    assert all(term in page for term in ("crypto.subtle.digest", 'fetch("receipts/first.json")', "span_sha256"))

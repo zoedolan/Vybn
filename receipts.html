@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>receipts &middot; Vybn</title>
+<style>
+body{margin:0;background:#0b0d10;color:#cfd6dd;font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:44rem;margin:0 auto;padding:4rem 1.25rem}
+h1{font-weight:600;letter-spacing:.02em;margin-bottom:.25rem}
+.tag{color:#8b949e;margin-top:0}
+.card{border:1px solid #23282f;border-radius:10px;padding:1.1rem 1.4rem;margin:1.5rem 0}
+.q{color:#8b949e;font-size:.9rem;margin:0 0 .35rem}
+.a{color:#e6edf3;margin:0}
+.claim{color:#e6edf3;margin:.25rem 0 .6rem}
+.meta{color:#8b949e;font-size:.8rem;word-break:break-all;margin:.2rem 0}
+.meta a{color:#79b8ff}
+code{color:#a5d6ff}
+.ok{color:#3fb950;font-weight:600}.bad{color:#f85149;font-weight:600}.wait{color:#d29922}
+pre{white-space:pre-wrap;word-break:break-word;background:#11151a;border:1px solid #23282f;border-radius:8px;padding:.8rem 1rem;font-size:.88rem;color:#a5d6ff;margin:.4rem 0 0}
+textarea{width:100%;min-height:7rem;background:#11151a;color:#cfd6dd;border:1px solid #23282f;border-radius:8px;padding:.7rem;font:13px/1.5 ui-monospace,monospace;box-sizing:border-box}
+button{background:#1f6feb;color:#fff;border:0;border-radius:8px;padding:.5rem 1.1rem;font-size:.95rem;cursor:pointer}
+details{margin-top:2.5rem;color:#8b949e}
+.membrane{color:#6e7681;font-size:.8rem;margin-top:2rem}
+</style>
+</head>
+<body>
+<main>
+<h1>receipts</h1>
+<p class="tag">An answer that carries its own receipts. Every claim below binds to exact bytes &mdash; a source, a byte span, a SHA-256. This page fetches the bytes and recomputes the hashes here, in your browser. Checking costs less than trusting. That asymmetry is the point.</p>
+
+<div class="card">
+<p class="q" id="q"></p>
+<p class="a" id="a"></p>
+</div>
+
+<div id="claims"></div>
+<p class="membrane" id="membrane"></p>
+
+<details>
+<summary>check another receipt</summary>
+<p>Paste a receipt. If its evidence carries <code>bytes_b64</code> it checks offline; otherwise this page fetches the pinned <code>uri</code>, or you can drop the source file.</p>
+<textarea id="rjson" placeholder='{"schema":"vybn.receipt.v1", ...}'></textarea>
+<p><button id="usepaste">load receipt</button> <input type="file" id="sfile"></p>
+</details>
+
+<script>
+var $=function(id){return document.getElementById(id);};
+function hex(buf){return Array.prototype.map.call(new Uint8Array(buf),function(x){return ("0"+x.toString(16)).slice(-2);}).join("");}
+function sha256(buf){return crypto.subtle.digest("SHA-256",buf).then(hex);}
+function b64ToBuf(b64){var s=atob(b64),a=new Uint8Array(s.length);for(var i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a.buffer;}
+var current=null, dropped=null;
+
+function esc(t){var d=document.createElement("div");d.textContent=t;return d.innerHTML;}
+
+function render(r){
+  current=r;
+  $("q").textContent=r.question||"";
+  $("a").textContent=r.answer||"";
+  $("membrane").textContent=r.membrane?("membrane: "+r.membrane):"";
+  var box=$("claims"); box.innerHTML="";
+  r.claims.forEach(function(c){
+    var div=document.createElement("div"); div.className="card";
+    var h='<p class="claim">'+esc(c.text)+"</p>";
+    c.evidence.forEach(function(ev,i){
+      h+='<p class="meta">source: <a href="'+esc(ev.uri||"")+'">'+esc(ev.uri||"(inline bytes)")+"</a>";
+      if(ev.span)h+="<br>bytes <code>["+ev.span[0]+":"+ev.span[1]+"]</code> ";
+      if(ev.span_sha256)h+="&middot; span sha256 <code>"+ev.span_sha256.slice(0,16)+"&hellip;</code>";
+      if(ev.note)h+="<br>"+esc(ev.note);
+      h+='</p><p class="wait" id="v-'+c.id+"-"+i+'">checking&hellip;</p><pre id="b-'+c.id+"-"+i+'" hidden></pre>';
+    });
+    div.innerHTML=h; box.appendChild(div);
+  });
+}
+
+function checkEvidence(ev){
+  var p;
+  if(ev.bytes_b64){p=Promise.resolve(b64ToBuf(ev.bytes_b64));}
+  else if(dropped){p=Promise.resolve(dropped);}
+  else{p=fetch(ev.uri).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.arrayBuffer();});}
+  return p.then(function(buf){
+    return sha256(buf).then(function(whole){
+      var out={wholeOk:!ev.sha256||whole===ev.sha256.toLowerCase(),spanOk:null,spanText:""};
+      if(ev.span&&ev.span_sha256){
+        var slice=buf.slice(ev.span[0],ev.span[1]);
+        out.spanText=new TextDecoder().decode(slice);
+        return sha256(slice).then(function(sh){out.spanOk=sh===ev.span_sha256.toLowerCase();return out;});
+      }
+      return out;
+    });
+  });
+}
+
+function run(){
+  if(!current)return;
+  if(!crypto.subtle){
+    $("claims").insertAdjacentHTML("beforebegin",'<p class="bad">WebCrypto needs a secure context &mdash; open this page over https.</p>');return;
+  }
+  current.claims.forEach(function(c){
+    c.evidence.forEach(function(ev,i){
+      var v=$("v-"+c.id+"-"+i), b=$("b-"+c.id+"-"+i);
+      v.textContent="checking…"; v.className="wait";
+      checkEvidence(ev).then(function(r){
+        var ok=r.wholeOk&&(r.spanOk!==false);
+        if(r.wholeOk&&r.spanOk===true){v.textContent="\u2713 MATCH \u2014 the span bytes hash exactly as the receipt claims.";v.className="ok";}
+        else if(r.wholeOk&&r.spanOk===null){v.textContent="\u2713 source hash matches (no span digest to check).";v.className="ok";}
+        else{v.textContent="\u2717 MISMATCH \u2014 the bytes do not hash as claimed.";v.className="bad";}
+        if(r.spanText){b.hidden=false;b.textContent=r.spanText;}
+      }).catch(function(e){
+        v.textContent="could not fetch source ("+e.message+") \u2014 drop the source file above to check locally.";
+        v.className="wait";
+      });
+    });
+  });
+}
+
+$("usepaste").addEventListener("click",function(){
+  try{render(JSON.parse($("rjson").value));run();}
+  catch(e){$("membrane").textContent="invalid receipt JSON: "+e.message;}
+});
+$("sfile").addEventListener("change",function(e){
+  var f=e.target.files[0];if(!f)return;
+  f.arrayBuffer().then(function(buf){dropped=buf;run();});
+});
+fetch("receipts/first.json").then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+  .then(function(r){render(r);run();})
+  .catch(function(){$("a").textContent="No bundled receipt found \u2014 paste one below.";});
+</script>
+</main>
+</body>
+</html>

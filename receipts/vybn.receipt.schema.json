@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zoedolan.github.io/Vybn/receipts/vybn.receipt.schema.json",
+  "title": "vybn.receipt.v1",
+  "description": "An answer that carries its own receipts. Every load-bearing claim is bound to evidence a cheap machine can check: exact source bytes by hash and byte span. The machine verifies integrity; the reader judges whether the span supports the claim. Verification must cost less than generation. That asymmetry is the point.",
+  "type": "object",
+  "required": ["schema", "issued", "issuer", "question", "answer", "claims"],
+  "properties": {
+    "schema": {"const": "vybn.receipt.v1"},
+    "issued": {"type": "string"},
+    "issuer": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string"},
+        "uri": {"type": "string"}
+      }
+    },
+    "question": {"type": "string"},
+    "answer": {"type": "string"},
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "evidence"],
+        "properties": {
+          "id": {"type": "string"},
+          "text": {"type": "string"},
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["type"],
+              "properties": {
+                "type": {"const": "source"},
+                "uri": {"type": "string", "description": "where the source bytes live; pin to immutable content (e.g. a commit-pinned raw URL)"},
+                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "digest of the entire source byte string"},
+                "span": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 2, "maxItems": 2, "description": "byte offsets [start, end) of the cited passage inside the source"},
+                "span_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "digest of exactly the span bytes"},
+                "bytes_b64": {"type": "string", "description": "inline source bytes, base64; when present the verifier needs no network"},
+                "note": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "membrane": {"type": "string", "description": "why every cited byte is safe to carry"}
+  }
+}
