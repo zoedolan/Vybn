@@ -3,6 +3,7 @@ Description=Vybn vLLM cluster (Nemotron 120B, 2 Sparks via Ray)
 After=network-online.target
 Wants=network-online.target
 ConditionPathExists=/var/run/docker.sock
+ConditionPathExists=%h/.config/vybn/vllm-enabled
 StartLimitIntervalSec=600
 StartLimitBurst=5
 

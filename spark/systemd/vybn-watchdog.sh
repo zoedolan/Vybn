@@ -42,6 +42,17 @@ check_http chat-api     http://127.0.0.1:8420/api/health vybn-portal.service 200
 # Zoe's private, read-only view of the working copy.
 check_http preview      http://127.0.0.1:8480/ vybn-preview.service 200
 
+# The distributed model is explicitly opt-in. An absent marker means off,
+# not unhealthy: a watchdog must never turn expensive compute on by itself.
+if [ ! -e "$HOME/.config/vybn/vllm-enabled" ]; then
+  if systemctl --user is-active --quiet vybn-vllm.service; then
+    log "STOP vybn-vllm.service — opt-in marker absent"
+    systemctl --user stop vybn-vllm.service
+  fi
+  log "off vllm (opt-in marker absent)"
+  exit 0
+fi
+
 # vLLM — /v1/models. A cold load can take 10–13 minutes. State comes
 # before timestamps: systemd retains the prior ActiveEnterTimestamp while a new
 # activation is still in ExecStartPre, so age arithmetic there is stale.

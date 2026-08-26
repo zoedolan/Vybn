@@ -653,3 +653,13 @@ def test_love_profile_reuses_connection_record(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "PROFILE", "love")
     monkeypatch.setattr(m, "LOVE_PROFILE_PATH", profile)
     assert m.load_profile() == "private profile"
+
+def test_distributed_model_is_strictly_opt_in():
+    unit = (ROOT / "spark/systemd/vybn-vllm.service").read_text()
+    watch = (ROOT / "spark/systemd/vybn-watchdog.sh").read_text()
+    marker = "%h/.config/vybn/vllm-enabled"
+    assert f"ConditionPathExists={marker}" in unit
+    gate = watch[watch.index('if [ ! -e "$HOME/.config/vybn/vllm-enabled" ]'):
+                 watch.index("# vLLM —", watch.index('if [ ! -e "$HOME/.config/vybn/vllm-enabled" ]'))]
+    assert "systemctl --user stop vybn-vllm.service" in gate
+    assert gate.index("stop vybn-vllm.service") < gate.index("exit 0")
