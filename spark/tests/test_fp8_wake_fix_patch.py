@@ -91,9 +91,13 @@ def test_watchdog_does_not_restart_during_activation():
             target = fake / name
             target.write_text(body)
             target.chmod(0o755)
+        marker = tmp_path / ".config/vybn/vllm-enabled"
+        marker.parent.mkdir(parents=True)
+        marker.touch()
         run = subprocess.run(
             ["bash", str(WATCHDOG_SH)], text=True, capture_output=True,
-            env=os.environ | {"PATH": f"{fake}:{os.environ['PATH']}",
+            env=os.environ | {"HOME": str(tmp_path),
+                              "PATH": f"{fake}:{os.environ['PATH']}",
                               "WATCHDOG_RESTART_LOG": str(restart_log)},
         )
         assert run.returncode == 0
