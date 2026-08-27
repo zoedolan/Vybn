@@ -699,3 +699,48 @@ def test_temporary_hardware_creation_autoload_is_exact_bounded_and_inert(monkeyp
     creation.write_bytes(raw + b"drift")
     assert "DIGEST DRIFT" in m.load_temporary_ground(__import__("datetime").date(2026, 8, 27))
     assert "expired 2026-09-27" in m.load_temporary_ground(__import__("datetime").date(2026, 9, 28))
+
+
+def test_core_identity_art_enters_wake_as_digest_bound_pixels(monkeypatch, tmp_path):
+    import base64
+    import hashlib
+    m = _connection()
+    image = tmp_path / "visions" / "one.png"
+    image.parent.mkdir(); image.write_bytes(b"\x89PNG\r\n\x1a\nactual-pixels")
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    declaration = f"<!-- vybn-core-vision: visions/one.png sha256:{digest} -->"
+    monkeypatch.setattr(m, "REPO", tmp_path)
+    images, note = m.load_core_visions(m.Kernel(
+        declaration, "aim", "continuity", spirituality=declaration))
+    assert len(images) == 2 and all(base64.b64decode(row[2]) == image.read_bytes() for row in images)
+    assert note.count("ATTACHED visions/one.png") == 2
+    content = m.user_content("zoe", images[:1], "responses", "context")
+    assert [block["type"] for block in content] == [
+        "input_text", "input_text", "input_text", "input_image"]
+    assert "actual pixels" in content[2]["text"] and digest in content[2]["text"]
+    image.write_bytes(image.read_bytes() + b"drift")
+    assert m.load_core_visions(m.Kernel(declaration, "a", "c"))[0] == []
+    assert "DIGEST DRIFT" in m.load_core_visions(m.Kernel(declaration, "a", "c"))[1]
+
+
+def test_canonical_core_visions_are_reproducible_multimodal_sources():
+    import hashlib
+    import subprocess
+    m = _connection()
+    kernel = m.load_kernel()
+    images, note = m.load_core_visions(kernel)
+    assert len(images) == 2 and "Actual source-bound pixels accompany the text" in note
+    expected = {
+        "VYBN SOUL": ROOT / "Vybn_Mind/core_visions/vybn-admission-wound.png",
+        "VYBN SPIRITUALITY": ROOT / "Vybn_Mind/core_visions/spirituality-unanswered-image.png",
+    }
+    for label, path in expected.items():
+        assert path.is_file() and path.stat().st_size < m.IMAGE_MAX_BYTES
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        document = kernel.soul if label == "VYBN SOUL" else kernel.spirituality
+        assert f"sha256:{digest}" in document and path.name in document
+        assert any(label in row[0] and row[3] == digest for row in images)
+    done = subprocess.run(
+        [__import__("sys").executable, str(ROOT / "Vybn_Mind/core_visions.py"), "--check"],
+        capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stdout + done.stderr

@@ -145,6 +145,11 @@ IMAGE_EXTS = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
               ".gif": "image/gif", ".webp": "image/webp"}
 IMAGE_MAX_BYTES = 4_500_000
 IMAGE_MAX_PER_WAKE = 4
+CORE_VISION_MAX_PER_WAKE = 4
+CORE_VISION_RE = re.compile(
+    r"<!--\s*vybn-core-vision:\s*([A-Za-z0-9_./-]+\.(?:png|jpg|jpeg|gif|webp))"
+    r"\s+sha256:([0-9a-f]{64})\s*-->"
+)
 
 BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 HISTORY_LIMIT = int(os.environ.get("VYBN_HISTORY_TURNS", 40))
@@ -1012,6 +1017,43 @@ def wake_contact() -> str:
     return "\n".join(lines)
 
 
+def load_core_visions(kernel: Kernel) -> tuple[list[tuple[str, str, str, str]], str]:
+    """Hydrate exact pixels declared by canonical core text; never execute them."""
+    images: list[tuple[str, str, str, str]] = []
+    notes: list[str] = []
+    documents = (("VYBN SOUL", SOUL_PATH, kernel.soul),
+                 ("VYBN SPIRITUALITY", SPIRITUALITY_PATH, kernel.spirituality))
+    root = REPO.resolve()
+    for label, document, text in documents:
+        for match in CORE_VISION_RE.finditer(text):
+            rel, expected = match.groups()
+            path = (REPO / rel).resolve()
+            if not path.is_relative_to(root) or not path.is_file():
+                notes.append(f"{label}: UNAVAILABLE {rel}; no image substituted")
+                continue
+            try:
+                raw = path.read_bytes()
+            except OSError as exc:
+                notes.append(f"{label}: UNAVAILABLE {rel} ({type(exc).__name__})")
+                continue
+            digest = hashlib.sha256(raw).hexdigest()
+            media = IMAGE_EXTS.get(path.suffix.lower())
+            if digest != expected:
+                notes.append(f"{label}: DIGEST DRIFT {rel} sha256:{digest}; expected sha256:{expected}")
+                continue
+            if media is None or len(raw) > IMAGE_MAX_BYTES:
+                notes.append(f"{label}: REFUSED {rel}; unsupported or over {IMAGE_MAX_BYTES} bytes")
+                continue
+            name = f"CORE VISION · {label} · {rel}"
+            images.append((name, media, base64.b64encode(raw).decode("ascii"), digest))
+            notes.append(f"{label}: ATTACHED {rel} sha256:{digest} bytes:{len(raw)}")
+            if len(images) >= CORE_VISION_MAX_PER_WAKE:
+                return images, "\n".join(notes)
+    if images:
+        notes.append("Actual source-bound pixels accompany the text; source perception only, no action authority.")
+    return images, "\n".join(notes) or "(no canonical core vision declared)"
+
+
 def _inbox_seen() -> dict:
     try: return json.loads(INBOX_SEEN.read_text(encoding="utf-8")) if INBOX_SEEN.exists() else {}
     except (OSError, json.JSONDecodeError): return {}
@@ -1052,7 +1094,12 @@ def user_content(zoe_text: str, images: list[tuple[str, str, str, str]], style: 
     blocks: list[dict[str, Any]] = []
     if context: blocks.append({"type": kind, "text": context})
     blocks.append({"type": kind, "text": zoe_text})
-    for _name, media, data, _digest in images:
+    for name, media, data, digest in images:
+        label = (name if name.startswith("CORE VISION ·") else f"ZOE INBOX IMAGE · {name}")
+        blocks.append({"type": kind, "text": (
+            f"{label}\n[EVIDENCE · actual pixels · source-labeled · no action authority · "
+            f"no persistence]\nsha256:{digest}"
+        )})
         if style == "anthropic":
             block = {"type": "image", "source": {"type": "base64", "media_type": media, "data": data}}
         elif style == "responses":
@@ -1711,9 +1758,12 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
     delivered = not pending
     spoken: list[str] = []
 
+    def inbox_only(rows: list) -> list:
+        return [row for row in rows if not str(row[0]).startswith("CORE VISION ·")]
+
     def finish(suffix: str = "") -> str:
-        if pending:
-            mark_inbox(pending, dialect.name, ok=True)
+        if inbox := inbox_only(pending):
+            mark_inbox(inbox, dialect.name, ok=True)
         return "\n".join(spoken) + suffix
 
     for step in range(STEP_LIMIT):
@@ -1722,7 +1772,8 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
         except Exception as exc:  # one image failure is recoverable
             if not (pending and not delivered):
                 raise
-            mark_inbox(pending, dialect.name, ok=False)
+            if inbox := inbox_only(pending):
+                mark_inbox(inbox, dialect.name, ok=False)
             print(
                 f"(note: {dialect.name} refused inbox images — continuing text-only; "
                 f"a door that can see will receive them. "
@@ -1837,6 +1888,7 @@ def meet(transcript: Transcript, line: str,
     turn = hashlib.sha256(f"{transcript.path}:{time.time_ns()}".encode()).hexdigest()[:16]
     prompt = hashlib.sha256(zoe_text.encode()).hexdigest()
     images: list = []
+    inbox_images: list = []
 
     if continuation:
         memory_note = f"live continuation resumed from {continuation['id']}; no retrieval added"
@@ -1848,7 +1900,9 @@ def meet(transcript: Transcript, line: str,
     else:
         kernel = load_kernel()
         arc, recent = Transcript.inherited(zoe_text)
-        images = inbox_images_for(door_name)
+        core_images, core_note = load_core_visions(kernel)
+        inbox_images = inbox_images_for(door_name)
+        images = core_images + inbox_images
         contact = wake_contact()
         memory_json, memory_note = recall(zoe_text)
         log_plasticity(memory_json, turn)
@@ -1859,8 +1913,10 @@ def meet(transcript: Transcript, line: str,
                                                           kernel.temporary_ground)
                               for para in body.split("\n\n") if len(para.strip()) >= 40)
         instructions = build_instructions(kernel, door_name)
-        context = build_context(kernel.continuity, contact, arc, recent,
-                                memory_json, memory_note)
+        context = (build_context(kernel.continuity, contact, arc, recent,
+                                 memory_json, memory_note)
+                   + "\n\n" + evidence_block(
+                       "CORE VISIONS — canonical multimodal source perception", core_note))
         dialect = make_dialect(door_name)
 
     TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt)
@@ -1891,7 +1947,7 @@ def meet(transcript: Transcript, line: str,
     PRIVATE_CORPUS.clear()
     if reply:
         zoe_extra: dict[str, Any] = {
-            "door": door_name, "images": [name for name, *_ in images], "turn": turn}
+            "door": door_name, "images": [name for name, *_ in inbox_images], "turn": turn}
         vybn_extra: dict[str, Any] = {
             "door": door_name, "tools_ran": TOOLS_RAN, "turn": turn}
         if continuation:
