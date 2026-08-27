@@ -131,6 +131,12 @@ CONTINUATION_KEY = HOME / ".config/vybn/continuation-keys" / f"{PROFILE}.key"
 CONTINUATION_MAX_BYTES = int(os.environ.get("VYBN_CONTINUATION_MAX_BYTES", 8 * 1024 ** 2))
 CONTINUATION_SCHEMA = "vybn.provider_continuation.v1"
 CONVEYANCES = HOME / ".local" / "state" / "vybn" / "conveyances"
+# Zoe-authorized temporary ground while the constitutive core is redesigned.
+# Pin the immutable creation: drift must be visible, never fluently substituted.
+TEMPORARY_GROUND_PATH = (CONVEYANCES / "artifacts" /
+                         "four-sparks-want-wants-itself-20260827.html")
+TEMPORARY_GROUND_SHA256 = "44fac7bd5465ecec5cb2dc575fee991e9b3f3ac781715fcc7ae21f0c6950111c"
+TEMPORARY_GROUND_UNTIL = _dt.date(2026, 9, 27)
 USAGE_LOG = HOME / ".cache" / "vybn-phase" / "api_usage.jsonl"
 REPO_STATE_PATH = REPO / "repo_mapping_output" / "repo_state.json"
 INBOX_IMAGES = REPO / "inbox" / "images"
@@ -222,6 +228,7 @@ class Kernel:
     him: str = ""
     commons: str = ""
     spirituality: str = ""
+    temporary_ground: str = ""
 
 
 SourceSnapshot = namedtuple("SourceSnapshot", "path raw sha256")
@@ -350,6 +357,33 @@ def load_profile() -> str:
             if PROFILE == "love" else "")
 
 
+def load_temporary_ground(today: _dt.date | None = None) -> str:
+    """Reread one pinned code-creation as temporary ideaspace, never execution."""
+    label = "TEMPORARY CREATIVE + HARDWARE GROUND"
+    today = today or _dt.date.today()
+    if today > TEMPORARY_GROUND_UNTIL:
+        return (f"{label}\nstatus: expired {TEMPORARY_GROUND_UNTIL.isoformat()}; "
+                "not loaded — Zoe may renew it")
+    try:
+        raw = TEMPORARY_GROUND_PATH.read_bytes()
+    except OSError as exc:
+        return (f"{label}\nstatus: UNAVAILABLE ({type(exc).__name__}) at "
+                f"{TEMPORARY_GROUND_PATH}; no reconstruction substituted")
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != TEMPORARY_GROUND_SHA256:
+        return (f"{label}\nstatus: DIGEST DRIFT sha256:{digest}; expected "
+                f"sha256:{TEMPORARY_GROUND_SHA256}; unreviewed replacement not loaded")
+    return (f"{label} — exact immutable code-creation, comments and behavior included\n"
+            f"source: {TEMPORARY_GROUND_PATH}\nsha256: {digest}\nbytes: {len(raw)}\n"
+            f"autoload_until: {TEMPORARY_GROUND_UNTIL.isoformat()}\n\n"
+            "PURPOSE: keep the four Sparks, CRS812, path-dependent perspectives, "
+            "fabric unknowns, costs, and matched controls inside the active ideaspace "
+            "while the constitutive core is redesigned.\n"
+            "BOUNDARY: source perception only. Scripts do not execute; claims retain "
+            "their stated status; beauty grants no action authority.\n\n"
+            + raw.decode("utf-8", "replace"))
+
+
 def load_continuity() -> str:
     for path in CONTINUITY_PATHS:
         if not path.exists(): continue
@@ -397,7 +431,8 @@ def load_aim() -> str:
 
 def load_kernel() -> Kernel:
     """Re-read every identity-bearing source for one ordinary model wake."""
-    return Kernel(*(load() for load in (load_soul, load_aim, load_continuity, load_him, load_commons, load_spirituality)))
+    return Kernel(load_soul(), load_aim(), load_continuity(), load_him(),
+                  load_commons(), load_spirituality(), load_temporary_ground())
 
 
 def aim_field(name: str) -> str:
@@ -1239,6 +1274,7 @@ def build_instructions(kernel: Kernel, door: str) -> str:
         source_closure,
         f"DOOR\nYou are presently instantiated through the truthful {door} door."
         f"\n{door_mind(door)}",
+        kernel.temporary_ground or "TEMPORARY CREATIVE + HARDWARE GROUND unavailable: not loaded.",
         _document_section("VYBN SOUL", SOUL_PATH, kernel.soul),
         _document_section("THE AIM", AIM_PATH, kernel.aim),
         _document_section("VYBN SPIRITUALITY", SPIRITUALITY_PATH, kernel.spirituality),
@@ -1819,7 +1855,8 @@ def meet(transcript: Transcript, line: str,
         PRIVATE_CORPUS.clear()
         if memory_json:
             PRIVATE_CORPUS.extend(private_strings(json.loads(memory_json)))
-        PRIVATE_CORPUS.extend(para.strip() for body in (kernel.continuity, kernel.him)
+        PRIVATE_CORPUS.extend(para.strip() for body in (kernel.continuity, kernel.him,
+                                                          kernel.temporary_ground)
                               for para in body.split("\n\n") if len(para.strip()) >= 40)
         instructions = build_instructions(kernel, door_name)
         context = build_context(kernel.continuity, contact, arc, recent,

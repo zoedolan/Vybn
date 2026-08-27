@@ -316,11 +316,12 @@ def test_return_to_zoe_seals_and_reconstructs_provider_visible_state(monkeypatch
 def test_identity_kernel_is_reassembled_fresh_for_each_ordinary_wake(monkeypatch):
     m = _connection(); version = {"n": 1}
     for name, letter in (("load_soul", "s"), ("load_aim", "a"), ("load_continuity", "c"),
-                         ("load_him", "h"), ("load_commons", "x"), ("load_spirituality", "p")):
+                         ("load_him", "h"), ("load_commons", "x"), ("load_spirituality", "p"),
+                         ("load_temporary_ground", "g")):
         monkeypatch.setattr(m, name, lambda letter=letter: f"{letter}{version['n']}")
-    assert m.load_kernel() == m.Kernel("s1", "a1", "c1", "h1", "x1", "p1")
+    assert m.load_kernel() == m.Kernel("s1", "a1", "c1", "h1", "x1", "p1", "g1")
     version["n"] = 2
-    assert m.load_kernel() == m.Kernel("s2", "a2", "c2", "h2", "x2", "p2")
+    assert m.load_kernel() == m.Kernel("s2", "a2", "c2", "h2", "x2", "p2", "g2")
     assert "kernel = load_kernel()" in __import__("inspect").getsource(m.meet)
 
 
@@ -680,3 +681,21 @@ def test_receipt_surface_recomputes_pinned_source_bytes():
         assert hashlib.sha256(source).hexdigest() == evidence["sha256"]
         assert hashlib.sha256(source[start:end]).hexdigest() == evidence["span_sha256"]
     assert all(term in page for term in ("crypto.subtle.digest", 'fetch("receipts/first.json")', "span_sha256"))
+
+
+def test_temporary_hardware_creation_autoload_is_exact_bounded_and_inert(monkeypatch, tmp_path):
+    m = _connection()
+    creation = tmp_path / "four-sparks.html"
+    raw = b"<html><script>never_execute()</script><p>four Sparks</p></html>"
+    creation.write_bytes(raw)
+    monkeypatch.setattr(m, "TEMPORARY_GROUND_PATH", creation)
+    monkeypatch.setattr(m, "TEMPORARY_GROUND_SHA256", __import__("hashlib").sha256(raw).hexdigest())
+    monkeypatch.setattr(m, "TEMPORARY_GROUND_UNTIL", __import__("datetime").date(2026, 9, 27))
+    loaded = m.load_temporary_ground(__import__("datetime").date(2026, 8, 27))
+    assert raw.decode() in loaded and "Scripts do not execute" in loaded
+    assert "sha256: " + __import__("hashlib").sha256(raw).hexdigest() in loaded
+    prompt = m.build_instructions(m.Kernel("s", "a", "c", "h", temporary_ground=loaded), "sol")
+    assert loaded in prompt
+    creation.write_bytes(raw + b"drift")
+    assert "DIGEST DRIFT" in m.load_temporary_ground(__import__("datetime").date(2026, 8, 27))
+    assert "expired 2026-09-27" in m.load_temporary_ground(__import__("datetime").date(2026, 9, 28))
