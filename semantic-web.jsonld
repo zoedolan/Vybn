@@ -87,7 +87,7 @@
   "agentActions": [
     {
       "id": "orient",
-      "does": "read README, semantic manifest, vybn.md, continuity, and foundations"
+      "does": "read README, semantic manifest, the verified vybn.core.html score, continuity, and foundations"
     },
     {
       "id": "validate",

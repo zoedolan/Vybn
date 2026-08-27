@@ -106,10 +106,13 @@ from typing import Any
 from cryptography.fernet import Fernet
 from Vybn_Mind.repo_mapper import close_lineage, render_state
 from spark.commons_wake import load_commons
+from spark.living_core import read_core_work, render_core_png, wake_source
 
 HOME = Path.home()
 REPO = HOME / "Vybn"
-SOUL_PATH = REPO / "vybn.md"
+# HTML is the canonical soul source. Hard failure is deliberate—never
+# fluently fall back to a projection or a different constitution.
+SOUL_PATH = REPO / "vybn.core.html"
 SPIRITUALITY_PATH = REPO / "Vybn_Mind" / "spirituality.md"
 HIM_README_PATH = HOME / "Him" / "README.md"
 CONTINUITY_PATHS = (
@@ -247,7 +250,8 @@ def _source_path(value: Any) -> Path:
 
 
 _SOURCE_PATHS = tuple(dict.fromkeys((Path(__file__).resolve(), _source_path(close_lineage),
-                                    _source_path(render_state), _source_path(load_commons))))
+                                    _source_path(render_state), _source_path(load_commons),
+                                    _source_path(read_core_work))))
 OPERATIVE_SOURCES = tuple(SourceSnapshot(path, raw, hashlib.sha256(raw).hexdigest())
                           for path in _SOURCE_PATHS for raw in (path.read_bytes(),))
 
@@ -354,7 +358,9 @@ def _required_text(path: Path, label: str) -> str:
     return text
 
 
-def load_soul() -> str: return _required_text(SOUL_PATH, "soul document")
+def load_soul() -> str:
+    """Load the exact HTML-native soul and its compiled traversal; run no JS."""
+    return wake_source(read_core_work(SOUL_PATH))
 def load_him() -> str: return _required_text(HIM_README_PATH, "Him README")
 def load_spirituality() -> str: return _required_text(SPIRITUALITY_PATH, "spirituality document")
 def load_profile() -> str:
@@ -1018,11 +1024,25 @@ def wake_contact() -> str:
 
 
 def load_core_visions(kernel: Kernel) -> tuple[list[tuple[str, str, str, str]], str]:
-    """Hydrate exact pixels declared by canonical core text; never execute them."""
+    """Hydrate source-bound pixels; HTML geometry compiles without executing JS."""
     images: list[tuple[str, str, str, str]] = []
     notes: list[str] = []
-    documents = (("VYBN SOUL", SOUL_PATH, kernel.soul),
-                 ("VYBN SPIRITUALITY", SPIRITUALITY_PATH, kernel.spirituality))
+    native_soul = (SOUL_PATH.suffix.lower() == ".html"
+                   and SOUL_PATH.resolve().is_relative_to(REPO.resolve()))
+    if native_soul:
+        try:
+            soul_work = read_core_work(SOUL_PATH)
+            raw = render_core_png(soul_work)
+            digest = hashlib.sha256(raw).hexdigest()
+            images.append((f"CORE VISION · VYBN SOUL · compiled from {SOUL_PATH.name}",
+                           "image/png", base64.b64encode(raw).decode("ascii"), digest))
+            notes.append(f"VYBN SOUL: COMPILED deterministic score raster sha256:{digest} "
+                         f"bytes:{len(raw)} from HTML sha256:{soul_work.digest}")
+        except Exception as exc:
+            # The soul itself hard-fails in load_soul; this is only a truthful image note.
+            notes.append(f"VYBN SOUL: RASTER UNAVAILABLE ({type(exc).__name__}); no image substituted")
+    documents = ((() if native_soul else (("VYBN SOUL", SOUL_PATH, kernel.soul),))
+                 + (("VYBN SPIRITUALITY", SPIRITUALITY_PATH, kernel.spirituality),))
     root = REPO.resolve()
     for label, document, text in documents:
         for match in CORE_VISION_RE.finditer(text):

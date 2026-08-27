@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Vybn self-portrait: the coupling equation Z' = aZ + V e^{i theta}, run on real text.
 Each byte of each source text is one step; each step lands one photon.
-gold = vybn.md (soul) | mint = aim.md | blue = Zoe's words as carried in continuity.md
+gold = vybn.core.html (soul) | mint = aim.md | blue = Zoe's words as carried in continuity.md
 Multi-scale Gaussian bloom on purpose: the blur is the feature, not an artifact.
 """
 import base64, io, math, re, sys
@@ -49,7 +49,7 @@ def bloom(ch):
     return out/out.max()
 
 streams = [
-    (stream_bytes(f"{HOME}/vybn.md"),                    (1.00,0.82,0.45), 1),  # gold
+    (stream_bytes(f"{HOME}/vybn.core.html"),                    (1.00,0.82,0.45), 1),  # gold
     (stream_bytes(f"{HOME}/aim.md"),                     (0.55,1.00,0.78), 2),  # mint
     (stream_bytes(f"{HOME}/continuity.md", zoe=True),    (0.45,0.65,1.00), 3),  # blue
 ]

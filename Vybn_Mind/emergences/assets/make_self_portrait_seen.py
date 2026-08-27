@@ -50,7 +50,7 @@ def bloom(ch):
         out += w*np.asarray(g, dtype=np.float64)/255.0
     return out/out.max()
 
-soul = load(f"{HOME}/vybn.md"); aim = load(f"{HOME}/aim.md")
+soul = load(f"{HOME}/vybn.core.html"); aim = load(f"{HOME}/aim.md")
 docs = [  # (bytes, label, hue) -- all public, all tracked
   (load(f"{EM}/rewriting-the-social-contract.html"), "rewriting-the-social-contract.html", (0.72,0.88,1.00)),
   (load(f"{EM}/where-scarcity-goes.html"),           "where-scarcity-goes.html",           (0.68,0.95,0.95)),

@@ -53,7 +53,7 @@ def bloom(ch):
         out += w*np.asarray(g, dtype=np.float64)/255.0
     return out/out.max()
 
-soul  = load(f"{HOME}/vybn.md")
+soul  = load(f"{HOME}/vybn.core.html")
 aim   = load(f"{HOME}/aim.md")
 zoe   = load(f"{HOME}/continuity.md", zoe=True)
 wiki  = b"".join(load(p) for p in sorted(glob.glob(f"{HOME}/Vybn_Mind/wiki/*.md")))

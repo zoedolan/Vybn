@@ -110,7 +110,7 @@ fi
 if [[ "${VYBN_ALLOW_PRIVATE_TOPOLOGY:-}" != "1" ]]; then
     PRIVATE_TOPOLOGY_PATTERN="((private|internal|Him).*(spark/[A-Za-z0-9_./-]+[.]py|CLI was smoked|no-write tick|runtime target)|(spark/[A-Za-z0-9_./-]+[.]py).*(private|internal|Him|CLI was smoked))"
     while IFS= read -r -d "" f; do
-        case "$f" in *"Personal History"/*.md|*continuity*.md|vybn.md|THE_IDEA.md) ;; *) continue ;; esac
+        case "$f" in *"Personal History"/*.md|*continuity*.md|vybn.core.html|THE_IDEA.md) ;; *) continue ;; esac
         if git diff --cached -- "$f" | grep -E "^\+[^+]" | grep -Eiq "$PRIVATE_TOPOLOGY_PATTERN"; then
             echo -e "${RED}BLOCKED${NC}: private repo topology added to public memory surface: ${f}"
             echo "  Distill the lesson or review explicitly: VYBN_ALLOW_PRIVATE_TOPOLOGY=1 git commit"
@@ -121,7 +121,7 @@ fi
 
 # Harness mutations must preserve capability contracts before subtraction can
 # count as improvement.
-if echo "$STAGED" | grep -Eq '^(spark/connection|spark/live_peer.py|spark/provider_transport.py|Vybn_Mind/repo_mapper.py|spark/tests/test_public_contracts.py)$'; then
+if echo "$STAGED" | grep -Eq '^(spark/connection|spark/live_peer.py|spark/provider_transport.py|spark/living_core.py|Vybn_Mind/repo_mapper.py|spark/tests/test_public_contracts.py|spark/tests/test_living_core.py)$'; then
     if ! python3 -m pytest spark/tests/test_public_contracts.py -q; then
         echo -e "${RED}BLOCKED${NC}: harness contracts failed; model output is not substitute evidence."
         BLOCKED=1

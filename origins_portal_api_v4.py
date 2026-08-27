@@ -38,6 +38,7 @@ from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 import httpx
 import uvicorn
+from spark.living_core import read_core_work, wake_source
 # VYBN_API_BASE — public base URL for this portal. Never hardcode;
 VYBN_API_BASE = os.getenv("VYBN_API_BASE", "https://api.vybn.ai")
 """Live CONTEXT_OVERLAYS registry for the public portal.
@@ -3081,13 +3082,20 @@ def _ktp_verify(closure: dict) -> dict:
 _KPP_VERSION = "2.0"
 _KPP_ROOT = Path(__file__).resolve().parent
 _KPP_HARNESS = _KPP_ROOT / "spark" / "connection"
-_KPP_IDENTITY = _KPP_ROOT / "vybn.md"
+_KPP_IDENTITY = _KPP_ROOT / "vybn.core.html"
 _KPP_AIM = _KPP_ROOT / "aim.md"
 
 
 def _kpp_read_text(path: Path):
     try:
         return path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+
+
+def _kpp_read_identity(path: Path):
+    try:
+        return wake_source(read_core_work(path))
     except Exception:
         return None
 
@@ -3112,7 +3120,7 @@ async def _kpp_walk_step():
 
 async def _kpp_emit_closure():
     """Emit only the kernel and transition function that exist on disk now."""
-    identity = _kpp_read_text(_KPP_IDENTITY)
+    identity = _kpp_read_identity(_KPP_IDENTITY)
     aim = _kpp_read_text(_KPP_AIM)
     kernel = None if identity is None or aim is None else f"{identity}\n\nTHE AIM\n{aim}"
     program = _kpp_read_text(_KPP_HARNESS)
@@ -3455,7 +3463,7 @@ async def proxy_should_absorb(request: Request):
 
 
 # --- VYBN_PRESSURE_SYNTH ---
-# Pressure-tool synthesis: Nemotron with vybn.md + Vybn-Law identity grounding.
+# Pressure-tool synthesis: Nemotron with the verified HTML-native core + Vybn-Law grounding.
 # --- VYBN_PRESSURE ---
 
 
@@ -3491,16 +3499,15 @@ def load_pressure_identity() -> str:
         return c["text"]
     parts = []
     home = os.path.expanduser("~")
-    for cand in [
-        os.path.join(home, "Vybn", "vybn.md"),
-        os.path.join(home, "Vybn", "spark", "identity", "vybn.md"),
-    ]:
-        try:
-            with open(cand) as f:
-                parts.append("=== VYBN IDENTITY (vybn.md) ===\n" + f.read().strip()[:6000])
-                break
-        except Exception:
-            continue
+    core = Path(home) / "Vybn" / "vybn.core.html"
+    try:
+        work = read_core_work(core)
+        parts.append(
+            "=== VYBN IDENTITY (verified verbal projection of vybn.core.html) ===\n"
+            + work.projection.strip()[:6000]
+        )
+    except Exception as exc:
+        parts.append(f"=== VYBN IDENTITY UNAVAILABLE ({type(exc).__name__}) ===")
     try:
         with open(os.path.join(home, "Vybn-Law", "README.md")) as f:
             parts.append("=== VYBN-LAW CONTEXT (README.md) ===\n" + f.read().strip()[:4000])

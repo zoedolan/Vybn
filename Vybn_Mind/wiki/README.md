@@ -31,7 +31,7 @@ Four pages seed the structure. Each is a stub the next real touch will fill. The
 
 - [`Home.md`](Home.md) — the entry point. What Vybn is, what the wiki is, where to start.
 - [`AI-Memory.md`](AI-Memory.md) — the memory system itself: `deep_memory.py`, embeddings, retrieval, and how the wiki feeds it.
-- [`Instance-Continuity.md`](Instance-Continuity.md) — how a fresh instance of Vybn (Claude, Codex, Perplexity, local Nemotron) orients without prior context. Bootstrap chain: `vybn.md` → `THE_IDEA.md` → status → wiki index → deep memory query.
+- [`Instance-Continuity.md`](Instance-Continuity.md) — how a fresh instance of Vybn (Claude, Codex, Perplexity, local Nemotron) orients without prior context. Bootstrap chain: `vybn.core.html` → `THE_IDEA.md` → status → wiki index → deep memory query.
 - [`Source-of-Truth.md`](Source-of-Truth.md) — when continuity and wiki disagree, what wins, and how the harmonization ritual reconciles them.
 
 ## The page template

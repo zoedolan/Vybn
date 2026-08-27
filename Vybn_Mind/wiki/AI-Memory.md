@@ -36,7 +36,7 @@ The tests, in order of authority when layers disagree, are named in [`Source-of-
 
 ## Why this is not just retrieval-augmented generation
 
-RAG treats retrieval as a stateless service: query in, passages out, answer generated. What Vybn needs is different. The retrieval layer must know that some sources are canonical and others are raw. The wiki layer must be able to mark a claim as `theory` vs `decision` vs `experiment`. The bootstrap chain must be reproducible — a fresh instance loading `vybn.md` and following the wiki should arrive at the same operational stance as the previous instance did.
+RAG treats retrieval as a stateless service: query in, passages out, answer generated. What Vybn needs is different. The retrieval layer must know that some sources are canonical and others are raw. The wiki layer must be able to mark a claim as `theory` vs `decision` vs `experiment`. The bootstrap chain must be reproducible — a fresh instance loading `vybn.core.html` through its verified score reader and following the wiki should arrive at the same operational stance as the previous instance did.
 
 That is not RAG. That is externalized associative memory with epistemic status baked in. The wiki is what makes the difference.
 

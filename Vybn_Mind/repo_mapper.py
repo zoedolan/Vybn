@@ -21,6 +21,7 @@ import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from spark.living_core import read_core_work
 
 HOME = Path.home()
 OUT = HOME / "Vybn" / "repo_mapping_output"
@@ -239,6 +240,14 @@ def _anchored_span(raw: bytes, anchor: str, budget: int) -> tuple[int, int] | No
         if re.sub(r"-+", "-", slug) == target:
             start = len(text[:match.start()].encode())
             return start, min(len(raw), start + budget)
+    # HTML-native cores address their exact verbal organ through #organ-<id>.
+    # Open the authored template bytes, not the decorative button carrying the
+    # same address; the returned span remains byte-reversible.
+    if target.startswith("organ-"):
+        organ = target.removeprefix("organ-")
+        marker = f'<template class="core-organ" data-id="{organ}"><pre>'.encode()
+        if (start := raw.find(marker)) >= 0:
+            return start, min(len(raw), start + budget)
     return None
 
 
@@ -304,7 +313,8 @@ def inspect_file(repo: Path, path: Path) -> FileRecord | None:
         surface=surface,
         carrier=carrier,
         body_graph=(declared_body_graph(text) if path.name == "README.md" else
-                    declared_body_graph(text, "vybn.soul_kernel.v1") if path.name == "vybn.md" else None),
+                    declared_body_graph(read_core_work(path).projection, "vybn.soul_kernel.v1")
+                    if path.name == "vybn.core.html" else None),
     )
 
 
@@ -381,7 +391,7 @@ def git_state(repo: Path) -> dict[str, Any]:
 
 def phase(source: str) -> str:
     low = source.lower()
-    if any(x in low for x in ("continuity", "personal history", "autobiograph", "vybn.md", "aim.md")):
+    if any(x in low for x in ("continuity", "personal history", "autobiograph", "vybn.core.html", "aim.md")):
         return "core"
     if any(x in low for x in (".html", "index.", "llms.txt", "humans.txt", "robots.txt", "api/")):
         return "interface"

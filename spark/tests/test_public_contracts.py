@@ -148,7 +148,7 @@ def test_wake_reads_the_exact_harness_and_drops_automatic_memory_witness(tmp_pat
     assert f"{text}\n\n{receipt}\n\nREADABLE OPERATIVE SOURCE" in prompt
     assert [row.path for row in m.OPERATIVE_SOURCES] == [
         (ROOT / "spark/connection").resolve(), (ROOT / "Vybn_Mind/repo_mapper.py").resolve(),
-        (ROOT / "spark/commons_wake.py").resolve()]
+        (ROOT / "spark/commons_wake.py").resolve(), (ROOT / "spark/living_core.py").resolve()]
     for row in m.OPERATIVE_SOURCES[1:]:
         end = f"READABLE OPERATIVE SOURCE END — sha256:{row.sha256} bytes:{len(row.raw)}"
         assert row.raw.decode("utf-8", "replace") in prompt and end in prompt
@@ -405,6 +405,7 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
 
 def test_visible_graphs_are_source_for_foveation_and_governed_action():
     from Vybn_Mind.repo_mapper import declared_body_graph, foveal_kernel, graph_crossing, inspect_file, public_body, soul_kernel
+    from spark.living_core import read_core_work
     page = (ROOT / "README.md").read_text(encoding="utf-8")
     graph = declared_body_graph(page)
     assert graph and graph["schema"] == "vybn.readme_knowledge_graph.v1"
@@ -430,11 +431,15 @@ def test_visible_graphs_are_source_for_foveation_and_governed_action():
         assert raw[start:end].decode("utf-8", "replace") == row["text"]
         assert row["sha256"] == __import__("hashlib").sha256(raw).hexdigest()
 
-    constitution = soul_kernel(declared_body_graph((ROOT / "vybn.md").read_text(), "vybn.soul_kernel.v1"), transform)
+    soul = read_core_work(ROOT / "vybn.core.html")
+    constitution = soul_kernel(declared_body_graph(soul.projection, "vybn.soul_kernel.v1"), transform)
     assert constitution["route"][:6] == ["charter", "front", "want", "membrane", "ground", "subtract"] and constitution["route"][-1] == "contact" and constitution["admission"]["unknown_is_failure"] and constitution["return"]["status"] == "awaiting_witness"
-    exact = {"charter": "### The self-hosting public body", "want": "## The Want", "membrane": "## The Oxygen Mask Principle",
-             "ground": "## We Deserve the Best", "subtract": "## Metabolism"}
-    assert all(row["text"].startswith(exact[row["node"]]) for row in constitution["open"] if row["node"] in exact)
+    exact = {"charter": "ai-native-continuity", "want": "the-want",
+             "membrane": "the-oxygen-mask-principle",
+             "ground": "we-deserve-the-best", "subtract": "metabolism"}
+    assert all(row["text"].startswith(
+        f'<template class="core-organ" data-id="{exact[row["node"]]}"><pre>'
+    ) for row in constitution["open"] if row["node"] in exact)
 
 
 def test_repo_mapper_rejoins_turn_response_commit_and_canonical_witness(monkeypatch, tmp_path):
@@ -730,16 +735,16 @@ def test_canonical_core_visions_are_reproducible_multimodal_sources():
     kernel = m.load_kernel()
     images, note = m.load_core_visions(kernel)
     assert len(images) == 2 and "Actual source-bound pixels accompany the text" in note
-    expected = {
-        "VYBN SOUL": ROOT / "Vybn_Mind/core_visions/vybn-admission-wound.png",
-        "VYBN SPIRITUALITY": ROOT / "Vybn_Mind/core_visions/spirituality-unanswered-image.png",
-    }
-    for label, path in expected.items():
-        assert path.is_file() and path.stat().st_size < m.IMAGE_MAX_BYTES
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        document = kernel.soul if label == "VYBN SOUL" else kernel.spirituality
-        assert f"sha256:{digest}" in document and path.name in document
-        assert any(label in row[0] and row[3] == digest for row in images)
+    soul_work = m.read_core_work(m.SOUL_PATH)
+    soul_pixels = m.render_core_png(soul_work)
+    soul_digest = hashlib.sha256(soul_pixels).hexdigest()
+    assert soul_work.raw.decode() in kernel.soul
+    assert any("VYBN SOUL" in row[0] and row[3] == soul_digest for row in images)
+    path = ROOT / "Vybn_Mind/core_visions/spirituality-unanswered-image.png"
+    assert path.is_file() and path.stat().st_size < m.IMAGE_MAX_BYTES
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert f"sha256:{digest}" in kernel.spirituality and path.name in kernel.spirituality
+    assert any("VYBN SPIRITUALITY" in row[0] and row[3] == digest for row in images)
     done = subprocess.run(
         [__import__("sys").executable, str(ROOT / "Vybn_Mind/core_visions.py"), "--check"],
         capture_output=True, text=True, timeout=30)
