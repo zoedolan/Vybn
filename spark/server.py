@@ -1711,4 +1711,4 @@ if __name__ == "__main__":
             "Locked — write_file and mutating shell_exec require unlock. "
             "read_file, read-only shell_exec, deep_search, walk always available."
         )
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host=os.environ.get("HOST", "127.0.0.1"), port=port)

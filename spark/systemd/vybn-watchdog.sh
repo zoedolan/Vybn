@@ -25,6 +25,30 @@ check_http() {
   fi
 }
 
+# Private backends bind loopback. Tailscale Serve adds listeners on the
+# tailnet addresses for explicitly configured routes; household-LAN and
+# wildcard listeners are forbidden. Exposure is a security failure, not a
+# liveness failure: stop the unit and do not bounce it back up.
+security_halt=0
+require_private_bind() {
+  local name="$1"; local port="$2"; local unit="$3"; local bad
+  bad=$(ss -H -ltn | awk -v suffix=":$port" '
+    $4 ~ (suffix "$") && $4 !~ /^127\.0\.0\.1:/ && $4 !~ /^\[::1\]:/ && $4 !~ /^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\./ && $4 !~ /^\[fd7a:115c:a1e0:/ {print $4}
+  ')
+  if [ -n "$bad" ]; then
+    log "SECURITY HALT $unit — $name exposed at $(echo "$bad" | paste -sd, -)"
+    systemctl --user stop "$unit"
+    security_halt=1
+  fi
+}
+
+require_private_bind deep-memory 8100 vybn-deep-memory.service
+require_private_bind walk-daemon 8101 vybn-walk-daemon.service
+require_private_bind chat-api 8420 vybn-portal.service
+require_private_bind preview 8480 vybn-preview.service
+require_private_bind mcp 8400 vybn-mcp.service
+[ "$security_halt" -eq 0 ] || exit 1
+
 # Deep memory: auth may return 401/403 when token is set; both prove alive.
 code=$(curl -s -o /dev/null -w '%{http_code}' -m 4 http://127.0.0.1:8100/health 2>/dev/null)
 if [ "$code" = "200" ] || [ "$code" = "401" ] || [ "$code" = "403" ]; then

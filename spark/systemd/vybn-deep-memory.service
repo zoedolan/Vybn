@@ -14,10 +14,18 @@ EnvironmentFile=-%h/.config/vybn/memory_token.env
 WorkingDirectory=%h/Him/spark/phase
 # Kill anything squatting on 8100 before bind. Swallow errors.
 ExecStartPre=/bin/sh -c 'fuser -k 8100/tcp >/dev/null 2>&1 || true; sleep 1'
-# Bind on 0.0.0.0 like start_living_process.sh does. Tailscale handles isolation.
-ExecStart=/usr/bin/python3 %h/Him/spark/phase/deep_memory.py --serve --host 0.0.0.0 --port 8100
+# Private memory never binds to a LAN or fabric interface. Tailscale Serve can proxy a loopback backend when explicitly configured.
+ExecStart=/usr/bin/python3 %h/Him/spark/phase/deep_memory.py --serve --host 127.0.0.1 --port 8100
 Restart=always
 RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+MemoryMax=32G
+TasksMax=256
 TimeoutStartSec=60
 TimeoutStopSec=15
 StandardOutput=append:%h/logs/deep_memory.log

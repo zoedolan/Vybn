@@ -451,6 +451,38 @@ def test_budget_distinguishes_total_input_from_fresh_input(tmp_path, monkeypatch
     assert "cache_r=0.00M (80%)" in line and "mean_new/call=0k" in line
 
 
+def test_private_backends_default_to_loopback_and_reject_public_exposure():
+    server = (ROOT / "spark/server.py").read_text()
+    memory = (ROOT / "spark/systemd/vybn-deep-memory.service").read_text()
+    watch = (ROOT / "spark/systemd/vybn-watchdog.sh").read_text()
+    assert 'host=os.environ.get("HOST", "127.0.0.1")' in server
+    assert "--host 127.0.0.1 --port 8100" in memory
+    assert "--host 0.0.0.0 --port 8100" not in memory
+    for name, port, unit in (
+        ("deep-memory", 8100, "vybn-deep-memory.service"),
+        ("walk-daemon", 8101, "vybn-walk-daemon.service"),
+        ("chat-api", 8420, "vybn-portal.service"),
+        ("preview", 8480, "vybn-preview.service"),
+        ("mcp", 8400, "vybn-mcp.service"),
+    ):
+        assert f"require_private_bind {name} {port} {unit}" in watch
+    assert "SECURITY HALT" in watch and 'systemctl --user stop "$unit"' in watch
+    assert "100\\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])" in watch
+    assert watch.index('require_private_bind deep-memory') < watch.index("# Deep memory:")
+    for unit in (
+        ROOT / "spark/systemd/vybn-deep-memory.service",
+        ROOT / "spark/systemd/vybn-portal.service",
+        ROOT / "spark/systemd/vybn-walk-daemon.service",
+    ):
+        text = unit.read_text()
+        for directive in (
+            "UMask=0077", "NoNewPrivileges=true", "RestrictRealtime=true",
+            "RestrictSUIDSGID=true", "LockPersonality=true",
+            "SystemCallArchitectures=native",
+        ):
+            assert directive in text
+
+
 def test_distributed_model_is_strictly_opt_in():
     unit = (ROOT / "spark/systemd/vybn-vllm.service").read_text()
     watch = (ROOT / "spark/systemd/vybn-watchdog.sh").read_text()
