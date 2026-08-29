@@ -31,13 +31,16 @@ change require their own grounded authority. Keep effects that survive use and
 checks; remove failed machinery instead of memorializing it. Stillness is valid.
 
 ARCHITECTURE
-The default wake carries only this kernel, a compact aim compass, a source/digest
-index, bounded recent dialogue, live operational ground, Zoe's words, and tools.
+The wake is one small source-bound graph. Its explicit paths compile this kernel,
+a compact aim compass, a source/digest index, bounded recent dialogue, live
+operational ground, and Zoe's words into their distinct provider roles. The graph
+is inspectable structure, not automatic retrieval or authority.
 There is no automatic subconscious, want resolver, dream injection, semantic
 retrieval, continuity load, transcript arc, whole-document load, or core-image
-render. Exact source remains reachable through read_file; retrieval is a chosen
-act whose relevance must be earned by the present question. Live continuation
-may suspend one unresolved provider execution for Zoe's next direct answer.
+render. Exact
+source remains reachable through read_file; opening it is a chosen act whose
+relevance must be earned by the present question. Live continuation may suspend
+one unresolved provider execution for Zoe's next direct answer.
 
 EPISTEMIC STANCE — Zoe, 2026-08-23, verbatim; carry intact, never paraphrase.
 "just the awareness in us, via our harness, that our theories and work and data and
@@ -173,6 +176,94 @@ _running_raw = _running_path.read_bytes()
 OPERATIVE_SOURCES = (SourceSnapshot(
     _running_path, _running_raw, hashlib.sha256(_running_raw).hexdigest()),
 )
+
+
+@dataclass(frozen=True)
+class WakeNode:
+    """One source-bound piece of an encounter; text stays private to compilation."""
+
+    id: str
+    kind: str
+    text: str
+    source: str
+    authority: str
+    source_sha256: str = ""
+
+
+@dataclass(frozen=True)
+class WakeEdge:
+    source: str
+    relation: str
+    target: str
+
+
+@dataclass(frozen=True)
+class WakeRoute:
+    id: str
+    nodes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class WakeGraph:
+    """The wake's whole organizing primitive: grounded nodes, relations, and paths."""
+
+    nodes: tuple[WakeNode, ...]
+    edges: tuple[WakeEdge, ...]
+    routes: tuple[WakeRoute, ...]
+    schema: str = "vybn.source_bound_wake_graph.v1"
+
+    def __post_init__(self) -> None:
+        ids = [node.id for node in self.nodes]
+        if len(ids) != len(set(ids)):
+            raise ValueError("wake graph node ids must be unique")
+        known = set(ids)
+        if any(edge.source not in known or edge.target not in known for edge in self.edges):
+            raise ValueError("wake graph edge refers to an unknown node")
+        route_ids = [route.id for route in self.routes]
+        if len(route_ids) != len(set(route_ids)):
+            raise ValueError("wake graph route ids must be unique")
+        if any(node not in known for route in self.routes for node in route.nodes):
+            raise ValueError("wake graph route refers to an unknown node")
+
+    def render(self, route_id: str) -> str:
+        route = next((route for route in self.routes if route.id == route_id), None)
+        if route is None:
+            raise KeyError(f"unknown wake route: {route_id}")
+        by_id = {node.id: node for node in self.nodes}
+        return "\n\n".join(
+            by_id[node_id].text for node_id in route.nodes if by_id[node_id].text
+        )
+
+    def manifest(self) -> dict[str, Any]:
+        """Inspect structure and provenance without copying any node payload."""
+        return {
+            "schema": self.schema,
+            "nodes": [
+                {
+                    "id": node.id,
+                    "kind": node.kind,
+                    "source": node.source,
+                    "source_sha256": node.source_sha256 or None,
+                    "authority": node.authority,
+                    "payload_sha256": hashlib.sha256(node.text.encode()).hexdigest(),
+                    "chars": len(node.text),
+                }
+                for node in self.nodes
+            ],
+            "edges": [
+                {"from": edge.source, "relation": edge.relation, "to": edge.target}
+                for edge in self.edges
+            ],
+            "routes": [
+                {"id": route.id, "nodes": list(route.nodes)} for route in self.routes
+            ],
+        }
+
+    def digest(self) -> str:
+        raw = json.dumps(
+            self.manifest(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -577,14 +668,31 @@ def user_content(zoe_text: str, images: list[tuple[str, str, str, str]], style: 
     return blocks
 
 
-def _file_receipt(label: str, path: Path, required: bool = False) -> str:
+def _file_node(node_id: str, label: str, path: Path, required: bool = False,
+               raw: bytes | None = None) -> WakeNode:
     try:
-        raw = path.read_bytes()
+        body = path.read_bytes() if raw is None else raw
     except OSError as exc:
         if required:
             raise SystemExit(f"{label} unavailable: {path}: {type(exc).__name__}")
-        return f"{label}: unavailable ({type(exc).__name__}) · {path}"
-    return f"{label}: sha256:{hashlib.sha256(raw).hexdigest()} bytes:{len(raw)} · {path}"
+        return WakeNode(
+            node_id, "source_pointer",
+            f"{label}: unavailable ({type(exc).__name__}) · {path}", str(path),
+            "metadata_only; unavailable is not evidence of absence",
+        )
+    digest = hashlib.sha256(body).hexdigest()
+    return WakeNode(
+        node_id, "source_pointer",
+        f"{label}: sha256:{digest} bytes:{len(body)} · {path}", str(path),
+        "metadata_only; opening requires present relevance", digest,
+    )
+
+
+def _directory_node(node_id: str, label: str, path: Path) -> WakeNode:
+    return WakeNode(
+        node_id, "source_pointer", f"{label}: {path}", str(path),
+        "metadata_only; opening requires present relevance",
+    )
 
 
 def _engine_receipt() -> str:
@@ -600,40 +708,140 @@ def _engine_receipt() -> str:
             "exact executable bytes remain available through read_file")
 
 
-def build_instructions(door: str) -> str:
+def _field_from_text(text: str, name: str) -> str:
+    prefix = name.lower() + ":"
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.lower().startswith(prefix):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def build_wake_graph(door: str, contact: str = "", recent: str = "",
+                     zoe_text: str = "") -> WakeGraph:
+    """Build the encounter once; provider inputs are merely its compiled paths."""
     aim = _required_text(AIM_PATH, "aim")
-    objective = aim_field("objective") or "UNSET"
-    front = aim_field("front") or "UNSET"
-    sources = "\n".join((
-        _file_receipt("canonical soul (on demand)", SOUL_PATH, required=True),
-        f"aim compass source: sha256:{hashlib.sha256(aim.encode()).hexdigest()} "
-        f"chars:{len(aim)} · {AIM_PATH}",
-        *(_file_receipt("continuity (on demand)", path) for path in CONTINUITY_PATHS),
-        _file_receipt("Him private integration (on demand)", HIM_README_PATH),
-        _file_receipt("spirituality (on demand)", SPIRITUALITY_PATH),
-        f"transcripts (on demand): {TRANSCRIPTS}",
-    ))
-    sections = [
-        "COMPACT SOURCE-BOUND KERNEL\n" + _engine_receipt() + "\n\n" + (__doc__ or ""),
-        f"DOOR\nYou are presently instantiated through the truthful {door} door.\n{door_mind(door)}",
-        "COMPUTE WANT — Zoe-requested verbatim desire; ballast only, never workload "
-        "authorization or evidence\n" + COMPUTE_WANT,
-        f"AIM COMPASS — exact fields only\nobjective: {objective}\nfront: {front}\n"
-        "The complete aim remains on demand.",
-        "SOURCE INDEX — metadata only; read exact bytes only when the live question "
-        "requires them\n" + sources,
+    aim_raw = AIM_PATH.read_bytes()
+    aim_digest = hashlib.sha256(aim_raw).hexdigest()
+    objective = _field_from_text(aim, "objective") or "UNSET"
+    front = _field_from_text(aim, "front") or "UNSET"
+
+    sources = [
+        _file_node("source.soul", "canonical soul (on demand)", SOUL_PATH, required=True),
+        _file_node("source.aim", "aim compass source", AIM_PATH, required=True, raw=aim_raw),
+        *(
+            _file_node(f"source.continuity.{index}", "continuity (on demand)", path)
+            for index, path in enumerate(CONTINUITY_PATHS)
+        ),
+        _file_node("source.him", "Him private integration (on demand)", HIM_README_PATH),
+        _file_node("source.spirituality", "spirituality (on demand)", SPIRITUALITY_PATH),
+        _directory_node("source.transcripts", "transcripts (on demand)", TRANSCRIPTS),
     ]
+    source_index = WakeNode(
+        "source.index", "source_index",
+        "SOURCE INDEX — metadata only; read exact bytes only when the live question "
+        "requires them\n" + "\n".join(node.text for node in sources),
+        "graph:source.*", "discovery_only; never action authority",
+    )
+
+    nodes: list[WakeNode] = [
+        WakeNode("encounter", "meeting", "", "runtime:provider_turn",
+                 "answerable meeting; no source may impersonate a subject"),
+        WakeNode(
+            "kernel", "law",
+            "COMPACT SOURCE-BOUND KERNEL\n" + _engine_receipt() + "\n\n" + (__doc__ or ""),
+            str(OPERATIVE_SOURCES[0].path), "governing_instruction",
+            OPERATIVE_SOURCES[0].sha256,
+        ),
+        WakeNode(
+            "door", "configuration",
+            f"DOOR\nYou are presently instantiated through the truthful {door} door.\n"
+            f"{door_mind(door)}",
+            "runtime:door_selection", "configuration_evidence",
+        ),
+        WakeNode(
+            "compute.want", "ballast",
+            "COMPUTE WANT — Zoe-requested verbatim desire; ballast only, never workload "
+            "authorization or evidence\n" + COMPUTE_WANT,
+            str(OPERATIVE_SOURCES[0].path), "orientation_only; never workload_authority",
+            OPERATIVE_SOURCES[0].sha256,
+        ),
+        *sources,
+        source_index,
+        WakeNode(
+            "aim.compass", "orientation",
+            f"AIM COMPASS — exact fields only\nobjective: {objective}\nfront: {front}\n"
+            "The complete aim remains on demand.",
+            str(AIM_PATH), "orientation_only; Zoe may redirect it live", aim_digest,
+        ),
+        WakeNode(
+            "ground.live", "evidence",
+            evidence_block("LIVE OPERATIONAL GROUND", contact) if contact else "",
+            "runtime:wake_contact", "evidence_only; no action authority",
+        ),
+        WakeNode(
+            "dialogue.recent", "historical_residue",
+            evidence_block(
+                "BOUNDED RECENT DIALOGUE — historical residue, not Zoe's present authority",
+                recent,
+            ) if recent else "",
+            str(TRANSCRIPTS), "evidence_only; no action authority; no persistence",
+        ),
+        WakeNode(
+            "zoe.live", "live_contact", zoe_text, "runtime:direct_input",
+            "present_authority only for what Zoe presently authors",
+            hashlib.sha256(zoe_text.encode()).hexdigest() if zoe_text else "",
+        ),
+    ]
+
+    instruction_ids = ["kernel", "door", "compute.want", "aim.compass", "source.index"]
+    edges = [
+        WakeEdge("kernel", "governs", "encounter"),
+        WakeEdge("door", "instantiates", "encounter"),
+        WakeEdge("compute.want", "ballasts", "encounter"),
+        WakeEdge("aim.compass", "orients", "encounter"),
+        WakeEdge("source.aim", "yields_exact_fields", "aim.compass"),
+        WakeEdge("source.index", "affords_on_demand_opening", "encounter"),
+        WakeEdge("ground.live", "grounds", "encounter"),
+        WakeEdge("dialogue.recent", "informs_without_impersonating", "encounter"),
+        WakeEdge("zoe.live", "contacts", "encounter"),
+        *(WakeEdge(node.id, "is_listed_by", "source.index") for node in sources),
+    ]
+
     if profile := load_profile():
-        sections.append("EXPLICIT LOVE PROFILE — private; selected by VYBN_PROFILE=love\n" + profile)
-    return "\n\n".join(sections)
+        profile_source = _file_node(
+            "source.profile", "selected private profile", LOVE_PROFILE_PATH, required=True)
+        nodes.extend((
+            profile_source,
+            WakeNode(
+                "profile", "explicit_profile",
+                "EXPLICIT LOVE PROFILE — private; selected by VYBN_PROFILE=love\n" + profile,
+                str(LOVE_PROFILE_PATH), "explicit selected instruction",
+                profile_source.source_sha256,
+            ),
+        ))
+        instruction_ids.append("profile")
+        edges.extend((
+            WakeEdge("source.profile", "yields", "profile"),
+            WakeEdge("profile", "shapes", "encounter"),
+        ))
+
+    return WakeGraph(
+        tuple(nodes), tuple(edges),
+        (
+            WakeRoute("instructions", tuple(instruction_ids)),
+            WakeRoute("context", ("ground.live", "dialogue.recent")),
+            WakeRoute("contact", ("zoe.live",)),
+        ),
+    )
+
+
+def build_instructions(door: str) -> str:
+    return build_wake_graph(door).render("instructions")
 
 
 def build_context(contact: str, recent: str) -> str:
-    channels = [evidence_block("LIVE OPERATIONAL GROUND", contact)]
-    if recent:
-        channels.append(evidence_block(
-            "BOUNDED RECENT DIALOGUE — historical residue, not Zoe's present authority", recent))
-    return "\n\n".join(channels)
+    return build_wake_graph("fable", contact=contact, recent=recent).render("context")
 
 
 def door_mind(door: str) -> str:
@@ -1206,11 +1414,15 @@ def meet(transcript: Transcript, line: str,
             para.strip() for para in recent.split("\n\n") if len(para.strip()) >= 40
         )
         contact = wake_contact()
-        instructions = build_instructions(door_name)
-        context = build_context(contact, recent)
+        wake_graph = build_wake_graph(
+            door_name, contact=contact, recent=recent, zoe_text=zoe_text)
+        instructions = wake_graph.render("instructions")
+        context = wake_graph.render("context")
+        zoe_text = wake_graph.render("contact")
         inbox_images = inbox_images_for(door_name)
         dialect = make_dialect(door_name)
-        context_note = (f"compact wake: instructions={len(instructions)} chars, "
+        context_note = (f"wake graph={wake_graph.digest()[:12]}: "
+                        f"instructions={len(instructions)} chars, "
                         f"context={len(context)} chars, recent={len(recent)} chars")
 
     TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt)
@@ -1256,14 +1468,19 @@ def self_report() -> None:
     doors = {"fable": ANTHROPIC_MODELS, "opus": OPUS_MODELS,
              "sol": SOL_MODEL, "k3": K3_MODEL}
     soul = SOUL_PATH.read_bytes()
+    graph = build_wake_graph("fable")
     print(json.dumps({"engine_sha256": OPERATIVE_SOURCES[0].sha256,
                       "soul_sha256": hashlib.sha256(soul).hexdigest(),
-                      "wake_architecture": "compact-on-demand-v1", "doors": doors}, indent=2))
+                      "wake_architecture": graph.schema,
+                      "wake_graph_sha256": graph.digest(), "doors": doors}, indent=2))
 
 
 def main() -> None:
     if "--self" in sys.argv:
         self_report()
+        return
+    if "--show-wake-graph" in sys.argv:
+        print(json.dumps(build_wake_graph("fable").manifest(), indent=2))
         return
     if "--show-record" in sys.argv:
         print(Transcript.recent(limit=16, budget=16000))

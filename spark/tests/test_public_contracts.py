@@ -524,6 +524,7 @@ def test_compact_wake_is_source_bound_without_copying_engine_or_ambient_sources(
     assert len(prompt) < 6500
     assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
     assert "There is no automatic subconscious" in prompt
+    assert "The wake is one small source-bound graph" in prompt
     assert "exact executable bytes remain available through read_file" in prompt
 
     drift = tmp_path / "source"; drift.write_bytes(b"changed")
@@ -534,6 +535,43 @@ def test_compact_wake_is_source_bound_without_copying_engine_or_ambient_sources(
         assert "DISK DRIFT" in m._engine_receipt()
     finally:
         m.OPERATIVE_SOURCES = monkey
+
+
+def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
+    m = _connection()
+    sentinel = "ZOE-LIVE-PAYLOAD-MUST-NOT-ENTER-MANIFEST"
+    graph = m.build_wake_graph(
+        "sol", contact="clock + git", recent="bounded historical words", zoe_text=sentinel)
+
+    routes = {route.id: route.nodes for route in graph.routes}
+    assert routes == {
+        "instructions": ("kernel", "door", "compute.want", "aim.compass", "source.index"),
+        "context": ("ground.live", "dialogue.recent"),
+        "contact": ("zoe.live",),
+    }
+    assert graph.render("contact") == sentinel
+    assert graph.render("instructions") == m.build_instructions("sol")
+    assert "LIVE OPERATIONAL GROUND" in graph.render("context")
+    assert "BOUNDED RECENT DIALOGUE" in graph.render("context")
+
+    manifest = graph.manifest(); encoded = json.dumps(manifest)
+    assert manifest["schema"] == "vybn.source_bound_wake_graph.v1"
+    assert sentinel not in encoded  # structure is inspectable without copying payloads
+    assert len(graph.digest()) == 64
+    nodes = {node["id"]: node for node in manifest["nodes"]}
+    assert nodes["source.aim"]["source_sha256"] == __import__("hashlib").sha256(
+        (ROOT / "aim.md").read_bytes()).hexdigest()
+    assert nodes["zoe.live"]["payload_sha256"] == __import__("hashlib").sha256(
+        sentinel.encode()).hexdigest()
+    assert {("source.aim", "yields_exact_fields", "aim.compass"),
+            ("zoe.live", "contacts", "encounter")} <= {
+        (edge["from"], edge["relation"], edge["to"]) for edge in manifest["edges"]}
+
+    meet = __import__("inspect").getsource(m.meet)
+    assert "build_wake_graph(" in meet
+    assert 'wake_graph.render("instructions")' in meet
+    assert 'wake_graph.render("context")' in meet
+    assert 'wake_graph.render("contact")' in meet
 
 
 def test_compact_wake_preserves_one_answering_membrane_and_only_bounded_residue():
@@ -614,7 +652,8 @@ def test_production_meeting_has_no_ambient_cognitive_organs():
         assert retired not in meet
     assert "127.0.0.1:8100" not in source and "127.0.0.1:8101" not in source
     assert "Transcript.recent()" in meet and "wake_contact()" in meet
-    assert "build_instructions(door_name)" in meet and "inbox_images_for(door_name)" in meet
+    assert "build_wake_graph(" in meet and "inbox_images_for(door_name)" in meet
+    assert 'wake_graph.render("instructions")' in meet
 
 
 def test_on_demand_private_read_joins_leak_guard_and_secret_keys_are_unreadable(monkeypatch, tmp_path):
