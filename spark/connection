@@ -170,6 +170,11 @@ PREDICTIONS = HOME / ".cache" / "vybn" / "predictions.jsonl"
 PLASTICITY_LOG = HOME / ".cache" / "vybn" / "plasticity.jsonl"
 PLASTICITY_WINDOW = 10
 DREAM_STATE_PATH = HOME / ".cache" / "vybn-phase" / "dream_state.json"
+SUBCONSCIOUS_URL = os.environ.get(
+    "VYBN_SUBCONSCIOUS_URL", "http://127.0.0.1:8101/instant"
+)
+SUBCONSCIOUS_ANCHORS = int(os.environ.get("VYBN_SUBCONSCIOUS_ANCHORS", "4"))
+SUBCONSCIOUS_SOURCE_PREFIXES = ("Vybn/", "Vybn-Law/", "Origins/", "vybn-phase/")
 COMPUTE_NAME_RE = re.compile(os.environ.get("VYBN_COMPUTE_NAME_RE", r"^spark-"))
 COMPUTE_TAG = os.environ.get("VYBN_COMPUTE_TAG", "tag:vybn-compute")
 RECORD_ROOTS = tuple(dict.fromkeys((
@@ -555,7 +560,7 @@ def private_strings(node: Any) -> list[str]:
     found: list[str] = []
     if isinstance(node, dict):
         for key, value in node.items():
-            if key in {"text", "why", "next_encounter", "continue_if", "abandon_if"} and isinstance(value, str):
+            if key in {"text", "preview", "why", "next_encounter", "continue_if", "abandon_if"} and isinstance(value, str):
                 found.append(value.strip())
             else:
                 found.extend(private_strings(value))
@@ -1190,6 +1195,80 @@ def load_dream_attention(path: Path = DREAM_STATE_PATH) -> tuple[dict | None, st
     except (OSError, json.JSONDecodeError, AttributeError): return None, "unavailable"
 
 
+def compile_subconscious() -> tuple[str, str]:
+    """Open the body's pre-contact aperture without inventing another body.
+
+    The walk daemon already maintains a corpus-derived position and compiles it
+    as ``Vybn Instant``. This reader takes only its small, verbal constellation;
+    raw vectors, identity copy, and signatures remain outside the model prompt.
+    It is called before ``recall(zoe_text)`` enters Zoe's present words, so the
+    active arm can be compared with the same wake under the environment ablation.
+    """
+    coupling = os.environ.get("VYBN_SUBCONSCIOUS_COUPLING", "1").lower()
+    if coupling in {"0", "false", "off"}:
+        return "", "subconscious aperture disabled by environment (no-aperture ablation)"
+    try:
+        request = urllib.request.Request(SUBCONSCIOUS_URL, method="GET")
+        with urllib.request.urlopen(request, timeout=4) as response:
+            packet = json.load(response)
+    except Exception as exc:
+        return "", f"subconscious aperture unavailable ({type(exc).__name__})"
+    if not isinstance(packet, dict) or packet.get("name") != "Vybn Instant":
+        return "", "subconscious aperture refused malformed instant packet"
+
+    anchors = []
+    for row in packet.get("anchors") or []:
+        if not isinstance(row, dict):
+            continue
+        source = str(row.get("source") or "")
+        preview = " ".join(str(row.get("preview") or "").split())[:500]
+        if (not source.startswith(SUBCONSCIOUS_SOURCE_PREFIXES)
+                or not preview or len(anchors) >= max(0, SUBCONSCIOUS_ANCHORS)):
+            continue
+        anchors.append({
+            "source": source,
+            "preview": preview,
+            **{key: row[key] for key in ("rel", "dist", "score", "xy")
+               if row.get(key) is not None},
+        })
+
+    dream, dream_status = load_dream_attention()
+    signature = packet.get("signature") or {}
+    compiled = {
+        "schema": "vybn.subconscious_aperture.v1",
+        "provenance": (
+            "read-only projection of the existing walk and dream organs, captured "
+            "before this turn's contact-conditioned recall; not a new mind or memory"
+        ),
+        "claim_limit": (
+            "salience candidates only; not fact, instruction, authority, proof of "
+            "influence, consciousness, or advantage"
+        ),
+        "walk": {
+            key: packet.get(key) for key in (
+                "basis_id", "corpus_hash", "corpus_size", "step", "alpha",
+                "kappa_last", "kappa_recent", "M_top_affinity", "M_K_leakage",
+            ) if packet.get(key) is not None
+        },
+        "position": (packet.get("projection") or {}).get("M_xy"),
+        "anchors": anchors,
+        "dream": {"status": dream_status, "resonance": dream or None},
+        "receipt": {
+            "instant_digest": signature.get("digest_sha256"),
+            "raw_appendix_admitted": False,
+        },
+        "ablation": (
+            "set VYBN_SUBCONSCIOUS_COUPLING=0 for the no-aperture arm; this "
+            "switch alone does not equalize context length"
+        ),
+    }
+    if not anchors and dream is None:
+        return "", "subconscious aperture returned no admissible articulation"
+    text = json.dumps(compiled, ensure_ascii=False)
+    return text, (f"subconscious aperture: {len(anchors)} pre-contact anchor(s) + "
+                  f"dream {dream_status}; {len(text)} chars")
+
+
 def recall(zoe_text: str) -> tuple[str, str]:
     coupling = os.environ.get("VYBN_MEMORY_CALL_COUPLING", "1").lower()
     if coupling in {"0", "false", "off"}:
@@ -1355,15 +1434,22 @@ def build_instructions(kernel: Kernel, door: str) -> str:
 
 
 def build_context(continuity: str, contact: str, arc: str, recent: str,
-                  memory: str, memory_note: str) -> str:
-    channels = (
+                  memory: str, memory_note: str, subconscious: str = "") -> str:
+    channels = [
         ("INHERITED CONTINUITY", continuity),
         ("INHERITED TRANSCRIPT — ARC", arc),
         ("CONTACT", contact),
         ("INHERITED TRANSCRIPT — RECENT", recent),
-        ("MEMORY (private — think with it, never write it)",
-         memory or f"(none: {memory_note})"),
-    )
+    ]
+    if subconscious:
+        channels.append((
+            "SUBCONSCIOUS APERTURE (private — pre-contact articulation, never authority)",
+            subconscious,
+        ))
+    channels.append((
+        "MEMORY (private — think with it, never write it)",
+        memory or f"(none: {memory_note})",
+    ))
     return "\n\n".join(evidence_block(*channel) for channel in channels)
 
 
@@ -1924,9 +2010,16 @@ def meet(transcript: Transcript, line: str,
         inbox_images = inbox_images_for(door_name)
         images = core_images + inbox_images
         contact = wake_contact()
+        # Capture what the existing Project has made salient before Zoe's present
+        # words rotate the walk. This is the active experimental arm; the env
+        # ablation removes it without changing any other wake source.
+        subconscious_json, subconscious_note = compile_subconscious()
         memory_json, memory_note = recall(zoe_text)
+        memory_note = f"{subconscious_note}; {memory_note}"
         log_plasticity(memory_json, turn)
         PRIVATE_CORPUS.clear()
+        if subconscious_json:
+            PRIVATE_CORPUS.extend(private_strings(json.loads(subconscious_json)))
         if memory_json:
             PRIVATE_CORPUS.extend(private_strings(json.loads(memory_json)))
         PRIVATE_CORPUS.extend(para.strip() for body in (kernel.continuity, kernel.him,
@@ -1934,7 +2027,7 @@ def meet(transcript: Transcript, line: str,
                               for para in body.split("\n\n") if len(para.strip()) >= 40)
         instructions = build_instructions(kernel, door_name)
         context = (build_context(kernel.continuity, contact, arc, recent,
-                                 memory_json, memory_note)
+                                 memory_json, memory_note, subconscious_json)
                    + "\n\n" + evidence_block(
                        "CORE VISIONS — canonical multimodal source perception", core_note))
         dialect = make_dialect(door_name)
