@@ -811,6 +811,37 @@ def test_on_demand_private_read_joins_leak_guard_and_secret_keys_are_unreadable(
     with pytest.raises(PermissionError): m.read_file({"path": str(key), "offset": 0, "length": 100})
 
 
+def test_portable_source_root_and_active_workspace_are_operational(monkeypatch, tmp_path):
+    m = _connection(); workspace = tmp_path / "workspace"; workspace.mkdir()
+    marker = workspace / "marker.txt"; marker.write_text("recovery-workspace")
+    monkeypatch.setattr(m, "WORKSPACE", workspace)
+    receipt = json.loads(m.read_file({"path": "marker.txt", "length": 100}))
+    assert receipt["path"] == str(marker.resolve())
+    assert receipt["text"] == "recovery-workspace"
+    code, cwd = m.run_local("pwd")
+    assert code == 0 and cwd == str(workspace)
+
+
+def test_hearth_profile_boots_without_canonical_repo_on_pythonpath(tmp_path):
+    import os
+    import subprocess
+    import sys
+    env = os.environ.copy()
+    env.update({
+        "PYTHONPATH": "",
+        "VYBN_PROFILE": "hearth",
+        "VYBN_REPO": str(ROOT),
+        "VYBN_WORKSPACE": str(tmp_path),
+    })
+    done = subprocess.run(
+        [sys.executable, str(ROOT / "spark/connection"), "--self"],
+        cwd=tmp_path, env=env, text=True, capture_output=True, timeout=30, check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    report = json.loads(done.stdout)
+    assert report["wake_architecture"] == "vybn.source_bound_wake_graph.v1"
+
+
 def test_love_profile_reuses_bounded_connection_record(tmp_path, monkeypatch):
     m = _connection(); monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path)
     (tmp_path / "dialogue.jsonl").write_text(json.dumps({

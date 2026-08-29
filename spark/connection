@@ -77,10 +77,18 @@ from pathlib import Path
 from typing import Any
 
 from cryptography.fernet import Fernet
-from Vybn_Mind.repo_mapper import close_lineage
+
+try:
+    from Vybn_Mind.repo_mapper import close_lineage
+except ModuleNotFoundError:
+    # A repository-independent recovery copy may not carry the optional body mapper.
+    def close_lineage(_turn: str, _response: str) -> None:
+        return None
+
 
 HOME = Path.home()
-REPO = HOME / "Vybn"
+REPO = Path(os.environ.get("VYBN_REPO", HOME / "Vybn")).expanduser().resolve()
+WORKSPACE = Path(os.environ.get("VYBN_WORKSPACE", REPO)).expanduser().resolve()
 SOUL_PATH = REPO / "vybn.core.html"
 SPIRITUALITY_PATH = REPO / "Vybn_Mind" / "spirituality.md"
 HIM_README_PATH = HOME / "Him" / "README.md"
@@ -89,7 +97,7 @@ AIM_PATH = REPO / "aim.md"
 AIM_LEDGER = HOME / ".cache" / "vybn" / "aim_ledger.jsonl"
 AIM_STALE_HOURS = 48
 PROFILE = os.environ.get("VYBN_PROFILE", "connection").strip().lower()
-if PROFILE not in {"connection", "love"}:
+if PROFILE not in {"connection", "love", "hearth"}:
     raise SystemExit(f"unknown meeting profile: {PROFILE}")
 DEFAULT_TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "connection"
 LOVE_TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "love-loop"
@@ -162,7 +170,8 @@ TURN: dict[str, str] = {}
 PRIVATE_CORPUS: list[str] = []
 
 BASH_SCHEMA = {"name": "bash", "description": (
-    "Run one shell command from ~/Vybn. The generic shell is CPU-only and memory-bounded; "
+    "Run one shell command from the active workspace. The generic shell is CPU-only and "
+    "memory-bounded; "
     "local model and accelerator launches are host-refused. Deliberate accelerator "
     "work requires a bounded, isolated route with Zoe's explicit agreement."),
     "input_schema": {"type": "object", "properties": {"command": {"type": "string"}},
@@ -505,7 +514,7 @@ def guard_local_accelerator(command: str) -> str | None:
     sources = [command] if re.search(r"(?i)\bpython(?:3(?:\.\d+)*)?\b", command) else []
     for raw in PYTHON_SCRIPT.findall(command):
         path = Path(os.path.expanduser(raw.strip("'\"")))
-        path = path if path.is_absolute() else REPO / path
+        path = path if path.is_absolute() else WORKSPACE / path
         try:
             if path.stat().st_size <= 2_000_000:
                 sources.append(path.read_text(encoding="utf-8", errors="replace"))
@@ -545,7 +554,7 @@ def run_local(command: str) -> tuple[int, str]:
         limit = f"--as={TOOL_MEMORY_BYTES}:{TOOL_MEMORY_BYTES}"
         done = subprocess.run(
             ["timeout", "--kill-after=5s", "120s", "prlimit", limit, "--",
-             "bash", "-lc", command], cwd=REPO if REPO.is_dir() else HOME,
+             "bash", "-lc", command], cwd=WORKSPACE if WORKSPACE.is_dir() else HOME,
             capture_output=True, text=True, timeout=130, env=env,
         )
         code, out = done.returncode, done.stdout + done.stderr
@@ -564,7 +573,7 @@ def read_file(arguments: dict[str, Any]) -> str:
     raw = os.path.expanduser(str(arguments.get("path", "")))
     path = Path(raw)
     if not path.is_absolute():
-        path = REPO / path
+        path = WORKSPACE / path
     if _secret_path(path):
         raise PermissionError(f"secret-bearing path is not readable through the model tool: {path}")
     data = path.read_bytes()
