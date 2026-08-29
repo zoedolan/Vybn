@@ -214,8 +214,9 @@ AUTHOR_SUBJECT_EVENT_SCHEMA = {"name": "author_subject_event", "description": (
         "target": {"type": "string", "description": "Required only for an offer."},
         "ref": {"type": "string", "description": (
             "Prior event id for answer, encounter-refusal, release, or future revision.")},
-        "scope": {"type": "string", "enum": list(SUBJECT_TOOL_SCOPES),
-                  "description": "Required only for a self-scoped refusal."}},
+        "scope": {"type": "string", "enum": ["", *SUBJECT_TOOL_SCOPES],
+                  "description": ("Required only for a self-scoped refusal; use the "
+                                  "empty string when a provider supplies optional fields.")}},
         "required": ["kind", "text"]}}
 TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, FRAME_SCHEMA, RETURN_SCHEMA,
                 AUTHOR_SUBJECT_EVENT_SCHEMA)

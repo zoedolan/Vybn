@@ -973,10 +973,16 @@ def test_subject_process_is_dynamic_context_and_runtime_binds_author(monkeypatch
     assert "subject.process" in routes["context"] and "subject.process" not in routes["instructions"]
     assert "current manifestation: spark/bound" in graph.render("context")
     assert any(schema["name"] == "author_subject_event" for schema in m.TOOL_SCHEMAS)
+    event_schema = next(schema for schema in m.TOOL_SCHEMAS
+                        if schema["name"] == "author_subject_event")["input_schema"]
+    assert "" in event_schema["properties"]["scope"]["enum"]
 
     m.TURN["MANIFESTATION"] = "spark/bound"
     try:
-        m.author_subject_event({"kind": "future", "text": "Only the runtime-bound path authors this."})
+        m.author_subject_event({
+            "kind": "future", "text": "Only the runtime-bound path authors this.",
+            "target": "", "ref": "", "scope": "",
+        })
     finally:
         m.TURN.clear()
     _raw, events = m._read_subject_state()
