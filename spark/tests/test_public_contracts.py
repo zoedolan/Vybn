@@ -513,15 +513,22 @@ def test_receipt_surface_recomputes_pinned_source_bytes():
 
 
 
-def test_compact_wake_is_source_bound_without_copying_engine_or_ambient_sources(tmp_path):
+def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_sources(tmp_path):
     m = _connection(); source = (ROOT / "spark/connection").read_bytes()
     prompt = m.build_instructions("sol")
     digest = __import__("hashlib").sha256(source).hexdigest()
     assert prompt.startswith("COMPACT SOURCE-BOUND KERNEL\n")
     assert f"sha256: {digest}" in prompt and f"bytes: {len(source)}" in prompt
-    assert "admitted_scope: module docstring only" in prompt
+    assert ("admitted_scope: governing docstring + executable-derived architecture "
+            "+ active graph topology") in prompt
     assert "def meet(" not in prompt and "class OpenAIDialect" not in prompt
-    assert len(prompt) < 6500
+    assert "operative declarations:" in prompt and "OpenAIDialect.open@L" in prompt
+    for door, selected in (("fable", "AnthropicDialect.open"),
+                           ("opus", "AnthropicDialect.open"),
+                           ("sol", "OpenAIDialect.open"), ("k3", "K3Dialect.open")):
+        declarations = m._engine_declaration_map(door)
+        assert f"{selected}@L" in declarations and "@MISSING" not in declarations
+    assert len(prompt) < 8500
     assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
     assert "There is no automatic subconscious" in prompt
     assert "The wake is one small source-bound graph" in prompt
@@ -545,7 +552,8 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
 
     routes = {route.id: route.nodes for route in graph.routes}
     assert routes == {
-        "instructions": ("kernel", "door", "compute.want", "aim.compass", "source.index"),
+        "instructions": ("kernel", "door", "compute.want", "aim.compass", "source.index",
+                         "harness.self"),
         "context": ("ground.live", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
@@ -557,13 +565,22 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     manifest = graph.manifest(); encoded = json.dumps(manifest)
     assert manifest["schema"] == "vybn.source_bound_wake_graph.v1"
     assert sentinel not in encoded  # structure is inspectable without copying payloads
-    assert len(graph.digest()) == 64
+    assert len(graph.digest()) == len(graph.structure_digest()) == 64
     nodes = {node["id"]: node for node in manifest["nodes"]}
     assert nodes["source.aim"]["source_sha256"] == __import__("hashlib").sha256(
         (ROOT / "aim.md").read_bytes()).hexdigest()
     assert nodes["zoe.live"]["payload_sha256"] == __import__("hashlib").sha256(
         sentinel.encode()).hexdigest()
-    assert {("source.aim", "yields_exact_fields", "aim.compass"),
+    assert nodes["source.engine"]["source_sha256"] == m.OPERATIVE_SOURCES[0].sha256
+    self_node = next(node for node in graph.nodes if node.id == "harness.self")
+    assert f"structure_sha256:{graph.structure_digest()}" in self_node.text
+    assert "harness.self>describes_boundedly>harness.self" in self_node.text
+    assert "payloads and payload hashes do not" in self_node.text
+    assert m._wake_self_map(graph, "sol") == self_node.text
+    assert sentinel not in json.dumps(graph.structure())
+    assert {("source.engine", "grounds", "harness.self"),
+            ("harness.self", "describes_boundedly", "harness.self"),
+            ("source.aim", "yields_exact_fields", "aim.compass"),
             ("zoe.live", "contacts", "encounter")} <= {
         (edge["from"], edge["relation"], edge["to"]) for edge in manifest["edges"]}
 
@@ -625,7 +642,7 @@ def test_ordinary_wake_admits_compass_fields_and_metadata_not_whole_documents(mo
     assert "objective: objective words" in prompt and "front: front words" in prompt
     assert all(marker not in prompt for marker in (
         "SOUL-PRIVATE-BODY", "HIM-PRIVATE-BODY", "SPIRIT-PRIVATE-BODY", "CONTINUITY-PRIVATE-BODY"))
-    assert prompt.count("sha256:") >= 5 and len(prompt) < 6500
+    assert prompt.count("sha256:") >= 5 and len(prompt) < 8500
 
 
 def test_recent_dialogue_is_tail_bounded_without_whole_record_scan(monkeypatch):

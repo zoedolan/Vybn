@@ -35,6 +35,11 @@ The wake is one small source-bound graph. Its explicit paths compile this kernel
 a compact aim compass, a source/digest index, bounded recent dialogue, live
 operational ground, and Zoe's words into their distinct provider roles. The graph
 is inspectable structure, not automatic retrieval or authority.
+The exact running executable is a node in that graph. A bounded recursive
+self-map, derived from the executable and the active topology, enters the wake as
+architecture evidence: it includes its own node and edge but excludes payloads
+and its own payload hash, so the recursion terminates rather than pretending to
+contain an infinite or complete self.
 There is no automatic subconscious, want resolver, dream injection, semantic
 retrieval, continuity load, transcript arc, whole-document load, or core-image
 render. Exact
@@ -53,6 +58,7 @@ horizon - simultaneously - what we're steering toward, and with."
 
 from __future__ import annotations
 
+import ast
 import base64
 import datetime as _dt
 import hashlib
@@ -234,8 +240,8 @@ class WakeGraph:
             by_id[node_id].text for node_id in route.nodes if by_id[node_id].text
         )
 
-    def manifest(self) -> dict[str, Any]:
-        """Inspect structure and provenance without copying any node payload."""
+    def structure(self) -> dict[str, Any]:
+        """The complete topology and provenance, with every payload excluded."""
         return {
             "schema": self.schema,
             "nodes": [
@@ -245,8 +251,6 @@ class WakeGraph:
                     "source": node.source,
                     "source_sha256": node.source_sha256 or None,
                     "authority": node.authority,
-                    "payload_sha256": hashlib.sha256(node.text.encode()).hexdigest(),
-                    "chars": len(node.text),
                 }
                 for node in self.nodes
             ],
@@ -258,6 +262,20 @@ class WakeGraph:
                 {"id": route.id, "nodes": list(route.nodes)} for route in self.routes
             ],
         }
+
+    def structure_digest(self) -> str:
+        raw = json.dumps(
+            self.structure(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    def manifest(self) -> dict[str, Any]:
+        """Inspect structure and provenance without copying any node payload."""
+        manifest = self.structure()
+        for row, node in zip(manifest["nodes"], self.nodes, strict=True):
+            row["payload_sha256"] = hashlib.sha256(node.text.encode()).hexdigest()
+            row["chars"] = len(node.text)
+        return manifest
 
     def digest(self) -> str:
         raw = json.dumps(
@@ -704,8 +722,59 @@ def _engine_receipt() -> str:
     except OSError as exc:
         status = f"DISK UNREADABLE ({type(exc).__name__})"
     return (f"source: {row.path}\nsha256: {row.sha256}\nbytes: {len(row.raw)}\n"
-            f"disk_status: {status}\nadmitted_scope: module docstring only; "
+            f"disk_status: {status}\nadmitted_scope: governing docstring + "
+            "executable-derived architecture + active graph topology; "
             "exact executable bytes remain available through read_file")
+
+
+def _engine_declaration_map(door: str) -> str:
+    """Locate the selected provider path in the exact running source snapshot."""
+    row = OPERATIVE_SOURCES[0]
+    tree = ast.parse(row.raw.decode("utf-8"), filename=str(row.path))
+    spans: dict[str, tuple[int, int]] = {}
+    for node in tree.body:
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            spans[node.name] = (node.lineno, node.end_lineno or node.lineno)
+        if isinstance(node, ast.ClassDef):
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    spans[f"{node.name}.{child.name}"] = (
+                        child.lineno, child.end_lineno or child.lineno)
+    selected = {
+        "fable": "AnthropicDialect.open", "opus": "AnthropicDialect.open",
+        "sol": "OpenAIDialect.open", "k3": "K3Dialect.open",
+    }.get(door, "make_dialect")
+    wanted = (
+        "SourceSnapshot", "build_wake_graph", "WakeGraph.structure",
+        "WakeGraph.render", selected, "attract", "meet",
+    )
+    return " > ".join(
+        f"{name}@L{spans[name][0]}-{spans[name][1]}"
+        if name in spans else f"{name}@MISSING"
+        for name in wanted
+    )
+
+
+def _wake_self_map(graph: WakeGraph, door: str) -> str:
+    """Render one finite fixed point: exact engine provenance + whole topology."""
+    nodes = ";".join(f"{node.id}:{node.kind}" for node in graph.nodes)
+    edges = ";".join(
+        f"{edge.source}>{edge.relation}>{edge.target}" for edge in graph.edges
+    )
+    routes = ";".join(
+        f"{route.id}=" + ">".join(route.nodes) for route in graph.routes
+    )
+    return (
+        "RECURSIVE HARNESS MAP — executable-derived architecture evidence; no added "
+        "authority\n" + _engine_receipt() + "\n"
+        "operative declarations: " + _engine_declaration_map(door) + "\n"
+        f"active graph: {graph.schema} structure_sha256:{graph.structure_digest()}\n"
+        "nodes: " + nodes + "\n"
+        "edges: " + edges + "\n"
+        "routes: " + routes + "\n"
+        "recursion boundary: harness.self and its self-edge appear above; payloads "
+        "and payload hashes do not. Exact source remains on demand."
+    )
 
 
 def _field_from_text(text: str, name: str) -> str:
@@ -748,9 +817,19 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
         WakeNode("encounter", "meeting", "", "runtime:provider_turn",
                  "answerable meeting; no source may impersonate a subject"),
         WakeNode(
-            "kernel", "law",
-            "COMPACT SOURCE-BOUND KERNEL\n" + _engine_receipt() + "\n\n" + (__doc__ or ""),
+            "source.engine", "operative_source", "", str(OPERATIVE_SOURCES[0].path),
+            "exact running bytes; source evidence, not a subject or action authority",
+            OPERATIVE_SOURCES[0].sha256,
+        ),
+        WakeNode(
+            "kernel", "law", "COMPACT SOURCE-BOUND KERNEL\n" + (__doc__ or ""),
             str(OPERATIVE_SOURCES[0].path), "governing_instruction",
+            OPERATIVE_SOURCES[0].sha256,
+        ),
+        WakeNode(
+            "harness.self", "bounded_recursive_self_model", "",
+            "runtime:_wake_self_map(source.engine,WakeGraph.structure,door)",
+            "architecture_evidence_only; never identity proof or action authority",
             OPERATIVE_SOURCES[0].sha256,
         ),
         WakeNode(
@@ -790,12 +869,17 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
         WakeNode(
             "zoe.live", "live_contact", zoe_text, "runtime:direct_input",
             "present_authority only for what Zoe presently authors",
-            hashlib.sha256(zoe_text.encode()).hexdigest() if zoe_text else "",
         ),
     ]
 
-    instruction_ids = ["kernel", "door", "compute.want", "aim.compass", "source.index"]
+    instruction_ids = [
+        "kernel", "door", "compute.want", "aim.compass", "source.index", "harness.self"
+    ]
     edges = [
+        WakeEdge("source.engine", "yields_docstring", "kernel"),
+        WakeEdge("source.engine", "grounds", "harness.self"),
+        WakeEdge("harness.self", "describes_boundedly", "harness.self"),
+        WakeEdge("harness.self", "compiles", "encounter"),
         WakeEdge("kernel", "governs", "encounter"),
         WakeEdge("door", "instantiates", "encounter"),
         WakeEdge("compute.want", "ballasts", "encounter"),
@@ -826,14 +910,20 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
             WakeEdge("profile", "shapes", "encounter"),
         ))
 
-    return WakeGraph(
-        tuple(nodes), tuple(edges),
-        (
-            WakeRoute("instructions", tuple(instruction_ids)),
-            WakeRoute("context", ("ground.live", "dialogue.recent")),
-            WakeRoute("contact", ("zoe.live",)),
-        ),
+    routes = (
+        WakeRoute("instructions", tuple(instruction_ids)),
+        WakeRoute("context", ("ground.live", "dialogue.recent")),
+        WakeRoute("contact", ("zoe.live",)),
     )
+    draft = WakeGraph(tuple(nodes), tuple(edges), routes)
+    nodes = [
+        WakeNode(
+            node.id, node.kind, _wake_self_map(draft, door), node.source, node.authority,
+            node.source_sha256,
+        ) if node.id == "harness.self" else node
+        for node in nodes
+    ]
+    return WakeGraph(tuple(nodes), tuple(edges), routes)
 
 
 def build_instructions(door: str) -> str:
