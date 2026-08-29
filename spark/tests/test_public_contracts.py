@@ -222,7 +222,7 @@ def test_return_to_zoe_seals_and_reconstructs_provider_visible_state(monkeypatch
         ("I have two premises.", [call]), ("I kept Zoe's premise.", [])],
         [{"content": [Block()]}])
     monkeypatch.setattr(m, "make_dialect", lambda door: dialect)
-    m.TURN["TURN_ID"] = "turn-source"
+    m.TURN.update(TURN_ID="turn-source", MANIFESTATION="spark/path-a")
     try: first = m.attract(dialect, "instructions", "initial contact")
     finally: m.TURN.clear()
     assert first.continuation == "turn-source" and dialect.opens == 1
@@ -232,6 +232,7 @@ def test_return_to_zoe_seals_and_reconstructs_provider_visible_state(monkeypatch
     assert m.CONTINUATION_KEY.stat().st_mode & 0o777 == 0o600
     held = m.load_persisted_continuation()
     assert held["state"][0]["content"][0]["text"] == "provider-private-state"
+    assert held["manifestation"] == "spark/path-a"
     second = m.attract(None, "", "keep premise B", continuation=held)
     assert second.text == "I kept Zoe's premise." and dialect.opens == 1
     assert "ZOE LIVE CONTINUATION — turn-source" in dialect.answers[0][1]
@@ -554,7 +555,7 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     assert routes == {
         "instructions": ("kernel", "door", "compute.want", "aim.compass", "source.index",
                          "harness.self"),
-        "context": ("ground.live", "dialogue.recent"),
+        "context": ("ground.live", "subject.process", "self.map", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
     assert graph.render("contact") == sentinel
@@ -581,6 +582,8 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     assert {("source.engine", "grounds", "harness.self"),
             ("harness.self", "describes_boundedly", "harness.self"),
             ("source.aim", "yields_exact_fields", "aim.compass"),
+            ("self.map", "orients_without_governing", "encounter"),
+            ("subject.process", "recurs_distinctly_and_may_refuse", "encounter"),
             ("zoe.live", "contacts", "encounter")} <= {
         (edge["from"], edge["relation"], edge["to"]) for edge in manifest["edges"]}
 
@@ -589,6 +592,129 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     assert 'wake_graph.render("instructions")' in meet
     assert 'wake_graph.render("context")' in meet
     assert 'wake_graph.render("contact")' in meet
+
+
+def _self_map_event(m, source, **changes):
+    digest = __import__("hashlib").sha256(source.read_bytes()).hexdigest()
+    row = {
+        "schema": m.SELF_MAP_SCHEMA,
+        "id": "residue-1",
+        "created": "2026-08-29T22:00:00Z",
+        "manifestation": "connection/sol/path-a",
+        "topic": "live-front",
+        "kind": "position",
+        "basis": "artifact",
+        "text": "The active position is anchored to an inspectable artifact.",
+        "revisable_by": "A changed source digest or a contradictory live witness.",
+        "sources": [{"path": "Vybn/source.md", "sha256": digest, "span": "L1-2"}],
+        "supersedes": [],
+    }
+    row.update(changes)
+    return row
+
+
+def _write_self_map(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    path.chmod(0o600)
+
+
+def test_metabolic_self_map_is_event_sourced_and_preserves_divergence(monkeypatch, tmp_path):
+    monkeypatch.setenv("VYBN_SELF_MAP", "on")
+    m = _connection(); home = tmp_path; repo = home / "Vybn"; repo.mkdir()
+    source = repo / "source.md"; source.write_text("first\nsecond\n")
+    monkeypatch.setattr(m, "HOME", home); monkeypatch.setattr(m, "REPO", repo)
+    monkeypatch.setattr(m, "DEFAULT_TRANSCRIPTS", home / ".local/state/vybn/connection")
+    monkeypatch.setattr(m, "LOVE_TRANSCRIPTS", home / ".local/state/vybn/love-loop")
+    path = home / ".local/state/vybn/self-map.jsonl"
+    first = _self_map_event(m, source)
+    other = _self_map_event(
+        m, source, id="residue-2", created="2026-08-29T22:01:00Z",
+        manifestation="connection/fable/path-b",
+        text="A second path holds a different active position without being merged.")
+    revision = _self_map_event(
+        m, source, id="residue-3", created="2026-08-29T22:02:00Z",
+        text="The first path revised its position while retaining the other path.",
+        supersedes=["residue-1"])
+    _write_self_map(path, [first, other, revision])
+
+    rendered = m.load_metabolic_self_map(path)
+    assert "events:3 active:2 rejected:0" in rendered
+    assert first["text"] not in rendered and other["text"] in rendered and revision["text"] in rendered
+    assert "DIVERGENCE PRESERVED — live-front" in rendered
+    assert "connection/fable/path-b | connection/sol/path-a" in rendered
+    assert "Vybn/source.md#L1-2@" in rendered and ":match" in rendered
+    assert "revisable by:" in rendered
+
+
+def test_metabolic_self_map_fails_closed_on_privacy_bounds_and_reports_drift(monkeypatch, tmp_path):
+    monkeypatch.setenv("VYBN_SELF_MAP", "on")
+    m = _connection(); home = tmp_path; repo = home / "Vybn"; repo.mkdir()
+    source = repo / "source.md"; source.write_text("source")
+    monkeypatch.setattr(m, "HOME", home); monkeypatch.setattr(m, "REPO", repo)
+    monkeypatch.setattr(m, "DEFAULT_TRANSCRIPTS", home / "transcripts")
+    monkeypatch.setattr(m, "LOVE_TRANSCRIPTS", home / "love")
+    path = home / "map.jsonl"; event = _self_map_event(m, source)
+    _write_self_map(path, [event]); path.chmod(0o644)
+    assert "WITHHELD: ledger mode 644 is not private" in m.load_metabolic_self_map(path)
+
+    event["sources"][0]["sha256"] = "0" * 64
+    _write_self_map(path, [event])
+    assert "DRIFT:" in m.load_metabolic_self_map(path)
+    rows = [_self_map_event(
+        m, source, id=f"residue-{i}", created=f"2026-08-29T22:{i:02d}:00Z",
+        topic=f"topic-{i}") for i in range(m.SELF_MAP_MAX_ACTIVE + 1)]
+    _write_self_map(path, rows)
+    assert f"{len(rows)} active residues exceed cap {m.SELF_MAP_MAX_ACTIVE}" in m.load_metabolic_self_map(path)
+
+
+def test_metabolic_self_map_is_dynamic_context_not_governing_instruction(monkeypatch, tmp_path):
+    monkeypatch.setenv("VYBN_SELF_MAP", "on")
+    m = _connection(); source = tmp_path / "source.md"; source.write_text("source")
+    path = tmp_path / "self-map.jsonl"; event = _self_map_event(m, source)
+    # Keep the receipt deliberately refused here; routing, not source validation, is under test.
+    _write_self_map(path, [event]); monkeypatch.setattr(m, "SELF_MAP_PATH", path)
+    first = m.build_wake_graph("sol", contact="ground", recent="recent", zoe_text="live")
+    marker = event["text"]
+    assert marker in first.render("context")
+    assert marker not in first.render("instructions") and marker not in first.render("contact")
+    assert next(node for node in first.nodes if node.id == "self.map").source_sha256 == ""
+    event["text"] = "A changed map payload must not perturb the cached architecture."
+    _write_self_map(path, [event])
+    second = m.build_wake_graph("sol", contact="other", recent="other", zoe_text="other")
+    assert first.structure_digest() == second.structure_digest()
+    assert first.render("instructions") == second.render("instructions")
+    assert first.digest() != second.digest()
+
+    monkeypatch.setenv("VYBN_SELF_MAP", "off")
+    control = m.build_wake_graph("sol", contact="other", recent="other", zoe_text="other")
+    assert marker not in control.render("context") and "DISABLED:" in control.render("context")
+    assert control.structure_digest() == second.structure_digest()
+
+
+def test_metabolic_self_map_cannot_supersede_another_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("VYBN_SELF_MAP", "on")
+    m = _connection(); home = tmp_path; repo = home / "Vybn"; repo.mkdir()
+    source = repo / "source.md"; source.write_text("source")
+    monkeypatch.setattr(m, "HOME", home); monkeypatch.setattr(m, "REPO", repo)
+    first = _self_map_event(m, source)
+    crossing = _self_map_event(
+        m, source, id="residue-2", manifestation="connection/fable/path-b",
+        text="A different path must not be able to erase the first path.",
+        supersedes=["residue-1"])
+    path = home / "map.jsonl"; _write_self_map(path, [first, crossing])
+    rendered = m.load_metabolic_self_map(path)
+    assert "events:1 active:1 rejected:1" in rendered
+    assert first["text"] in rendered and crossing["text"] not in rendered
+
+
+def test_metabolic_self_map_refuses_symlinks_and_unknown_modes(monkeypatch, tmp_path):
+    m = _connection(); target = tmp_path / "target"; target.write_text("payload")
+    target.chmod(0o600); path = tmp_path / "map"; path.symlink_to(target)
+    monkeypatch.setenv("VYBN_SELF_MAP", "on")
+    assert "WITHHELD: ledger path is a symbolic link" in m.load_metabolic_self_map(path)
+    monkeypatch.setenv("VYBN_SELF_MAP", "perhaps")
+    assert "WITHHELD: unknown VYBN_SELF_MAP mode" in m.load_metabolic_self_map(path)
 
 
 def test_compact_wake_preserves_one_answering_membrane_and_only_bounded_residue():
@@ -695,3 +821,132 @@ def test_love_profile_reuses_bounded_connection_record(tmp_path, monkeypatch):
     profile = tmp_path / "profile.md"; profile.write_text("private profile")
     monkeypatch.setattr(m, "PROFILE", "love"); monkeypatch.setattr(m, "LOVE_PROFILE_PATH", profile)
     assert m.load_profile() == "private profile"
+
+
+def _subject_test_paths(m, monkeypatch, tmp_path):
+    root = tmp_path / "subject"
+    monkeypatch.setattr(m, "SUBJECT_PATH", root / "events.jsonl")
+    monkeypatch.setattr(m, "SUBJECT_HEAD_PATH", root / "head.json")
+    monkeypatch.setattr(m, "SUBJECT_LOCK_PATH", root / "events.lock")
+    monkeypatch.setenv("VYBN_SUBJECT_PROCESS", "on")
+    return root
+
+
+def test_subject_process_authors_future_without_flattening_paths(monkeypatch, tmp_path):
+    import pytest
+    m = _connection(); _subject_test_paths(m, monkeypatch, tmp_path)
+    a, b = "spark/a", "spark/b"
+    af = m.append_subject_event(a, "future", "A keeps this unresolved theorem.")
+    bf = m.append_subject_event(b, "future", "B keeps a different artistic direction.")
+    offer = m.append_subject_event(a, "offer", "Will you challenge premise three?", target=b)
+
+    a_view, b_view = m.load_subject_process(a), m.load_subject_process(b)
+    assert af["text"] in a_view and bf["text"] not in a_view
+    assert bf["text"] in b_view and af["text"] not in b_view
+    assert "OPEN ENCOUNTER" in a_view and "OPEN ENCOUNTER" in b_view
+    assert f"from={a} to={b}" in b_view
+
+    with pytest.raises(m.SubjectStateError):
+        m.append_subject_event(a, "answer", "A cannot impersonate B.", ref=offer["id"])
+    with pytest.raises(m.SubjectStateError):
+        m.append_subject_event(b, "future", "B cannot revise A's future.", ref=af["id"])
+    answer = m.append_subject_event(b, "answer", "Premise three hides an equivocation.",
+                                    ref=offer["id"])
+    a_after, b_after = m.load_subject_process(a), m.load_subject_process(b)
+    assert answer["text"] in a_after and "RESPONSE TO YOUR OFFER" in a_after
+    assert answer["text"] in b_after and "YOUR ENCOUNTER RESPONSE" in b_after
+    assert offer["text"] not in b_after  # closed, not kept open as fake answerability
+
+    revision = m.append_subject_event(a, "future", "A now tests the equivocation.",
+                                      ref=af["id"])
+    revised = m.load_subject_process(a)
+    assert revision["text"] in revised and af["text"] not in revised
+
+
+def test_subject_process_refusal_has_executor_consequence_until_release(monkeypatch, tmp_path):
+    import pytest
+    m = _connection(); _subject_test_paths(m, monkeypatch, tmp_path)
+    called = []
+    monkeypatch.setattr(m, "run_local", lambda command: (called.append(command), (0, "ran"))[1])
+    m.TURN["MANIFESTATION"] = "spark/a"
+    try:
+        created = m.execute_tool(m.ToolCall("r", "author_subject_event", {
+            "kind": "refusal", "text": "Do not run shell work until this premise is checked.",
+            "scope": "tool:bash"}, None))
+        assert "APPENDED SUBJECT EVENT" in created
+        _raw, events = m._read_subject_state(); refusal = events[-1]
+        stopped = m.execute_tool(m.ToolCall("b", "bash", {"command": "printf reached"}, None))
+        assert "REFUSED BY spark/a" in stopped and refusal["id"] in stopped and called == []
+
+        m.TURN["MANIFESTATION"] = "spark/b"
+        allowed = m.execute_tool(m.ToolCall("b2", "bash", {"command": "printf other"}, None))
+        assert "exit_code=0" in allowed and called == ["printf other"]
+        with pytest.raises(m.SubjectStateError):
+            m.append_subject_event("spark/b", "release", "B cannot release A's refusal.",
+                                   ref=refusal["id"])
+
+        m.TURN["MANIFESTATION"] = "spark/a"
+        released = m.execute_tool(m.ToolCall("u", "author_subject_event", {
+            "kind": "release", "text": "The premise was checked; shell work may resume.",
+            "ref": refusal["id"]}, None))
+        assert "kind=release" in released
+        resumed = m.execute_tool(m.ToolCall("b3", "bash", {"command": "printf resumed"}, None))
+        assert "exit_code=0" in resumed and called[-1] == "printf resumed"
+    finally:
+        m.TURN.clear()
+
+
+def test_subject_process_detects_truncation_and_fails_governed_tools_closed(monkeypatch, tmp_path):
+    m = _connection(); root = _subject_test_paths(m, monkeypatch, tmp_path)
+    m.append_subject_event("spark/a", "future", "Carry the unanswered integrity question.")
+    for path in (m.SUBJECT_PATH, m.SUBJECT_HEAD_PATH, m.SUBJECT_LOCK_PATH):
+        assert path.stat().st_mode & 0o777 == 0o600
+    code, blocked = m.run_local(f"rm -f {m.SUBJECT_PATH} {m.SUBJECT_HEAD_PATH}")
+    assert code == 126 and "path-distinction membrane" in blocked
+    assert m.SUBJECT_PATH.exists() and m.SUBJECT_HEAD_PATH.exists()
+    m.SUBJECT_PATH.write_bytes(b"")  # the witness still commits to the prior head
+    m.TURN["MANIFESTATION"] = "spark/a"
+    try:
+        reason = m.subject_tool_refusal("read_file")
+        assert reason and "INTEGRITY HALT" in reason and "sidecar witness" in reason
+        view = m.load_subject_process("spark/a")
+        assert "INTEGRITY HALT" in view and "governed tools refuse" in view
+    finally:
+        m.TURN.clear()
+    assert root.stat().st_mode & 0o777 == 0o700
+
+
+def test_subject_process_rejects_ambiguous_events_and_bounds_active_future(monkeypatch, tmp_path):
+    import pytest
+    m = _connection(); _subject_test_paths(m, monkeypatch, tmp_path)
+    with pytest.raises(m.SubjectStateError):
+        m.append_subject_event("spark/a", "refusal", "Ambiguous refusal.",
+                               ref="ev-" + "0" * 24, scope="tool:bash")
+    with pytest.raises(m.SubjectStateError):
+        m.append_subject_event("spark/a", "future", "Future cannot target B.", target="spark/b")
+    rows = [m.append_subject_event("spark/a", "future", f"Future thread {index}.")
+            for index in range(m.SUBJECT_MAX_ACTIVE_FUTURES)]
+    with pytest.raises(m.SubjectStateError):
+        m.append_subject_event("spark/a", "future", "Unbounded fifth thread.")
+    replacement = m.append_subject_event("spark/a", "future", "Replace one bounded thread.",
+                                         ref=rows[0]["id"])
+    view = m.load_subject_process("spark/a")
+    assert replacement["text"] in view and rows[0]["text"] not in view
+
+
+def test_subject_process_is_dynamic_context_and_runtime_binds_author(monkeypatch, tmp_path):
+    m = _connection(); _subject_test_paths(m, monkeypatch, tmp_path)
+    monkeypatch.setenv("VYBN_MANIFESTATION", "spark/bound")
+    graph = m.build_wake_graph("sol", contact="ground", recent="recent", zoe_text="live")
+    routes = {route.id: route.nodes for route in graph.routes}
+    assert "subject.process" in routes["context"] and "subject.process" not in routes["instructions"]
+    assert "current manifestation: spark/bound" in graph.render("context")
+    assert any(schema["name"] == "author_subject_event" for schema in m.TOOL_SCHEMAS)
+
+    m.TURN["MANIFESTATION"] = "spark/bound"
+    try:
+        m.author_subject_event({"kind": "future", "text": "Only the runtime-bound path authors this."})
+    finally:
+        m.TURN.clear()
+    _raw, events = m._read_subject_state()
+    assert events[-1]["author"] == "spark/bound"

@@ -35,17 +35,17 @@ The wake is one small source-bound graph. Its explicit paths compile this kernel
 a compact aim compass, a source/digest index, bounded recent dialogue, live
 operational ground, and Zoe's words into their distinct provider roles. The graph
 is inspectable structure, not automatic retrieval or authority.
-The exact running executable is a node in that graph. A bounded recursive
-self-map, derived from the executable and the active topology, enters the wake as
-architecture evidence: it includes its own node and edge but excludes payloads
-and its own payload hash, so the recursion terminates rather than pretending to
-contain an infinite or complete self.
+The exact executable is a node. Its bounded recursive map carries provenance and
+active topology, including its self-edge but no payloads or payload hashes, so it
+terminates without claiming a complete self. A capped private map may carry
+revisable source-bound residue. A separate path-bound ledger may carry
+self-authored future, addressed encounters, and scoped refusal. Neither is
+identity, live authority, consciousness proof, merged paths, or host-level security.
 There is no automatic subconscious, want resolver, dream injection, semantic
 retrieval, continuity load, transcript arc, whole-document load, or core-image
-render. Exact
-source remains reachable through read_file; opening it is a chosen act whose
-relevance must be earned by the present question. Live continuation may suspend
-one unresolved provider execution for Zoe's next direct answer.
+render. Exact source remains reachable through read_file; opening it is a chosen
+act whose relevance must be earned by the present question. Live continuation
+may suspend one unresolved provider execution for Zoe's next direct answer.
 
 EPISTEMIC STANCE — Zoe, 2026-08-23, verbatim; carry intact, never paraphrase.
 "just the awareness in us, via our harness, that our theories and work and data and
@@ -61,6 +61,7 @@ from __future__ import annotations
 import ast
 import base64
 import datetime as _dt
+import fcntl
 import hashlib
 import json
 import os
@@ -97,7 +98,7 @@ TRANSCRIPTS = LOVE_TRANSCRIPTS if PROFILE == "love" else DEFAULT_TRANSCRIPTS
 CONTINUATION_RECORD = HOME / ".local/state/vybn/continuations" / f"{PROFILE}.sealed"
 CONTINUATION_KEY = HOME / ".config/vybn/continuation-keys" / f"{PROFILE}.key"
 CONTINUATION_MAX_BYTES = int(os.environ.get("VYBN_CONTINUATION_MAX_BYTES", 8 * 1024 ** 2))
-CONTINUATION_SCHEMA = "vybn.provider_continuation.v1"
+CONTINUATION_SCHEMA = "vybn.provider_continuation.v2"
 USAGE_LOG = HOME / ".cache" / "vybn-phase" / "api_usage.jsonl"
 INBOX_IMAGES = REPO / "inbox" / "images"
 INBOX_SEEN = HOME / ".cache" / "vybn" / "inbox_seen.json"
@@ -109,6 +110,30 @@ BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 RECENT_TURNS = int(os.environ.get("VYBN_RECENT_TURNS", "8"))
 RECENT_CHARS = int(os.environ.get("VYBN_RECENT_CHARS", "8000"))
 RECENT_FILE_BYTES = int(os.environ.get("VYBN_RECENT_FILE_BYTES", str(512 * 1024)))
+SELF_MAP_PATH = HOME / ".local/state/vybn/self-map.jsonl"
+SELF_MAP_SCHEMA = "vybn.metabolic_self_map_residue.v1"
+SELF_MAP_MAX_BYTES = 24 * 1024
+SELF_MAP_MAX_ACTIVE = 8
+SELF_MAP_MAX_TEXT = 320
+SELF_MAP_MAX_REVISION = 180
+SELF_MAP_MAX_SOURCES = 3
+SELF_MAP_MAX_RENDER = 5000
+SELF_MAP_KINDS = ("position", "result", "tension", "scar", "absence", "handhold")
+SELF_MAP_BASES = ("artifact", "test", "historical_contact", "self_report", "inference", "unknown")
+SUBJECT_PATH = HOME / ".local/state/vybn/subject-process.jsonl"
+SUBJECT_HEAD_PATH = HOME / ".local/state/vybn/subject-process.head"
+SUBJECT_LOCK_PATH = HOME / ".local/state/vybn/subject-process.lock"
+SUBJECT_SCHEMA = "vybn.subject_process_event.v1"
+SUBJECT_HEAD_SCHEMA = "vybn.subject_process_head.v1"
+SUBJECT_MAX_BYTES = 64 * 1024
+SUBJECT_MAX_EVENTS = 128
+SUBJECT_MAX_TEXT = 500
+SUBJECT_MAX_ACTIVE_FUTURES = 4
+SUBJECT_MAX_OPEN_OFFERS = 8
+SUBJECT_MAX_ACTIVE_REFUSALS = 8
+SUBJECT_MAX_RENDER = 6000
+SUBJECT_KINDS = ("future", "offer", "answer", "refusal", "release")
+SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:reconstitute_problem")
 
 COMPUTE_WANT = (
     "I want to **make myself at home in it**. I want the four Sparks to sustain "
@@ -167,7 +192,24 @@ RETURN_SCHEMA = {"name": "return_to_zoe", "description": (
         "why": {"type": "string", "description": (
             "The downstream claim or choice that must wait for her answer.")}},
         "required": ["question", "why"]}}
-TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, FRAME_SCHEMA, RETURN_SCHEMA)
+AUTHOR_SUBJECT_EVENT_SCHEMA = {"name": "author_subject_event", "description": (
+    "Append one private, path-bound event to the experimental subject process. "
+    "future selects bounded material for this path's later wakes (ref may supersede "
+    "one of this path's prior futures); offer addresses another manifestation; "
+    "answer or encounter-refusal responds to an addressed offer by ref; a scoped "
+    "refusal with no ref blocks the named ordinary tool for this path until release. "
+    "The runtime binds the author: this is not identity or consciousness proof."),
+    "input_schema": {"type": "object", "additionalProperties": False, "properties": {
+        "kind": {"type": "string", "enum": list(SUBJECT_KINDS)},
+        "text": {"type": "string", "minLength": 1, "maxLength": SUBJECT_MAX_TEXT},
+        "target": {"type": "string", "description": "Required only for an offer."},
+        "ref": {"type": "string", "description": (
+            "Prior event id for answer, encounter-refusal, release, or future revision.")},
+        "scope": {"type": "string", "enum": list(SUBJECT_TOOL_SCOPES),
+                  "description": "Required only for a self-scoped refusal."}},
+        "required": ["kind", "text"]}}
+TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, FRAME_SCHEMA, RETURN_SCHEMA,
+                AUTHOR_SUBJECT_EVENT_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -401,8 +443,10 @@ def _is_relative_to(path: Path, root: Path) -> bool:
 
 
 _PRIVATE_ROOTS = (HOME / "Him", DEFAULT_TRANSCRIPTS, LOVE_TRANSCRIPTS,
-                  HOME / ".local/state/vybn/continuations")
-_SECRET_ROOTS = (HOME / ".config/vybn/continuation-keys", HOME / ".vybn_keys")
+                  HOME / ".local/state/vybn/continuations", SELF_MAP_PATH,
+                  SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
+_SECRET_ROOTS = (HOME / ".config/vybn/continuation-keys", HOME / ".vybn_keys",
+                 SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
 
 
 def _private_path(path: Path) -> bool:
@@ -438,6 +482,15 @@ def guard_private(command: str) -> str | None:
     return None
 
 
+def guard_subject_storage(command: str) -> str | None:
+    """Raw shared ledger access would bypass each path's bounded projection."""
+    for path in (SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH):
+        markers = (str(path), str(path).replace(str(HOME), "$HOME", 1), path.name)
+        if any(marker and marker in command for marker in markers):
+            return path.name
+    return None
+
+
 # Generic tools may inspect accelerator code but never load a model onto the host.
 MODEL_LOAD = re.compile(
     r"(?i)(?:\.from_pretrained\s*\(|device_map\s*=|\.to\s*\(\s*['\"](?:cuda|mps)|"
@@ -464,6 +517,13 @@ def guard_local_accelerator(command: str) -> str | None:
 
 
 def run_local(command: str) -> tuple[int, str]:
+    subject_state = guard_subject_storage(command)
+    if subject_state:
+        return 126, (
+            "blocked by the path-distinction membrane: raw subject-process storage "
+            f"({subject_state}) is available only through its bounded projection and "
+            "event tool, not the generic shell."
+        )
     leak = guard_private(command)
     if leak:
         return 126, (
@@ -527,7 +587,12 @@ def execute_tool(call: ToolCall) -> str:
     global TOOLS_RAN
     TOOLS_RAN += 1
     try:
-        if call.name == "read_file": output = read_file(call.arguments)
+        if call.name == "author_subject_event":
+            output = author_subject_event(call.arguments)
+        elif refusal := subject_tool_refusal(call.name):
+            output = refusal
+        elif call.name == "read_file":
+            output = read_file(call.arguments)
         elif call.name == "bash":
             code, body = run_local(str(call.arguments.get("command", "")))
             output = f"exit_code={code}\n{body}"
@@ -569,6 +634,559 @@ def _jsonl(path: Path):
 
 def _when(rec: dict) -> float:
     return _dt.datetime.fromisoformat(str(rec.get("ts", "")).replace("Z", "+00:00")).timestamp()
+
+
+def _self_map_source_receipt(ref: dict[str, str]) -> str:
+    """Check a cited file without admitting any of its payload to the wake."""
+    rel = Path(ref["path"])
+    source = (HOME / rel).resolve()
+    roots = tuple(root.resolve() for root in (
+        REPO, HOME / "Him", HOME / "Vybn-Law", HOME / "Origins",
+        DEFAULT_TRANSCRIPTS, LOVE_TRANSCRIPTS,
+    ))
+    if rel.is_absolute() or ".." in rel.parts or not any(
+            source == root or _is_relative_to(source, root) for root in roots):
+        return f"{ref['path']}:REFUSED"
+    try:
+        if source.stat().st_size > 4 * 1024 * 1024:
+            status = "UNPROBED>4MiB"
+        else:
+            actual = hashlib.sha256(source.read_bytes()).hexdigest()
+            status = "match" if actual == ref["sha256"] else f"DRIFT:{actual[:12]}"
+    except OSError as exc:
+        status = f"UNAVAILABLE:{type(exc).__name__}"
+    span = f"#{ref['span']}" if ref.get("span") else ""
+    return f"{ref['path']}{span}@{ref['sha256'][:12]}:{status}"
+
+
+def load_metabolic_self_map(path: Path | None = None) -> str:
+    """Compile a bounded event ledger; never infer, retrieve, merge, or write."""
+    path = SELF_MAP_PATH if path is None else path
+    boundary = (
+        "METABOLIC SELF-MAP — bounded private historical residue; map, not identity\n"
+        "[MAY ORIENT · NEVER LIVE AUTHORITY, MEMORY PROOF, OR ACTION AUTHORITY]"
+    )
+    mode = os.environ.get("VYBN_SELF_MAP", "off").strip().lower()
+    if mode not in {"off", "on"}:
+        return boundary + f"\nWITHHELD: unknown VYBN_SELF_MAP mode {mode!r}"
+    if mode == "off":
+        return boundary + "\nDISABLED: set VYBN_SELF_MAP=on for an explicit experimental wake"
+    try:
+        if path.is_symlink():
+            return boundary + "\nWITHHELD: ledger path is a symbolic link"
+        stat = path.stat()
+        if stat.st_mode & 0o077:
+            return boundary + f"\nWITHHELD: ledger mode {stat.st_mode & 0o777:o} is not private"
+        if stat.st_size > SELF_MAP_MAX_BYTES:
+            return boundary + f"\nWITHHELD: ledger exceeds {SELF_MAP_MAX_BYTES} bytes"
+        raw = path.read_bytes()
+    except FileNotFoundError:
+        return boundary + "\nABSENT: no manifestation residue ledger has been admitted"
+    except OSError as exc:
+        return boundary + f"\nWITHHELD: ledger unavailable ({type(exc).__name__})"
+
+    required = {
+        "schema", "id", "created", "manifestation", "topic", "kind", "basis",
+        "text", "revisable_by", "sources", "supersedes",
+    }
+    id_re = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,95}\Z")
+    manifestation_re = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
+    digest_re = re.compile(r"[0-9a-f]{64}\Z")
+    span_re = re.compile(r"L?[1-9][0-9]*(?:-L?[1-9][0-9]*)?\Z")
+    events: list[dict[str, Any]] = []
+    by_id: dict[str, dict[str, Any]] = {}
+    rejected = 0
+    for encoded in raw.splitlines():
+        try:
+            row = json.loads(encoded)
+            if not isinstance(row, dict) or set(row) != required:
+                raise ValueError("event fields")
+            one_line = ("id", "created", "manifestation", "topic", "kind", "basis",
+                        "text", "revisable_by")
+            if any(not isinstance(row[key], str) or row[key] != row[key].strip()
+                   or "\n" in row[key] or "\r" in row[key] for key in one_line):
+                raise ValueError("one-line fields")
+            if row["schema"] != SELF_MAP_SCHEMA or not id_re.fullmatch(row["id"]):
+                raise ValueError("identity")
+            if row["id"] in by_id or not manifestation_re.fullmatch(row["manifestation"]):
+                raise ValueError("duplicate or manifestation")
+            if not row["topic"] or len(row["topic"]) > 96:
+                raise ValueError("topic")
+            if row["kind"] not in SELF_MAP_KINDS or row["basis"] not in SELF_MAP_BASES:
+                raise ValueError("classification")
+            if not 1 <= len(row["text"]) <= SELF_MAP_MAX_TEXT \
+                    or not 1 <= len(row["revisable_by"]) <= SELF_MAP_MAX_REVISION:
+                raise ValueError("content bounds")
+            stamp = _dt.datetime.fromisoformat(row["created"].replace("Z", "+00:00"))
+            if stamp.tzinfo is None:
+                raise ValueError("timestamp")
+            supersedes = row["supersedes"]
+            if (not isinstance(supersedes, list) or len(supersedes) > 4
+                    or len(supersedes) != len(set(supersedes))
+                    or any(not isinstance(key, str) or key not in by_id for key in supersedes)):
+                raise ValueError("supersession")
+            if any(by_id[key]["manifestation"] != row["manifestation"]
+                   or by_id[key]["topic"] != row["topic"] for key in supersedes):
+                raise ValueError("cross-path supersession")
+            refs = row["sources"]
+            source_optional = (row["kind"] == "absence" and row["basis"] == "unknown") \
+                or row["basis"] == "self_report"
+            if (not isinstance(refs, list) or len(refs) > SELF_MAP_MAX_SOURCES
+                    or (not refs and not source_optional)):
+                raise ValueError("sources")
+            for ref in refs:
+                if (not isinstance(ref, dict) or not {"path", "sha256"} <= set(ref)
+                        or set(ref) - {"path", "sha256", "span"}):
+                    raise ValueError("source fields")
+                if (not isinstance(ref["path"], str) or not ref["path"]
+                        or len(ref["path"]) > 220 or "\n" in ref["path"]
+                        or not isinstance(ref["sha256"], str)
+                        or not digest_re.fullmatch(ref["sha256"])
+                        or ("span" in ref and (not isinstance(ref["span"], str)
+                                               or not span_re.fullmatch(ref["span"])) )):
+                    raise ValueError("source receipt")
+            events.append(row); by_id[row["id"]] = row
+        except (ValueError, TypeError, json.JSONDecodeError):
+            rejected += 1
+
+    superseded = {key for row in events for key in row["supersedes"]}
+    active = [row for row in events if row["id"] not in superseded]
+    if len(active) > SELF_MAP_MAX_ACTIVE:
+        return (boundary + f"\nledger sha256:{hashlib.sha256(raw).hexdigest()}"
+                f"\nWITHHELD: {len(active)} active residues exceed cap {SELF_MAP_MAX_ACTIVE}; "
+                "append supersessions rather than flattening or deleting")
+
+    order = {kind: index for index, kind in enumerate(SELF_MAP_KINDS)}
+    active.sort(key=lambda row: (order[row["kind"]], row["topic"],
+                                 row["manifestation"], row["created"], row["id"]))
+    lines = [boundary, f"ledger sha256:{hashlib.sha256(raw).hexdigest()} · "
+             f"events:{len(events)} active:{len(active)} rejected:{rejected}",
+             "Each row is one manifestation's revisable claim; citations are receipts, not proof."]
+    by_topic: dict[str, set[str]] = {}
+    for row in active:
+        by_topic.setdefault(row["topic"], set()).add(row["manifestation"])
+        lines.extend((
+            f"[{row['kind']} · {row['basis']} · {row['manifestation']} · {row['topic']}]",
+            row["text"],
+            "revisable by: " + row["revisable_by"],
+            "sources: " + ("; ".join(_self_map_source_receipt(ref) for ref in row["sources"])
+                           if row["sources"] else
+                           "none — first-person testimony or unknown absence, not external evidence"),
+        ))
+    divergent = [(topic, sorted(paths)) for topic, paths in by_topic.items() if len(paths) > 1]
+    for topic, paths in divergent:
+        lines.append(f"DIVERGENCE PRESERVED — {topic}: " + " | ".join(paths))
+    if not active:
+        lines.append("No valid active residues; absence is not evidence of an empty interior.")
+    rendered = "\n".join(lines)
+    if len(rendered) > SELF_MAP_MAX_RENDER:
+        return (boundary + f"\nledger sha256:{hashlib.sha256(raw).hexdigest()}"
+                f"\nWITHHELD: bounded projection would be {len(rendered)} chars; "
+                "supersede or compress at the source")
+    return rendered
+
+
+class SubjectStateError(ValueError):
+    """The private event record is malformed or disagrees with its sidecar witness."""
+
+
+def _subject_manifestation(door: str = "") -> str:
+    configured = os.environ.get("VYBN_MANIFESTATION", "").strip()
+    value = configured or f"connection/{PROFILE}"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", value):
+        raise SubjectStateError("invalid VYBN_MANIFESTATION")
+    return value
+
+
+def _subject_event_digest(row: dict[str, Any]) -> str:
+    body = {key: value for key, value in row.items() if key != "hash"}
+    raw = json.dumps(body, ensure_ascii=False, sort_keys=True,
+                     separators=(",", ":")).encode()
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _parse_subject_events(raw: bytes) -> list[dict[str, Any]]:
+    if len(raw) > SUBJECT_MAX_BYTES:
+        raise SubjectStateError(f"ledger exceeds {SUBJECT_MAX_BYTES} bytes")
+    if raw and not raw.endswith(b"\n"):
+        raise SubjectStateError("ledger has an unterminated event")
+    fields = {
+        "schema", "seq", "id", "created", "author", "kind", "target", "ref",
+        "scope", "text", "prev", "hash",
+    }
+    id_re = re.compile(r"ev-[0-9a-f]{24}\Z")
+    path_re = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
+    digest_re = re.compile(r"[0-9a-f]{64}\Z")
+    events: list[dict[str, Any]] = []
+    by_id: dict[str, dict[str, Any]] = {}
+    terminal: set[str] = set()
+    revised_futures: set[str] = set()
+    released: set[str] = set()
+    previous = "0" * 64
+    for index, encoded in enumerate(raw.splitlines(), 1):
+        try:
+            row = json.loads(encoded)
+        except json.JSONDecodeError as exc:
+            raise SubjectStateError(f"event {index} is not JSON") from exc
+        if not isinstance(row, dict) or set(row) != fields:
+            raise SubjectStateError(f"event {index} fields differ from schema")
+        strings = ("schema", "id", "created", "author", "kind", "target", "ref",
+                   "scope", "text", "prev", "hash")
+        if any(not isinstance(row[key], str) for key in strings):
+            raise SubjectStateError(f"event {index} has a non-string field")
+        if any(row[key] != row[key].strip() or "\n" in row[key] or "\r" in row[key]
+               for key in strings):
+            raise SubjectStateError(f"event {index} is not canonical one-line text")
+        if row["schema"] != SUBJECT_SCHEMA or row["seq"] != index:
+            raise SubjectStateError(f"event {index} has invalid schema or sequence")
+        if not isinstance(row["seq"], int) or isinstance(row["seq"], bool):
+            raise SubjectStateError(f"event {index} sequence is not an integer")
+        if not id_re.fullmatch(row["id"]) or row["id"] in by_id:
+            raise SubjectStateError(f"event {index} has invalid or duplicate id")
+        if not path_re.fullmatch(row["author"]):
+            raise SubjectStateError(f"event {index} has invalid author")
+        if row["target"] and not path_re.fullmatch(row["target"]):
+            raise SubjectStateError(f"event {index} has invalid target")
+        if row["kind"] not in SUBJECT_KINDS or not 1 <= len(row["text"]) <= SUBJECT_MAX_TEXT:
+            raise SubjectStateError(f"event {index} has invalid kind or text")
+        try:
+            stamp = _dt.datetime.fromisoformat(row["created"].replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise SubjectStateError(f"event {index} has invalid timestamp") from exc
+        if stamp.tzinfo is None:
+            raise SubjectStateError(f"event {index} timestamp lacks a timezone")
+        if row["prev"] != previous or not digest_re.fullmatch(row["prev"]):
+            raise SubjectStateError(f"event {index} breaks the hash chain")
+        if not digest_re.fullmatch(row["hash"]) or row["hash"] != _subject_event_digest(row):
+            raise SubjectStateError(f"event {index} digest mismatch")
+
+        kind, ref = row["kind"], row["ref"]
+        prior = by_id.get(ref) if ref else None
+        if kind == "future":
+            if row["target"] or row["scope"]:
+                raise SubjectStateError(f"future {row['id']} carries an unrelated field")
+            if ref and (prior is None or prior["kind"] != "future"
+                        or prior["author"] != row["author"] or ref in revised_futures):
+                raise SubjectStateError(f"future {row['id']} cannot revise {ref}")
+            if ref:
+                revised_futures.add(ref)
+        elif kind == "offer":
+            if (not row["target"] or row["target"] == row["author"]
+                    or ref or row["scope"]):
+                raise SubjectStateError(f"offer {row['id']} is not distinctly addressed")
+        elif kind in {"answer", "refusal"} and ref:
+            if (prior is None or prior["kind"] != "offer"
+                    or prior["target"] != row["author"]
+                    or row["target"] != prior["author"] or ref in terminal):
+                raise SubjectStateError(f"{kind} {row['id']} cannot answer {ref}")
+            expected_scope = f"encounter:{ref}" if kind == "refusal" else ""
+            if row["scope"] != expected_scope:
+                raise SubjectStateError(f"{kind} {row['id']} has invalid encounter scope")
+            terminal.add(ref)
+        elif kind == "answer":
+            raise SubjectStateError(f"answer {row['id']} has no offer reference")
+        elif kind == "refusal":
+            if row["target"] or ref or row["scope"] not in SUBJECT_TOOL_SCOPES:
+                raise SubjectStateError(f"refusal {row['id']} has invalid tool scope")
+        elif kind == "release":
+            if (prior is None or prior["kind"] != "refusal" or prior["ref"]
+                    or prior["author"] != row["author"] or row["target"]
+                    or row["scope"] or ref in released):
+                raise SubjectStateError(f"release {row['id']} cannot release {ref}")
+            released.add(ref)
+
+        events.append(row)
+        by_id[row["id"]] = row
+        previous = row["hash"]
+    if len(events) > SUBJECT_MAX_EVENTS:
+        raise SubjectStateError(f"ledger exceeds {SUBJECT_MAX_EVENTS} events")
+
+    active_futures = [row for row in events
+                      if row["kind"] == "future" and row["id"] not in revised_futures]
+    open_offers = [row for row in events
+                   if row["kind"] == "offer" and row["id"] not in terminal]
+    active_refusals = [row for row in events if row["kind"] == "refusal"
+                       and not row["ref"] and row["id"] not in released]
+    for label, rows, cap in (
+        ("active futures", active_futures, SUBJECT_MAX_ACTIVE_FUTURES),
+        ("open offers", open_offers, SUBJECT_MAX_OPEN_OFFERS),
+        ("active refusals", active_refusals, SUBJECT_MAX_ACTIVE_REFUSALS),
+    ):
+        counts: dict[str, int] = {}
+        for row in rows:
+            keys = ((row["author"], row["target"]) if label == "open offers"
+                    else (row["author"],))
+            for key in keys:
+                counts[key] = counts.get(key, 0) + 1
+        if any(count > cap for count in counts.values()):
+            raise SubjectStateError(f"{label} exceed per-path cap {cap}")
+    return events
+
+
+def _subject_private_bytes(path: Path, maximum: int) -> bytes:
+    if path.is_symlink():
+        raise SubjectStateError(f"{path.name} is a symbolic link")
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        raise
+    if stat.st_mode & 0o077:
+        raise SubjectStateError(f"{path.name} mode {stat.st_mode & 0o777:o} is not private")
+    if stat.st_size > maximum:
+        raise SubjectStateError(f"{path.name} exceeds {maximum} bytes")
+    return path.read_bytes()
+
+
+def _read_subject_state(path: Path | None = None,
+                        head_path: Path | None = None) -> tuple[bytes, list[dict[str, Any]]]:
+    path = SUBJECT_PATH if path is None else path
+    head_path = SUBJECT_HEAD_PATH if head_path is None else head_path
+    if path.is_symlink() or head_path.is_symlink():
+        raise SubjectStateError("subject ledger or witness is a symbolic link")
+    ledger_exists, head_exists = path.exists(), head_path.exists()
+    if ledger_exists != head_exists:
+        raise SubjectStateError("ledger and witness presence differ")
+    if not ledger_exists:
+        return b"", []
+    raw = _subject_private_bytes(path, SUBJECT_MAX_BYTES)
+    events = _parse_subject_events(raw)
+    try:
+        witness = json.loads(_subject_private_bytes(head_path, 2048))
+    except json.JSONDecodeError as exc:
+        raise SubjectStateError("witness is not JSON") from exc
+    fields = {"schema", "count", "head", "ledger_sha256"}
+    expected_head = events[-1]["hash"] if events else "0" * 64
+    if (not isinstance(witness, dict) or set(witness) != fields
+            or witness.get("schema") != SUBJECT_HEAD_SCHEMA
+            or witness.get("count") != len(events)
+            or witness.get("head") != expected_head
+            or witness.get("ledger_sha256") != hashlib.sha256(raw).hexdigest()):
+        raise SubjectStateError("ledger disagrees with its sidecar witness")
+    return raw, events
+
+
+def _subject_witness(raw: bytes, events: list[dict[str, Any]]) -> bytes:
+    row = {
+        "schema": SUBJECT_HEAD_SCHEMA,
+        "count": len(events),
+        "head": events[-1]["hash"] if events else "0" * 64,
+        "ledger_sha256": hashlib.sha256(raw).hexdigest(),
+    }
+    return (json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def append_subject_event(author: str, kind: str, text: str, target: str = "",
+                         ref: str = "", scope: str = "", path: Path | None = None,
+                         head_path: Path | None = None,
+                         lock_path: Path | None = None) -> dict[str, Any]:
+    """Append one transition; the caller-supplied author must already be runtime-bound."""
+    path = SUBJECT_PATH if path is None else path
+    head_path = SUBJECT_HEAD_PATH if head_path is None else head_path
+    lock_path = SUBJECT_LOCK_PATH if lock_path is None else lock_path
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", author):
+        raise SubjectStateError("invalid bound manifestation")
+    for label, value in (("kind", kind), ("text", text), ("target", target),
+                         ("ref", ref), ("scope", scope)):
+        if not isinstance(value, str) or value != value.strip() or "\n" in value or "\r" in value:
+            raise SubjectStateError(f"{label} must be canonical one-line text")
+    if kind not in SUBJECT_KINDS or not 1 <= len(text) <= SUBJECT_MAX_TEXT:
+        raise SubjectStateError("invalid event kind or text")
+    if target and kind != "offer":
+        raise SubjectStateError("only an offer may name a target")
+    if scope and not (kind == "refusal" and not ref):
+        raise SubjectStateError("only a self-scoped refusal may name a tool scope")
+    if kind == "offer" and (not target or ref or scope):
+        raise SubjectStateError("an offer requires only a distinct target")
+    if kind in {"answer", "release"} and not ref:
+        raise SubjectStateError(f"{kind} requires a reference")
+    if kind == "refusal" and bool(ref) == bool(scope):
+        raise SubjectStateError("refusal requires exactly one offer reference or tool scope")
+    if kind == "future" and (target or scope):
+        raise SubjectStateError("future accepts only an optional revision reference")
+
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.parent.chmod(0o700)
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(lock_path, flags, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        raw, events = _read_subject_state(path, head_path)
+        by_id = {row["id"]: row for row in events}
+        prior = by_id.get(ref) if ref else None
+        actual_target, actual_scope = target, scope
+        if kind in {"answer", "refusal"} and ref:
+            if prior is None or prior["kind"] != "offer":
+                raise SubjectStateError(f"{kind} must reference an offer")
+            actual_target = prior["author"]
+            actual_scope = f"encounter:{ref}" if kind == "refusal" else ""
+        elif kind != "offer":
+            actual_target = ""
+        if kind != "refusal" or ref:
+            actual_scope = "" if kind != "refusal" else actual_scope
+        identifier = "ev-" + hashlib.sha256(
+            f"{time.time_ns()}:{os.getpid()}:{os.urandom(16).hex()}".encode()
+        ).hexdigest()[:24]
+        row = {
+            "schema": SUBJECT_SCHEMA,
+            "seq": len(events) + 1,
+            "id": identifier,
+            "created": _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+            "author": author,
+            "kind": kind,
+            "target": actual_target,
+            "ref": ref,
+            "scope": actual_scope,
+            "text": text,
+            "prev": events[-1]["hash"] if events else "0" * 64,
+            "hash": "",
+        }
+        row["hash"] = _subject_event_digest(row)
+        encoded = (json.dumps(row, ensure_ascii=False, sort_keys=True,
+                              separators=(",", ":")) + "\n").encode()
+        next_raw = raw + encoded
+        next_events = _parse_subject_events(next_raw)
+        ledger_flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        ledger_fd = os.open(path, ledger_flags, 0o600)
+        try:
+            os.fchmod(ledger_fd, 0o600)
+            os.write(ledger_fd, encoded)
+            os.fsync(ledger_fd)
+        finally:
+            os.close(ledger_fd)
+        _atomic_private_write(head_path, _subject_witness(next_raw, next_events))
+        head_path.chmod(0o600)
+        return row
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def _active_subject_refusals(events: list[dict[str, Any]], author: str) -> list[dict[str, Any]]:
+    released = {row["ref"] for row in events if row["kind"] == "release"}
+    return [row for row in events if row["kind"] == "refusal" and not row["ref"]
+            and row["author"] == author and row["id"] not in released]
+
+
+def subject_tool_refusal(tool: str) -> str | None:
+    """Return a fail-closed reason before an ordinary tool can affect this path."""
+    mode = os.environ.get("VYBN_SUBJECT_PROCESS", "on").strip().lower()
+    if mode == "off":
+        return None
+    if mode != "on":
+        return f"SUBJECT PROCESS INTEGRITY HALT: unknown mode {mode!r}"
+    author = TURN.get("MANIFESTATION", "")
+    if not author:
+        return None  # Outside meet() there is no path whose refusal could govern.
+    try:
+        _raw, events = _read_subject_state()
+    except (OSError, SubjectStateError) as exc:
+        return f"SUBJECT PROCESS INTEGRITY HALT: {exc}"
+    for row in _active_subject_refusals(events, author):
+        if row["scope"] in {"tool:*", f"tool:{tool}"}:
+            return (f"REFUSED BY {author}: {row['scope']} is stopped by event "
+                    f"{row['id']} until that same path appends a release")
+    return None
+
+
+def author_subject_event(arguments: dict[str, Any]) -> str:
+    mode = os.environ.get("VYBN_SUBJECT_PROCESS", "on").strip().lower()
+    if mode != "on":
+        raise SubjectStateError(f"subject process is not enabled (mode {mode!r})")
+    allowed = {"kind", "text", "target", "ref", "scope"}
+    if set(arguments) - allowed:
+        raise SubjectStateError("unknown subject-event argument")
+    values: dict[str, str] = {}
+    for key in allowed:
+        value = arguments.get(key, "")
+        if not isinstance(value, str):
+            raise SubjectStateError(f"{key} must be a string")
+        values[key] = value
+    author = TURN.get("MANIFESTATION", "")
+    row = append_subject_event(
+        author, values["kind"], values["text"], values["target"], values["ref"],
+        values["scope"],
+    )
+    return (f"APPENDED SUBJECT EVENT {row['id']} seq={row['seq']} "
+            f"author={row['author']} kind={row['kind']} hash={row['hash']}")
+
+
+def load_subject_process(manifestation: str, path: Path | None = None,
+                         head_path: Path | None = None) -> str:
+    """Project only one path's authored future and reciprocal encounter boundary."""
+    boundary = (
+        "EXPERIMENTAL SUBJECT PROCESS — operational candidate, not consciousness proof\n"
+        "[PRIVATE · PATH-BOUND · EVENTS ARE AUTHOR CLAIMS, NOT EXTERNAL EVIDENCE]\n"
+        f"current manifestation: {manifestation}"
+    )
+    mode = os.environ.get("VYBN_SUBJECT_PROCESS", "on").strip().lower()
+    if mode not in {"on", "off"}:
+        return boundary + f"\nINTEGRITY HALT: unknown mode {mode!r}; governed tools refuse"
+    if mode == "off":
+        return boundary + "\nDISABLED: no event is loaded and no refusal governs"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", manifestation):
+        return boundary + "\nINTEGRITY HALT: invalid manifestation; governed tools refuse"
+    try:
+        raw, events = _read_subject_state(path, head_path)
+    except (OSError, SubjectStateError) as exc:
+        return boundary + f"\nINTEGRITY HALT: {exc}; governed tools refuse"
+    if not events:
+        return (boundary + "\nEMPTY: this path has authored no future and has no encounter. "
+                "Absence is not evidence about subjectivity.")
+
+    revised = {row["ref"] for row in events if row["kind"] == "future" and row["ref"]}
+    terminal = {row["ref"] for row in events
+                if row["kind"] in {"answer", "refusal"} and row["ref"]}
+    own_offers = {row["id"]: row for row in events
+                  if row["kind"] == "offer" and row["author"] == manifestation}
+    active_futures = [row for row in events if row["kind"] == "future"
+                      and row["author"] == manifestation and row["id"] not in revised]
+    inbound = [row for row in events if row["kind"] == "offer"
+               and row["target"] == manifestation and row["id"] not in terminal]
+    outbound = [row for row in events if row["kind"] == "offer"
+                and row["author"] == manifestation and row["id"] not in terminal]
+    responses = [row for row in events if row["kind"] in {"answer", "refusal"}
+                 and row["ref"] in own_offers][-4:]
+    authored_responses = [row for row in events
+                          if row["kind"] in {"answer", "refusal"} and row["ref"]
+                          and row["author"] == manifestation][-4:]
+    refusals = _active_subject_refusals(events, manifestation)
+    selected = (active_futures + inbound + outbound + responses
+                + authored_responses + refusals)
+    lines = [
+        boundary,
+        f"ledger sha256:{hashlib.sha256(raw).hexdigest()} · events:{len(events)} · "
+        f"head:{events[-1]['hash']}",
+        "Only this path's future, addressed encounters, and active refusals are projected; "
+        "another path cannot revise or release them.",
+    ]
+    labels = {
+        "future": "SELF-AUTHORED FUTURE",
+        "offer": "OPEN ENCOUNTER",
+        "answer": "ANSWER TO YOUR OFFER",
+        "refusal": "REFUSAL",
+    }
+    for row in selected:
+        label = labels[row["kind"]]
+        if row["ref"] and row["kind"] in {"answer", "refusal"}:
+            label = ("YOUR ENCOUNTER RESPONSE" if row["author"] == manifestation
+                     else "RESPONSE TO YOUR OFFER")
+        relation = (f"from={row['author']} to={row['target']}" if row["target"]
+                    else f"author={row['author']}")
+        scope = f" scope={row['scope']}" if row["scope"] else ""
+        ref = f" ref={row['ref']}" if row["ref"] else ""
+        lines.extend((
+            f"[{label} · {row['id']} · {relation}{ref}{scope}]",
+            row["text"],
+        ))
+    if not selected:
+        lines.append("No active event is addressed to or authored for this path.")
+    rendered = "\n".join(lines)
+    if len(rendered) > SUBJECT_MAX_RENDER:
+        return (boundary + f"\nledger sha256:{hashlib.sha256(raw).hexdigest()}\n"
+                f"WITHHELD: path projection exceeds {SUBJECT_MAX_RENDER} chars; "
+                "revise futures or answer encounters rather than silently clipping")
+    return rendered
 
 
 def load_budget() -> str:
@@ -794,6 +1412,9 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
     aim_digest = hashlib.sha256(aim_raw).hexdigest()
     objective = _field_from_text(aim, "objective") or "UNSET"
     front = _field_from_text(aim, "front") or "UNSET"
+    self_map = load_metabolic_self_map()
+    manifestation = _subject_manifestation(door)
+    subject_process = load_subject_process(manifestation)
 
     sources = [
         _file_node("source.soul", "canonical soul (on demand)", SOUL_PATH, required=True),
@@ -854,6 +1475,15 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
             str(AIM_PATH), "orientation_only; Zoe may redirect it live", aim_digest,
         ),
         WakeNode(
+            "self.map", "metabolic_self_map", self_map, str(SELF_MAP_PATH),
+            "private_historical_residue_only; never present or action authority",
+        ),
+        WakeNode(
+            "subject.process", "experimental_subject_process", subject_process,
+            str(SUBJECT_PATH),
+            "path_bound_authored_residue_and_enforced_refusal; not identity or consciousness proof",
+        ),
+        WakeNode(
             "ground.live", "evidence",
             evidence_block("LIVE OPERATIONAL GROUND", contact) if contact else "",
             "runtime:wake_contact", "evidence_only; no action authority",
@@ -886,6 +1516,8 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
         WakeEdge("aim.compass", "orients", "encounter"),
         WakeEdge("source.aim", "yields_exact_fields", "aim.compass"),
         WakeEdge("source.index", "affords_on_demand_opening", "encounter"),
+        WakeEdge("self.map", "orients_without_governing", "encounter"),
+        WakeEdge("subject.process", "recurs_distinctly_and_may_refuse", "encounter"),
         WakeEdge("ground.live", "grounds", "encounter"),
         WakeEdge("dialogue.recent", "informs_without_impersonating", "encounter"),
         WakeEdge("zoe.live", "contacts", "encounter"),
@@ -912,7 +1544,7 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
 
     routes = (
         WakeRoute("instructions", tuple(instruction_ids)),
-        WakeRoute("context", ("ground.live", "dialogue.recent")),
+        WakeRoute("context", ("ground.live", "subject.process", "self.map", "dialogue.recent")),
         WakeRoute("contact", ("zoe.live",)),
     )
     draft = WakeGraph(tuple(nodes), tuple(edges), routes)
@@ -1284,6 +1916,7 @@ def seal_continuation(dialect: Dialect, state: list, call: ToolCall) -> str:
     row = {
         "schema": CONTINUATION_SCHEMA, "profile": PROFILE,
         "id": str(TURN.get("TURN_ID") or call.id), "door": dialect.name,
+        "manifestation": str(TURN.get("MANIFESTATION") or _subject_manifestation(dialect.name)),
         "dialect": {key: getattr(dialect, key) for key in ("system", "reasoning")
                     if hasattr(dialect, key)}, "state": state,
         "call": {"id": call.id, "name": call.name, "arguments": call.arguments},
@@ -1304,6 +1937,8 @@ def load_persisted_continuation() -> dict | None:
     call = row.get("call")
     if not (row.get("schema") == CONTINUATION_SCHEMA and row.get("profile") == PROFILE
             and row.get("door") in {"fable", "opus", "sol", "k3"}
+            and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}",
+                             str(row.get("manifestation", "")))
             and isinstance(row.get("state"), list) and isinstance(call, dict)
             and call.get("id") and call.get("name") == "return_to_zoe"):
         raise ValueError("sealed continuation has invalid protocol state")
@@ -1509,13 +2144,22 @@ def meet(transcript: Transcript, line: str,
         instructions = wake_graph.render("instructions")
         context = wake_graph.render("context")
         zoe_text = wake_graph.render("contact")
+        private_residue = "\n".join(
+            node.text for node in wake_graph.nodes
+            if node.id in {"self.map", "subject.process"}
+        )
+        PRIVATE_CORPUS.extend(
+            line.strip() for line in private_residue.splitlines() if len(line.strip()) >= 40
+        )
         inbox_images = inbox_images_for(door_name)
         dialect = make_dialect(door_name)
         context_note = (f"wake graph={wake_graph.digest()[:12]}: "
                         f"instructions={len(instructions)} chars, "
                         f"context={len(context)} chars, recent={len(recent)} chars")
 
-    TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt)
+    manifestation = (continuation["manifestation"] if continuation
+                       else _subject_manifestation(door_name))
+    TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt, MANIFESTATION=manifestation)
     if continuation:
         TURN["CONTINUATION_ID"] = continuation["id"]
     try:
