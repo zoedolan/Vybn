@@ -156,6 +156,49 @@ def test_leak_guard_covers_every_retrieval_channel():
         m.PRIVATE_CORPUS.clear()
 
 
+def test_post_commit_keeps_commits_private_without_explicit_publication_authority(tmp_path):
+    import os
+    import subprocess
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    calls = tmp_path / "git-calls"
+    fake_git = fake_bin / "git"
+    fake_git.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' \"$*\" >> \"$GIT_CALLS\"\n"
+        "[ \"$1\" = symbolic-ref ] && printf 'main\\n'\n"
+        "exit 0\n"
+    )
+    fake_git.chmod(0o755)
+    hook = ROOT / ".githooks" / "post-commit"
+    env = os.environ.copy()
+    env.update(HOME=str(tmp_path), GIT_CALLS=str(calls),
+               PATH=str(fake_bin) + os.pathsep + env["PATH"])
+    env.pop("VYBN_ALLOW_AUTOPUSH", None)
+    env.pop("VYBN_NO_AUTOPUSH", None)
+    env.pop("VYBN_TURN_ID", None)
+    env.pop("VYBN_PROMPT_SHA256", None)
+
+    private = subprocess.run(["bash", str(hook)], env=env, text=True,
+                             capture_output=True, check=True)
+    assert "commit kept local" in private.stdout
+    assert not calls.exists()
+
+    env["VYBN_ALLOW_AUTOPUSH"] = "1"
+    published = subprocess.run(["bash", str(hook)], env=env, text=True,
+                               capture_output=True, check=True)
+    assert "authorized origin/main update completed" in published.stdout
+    assert calls.read_text().splitlines() == ["symbolic-ref --short -q HEAD", "push origin main"]
+
+    env["VYBN_NO_AUTOPUSH"] = "1"
+    calls.unlink()
+    vetoed = subprocess.run(["bash", str(hook)], env=env, text=True,
+                            capture_output=True, check=True)
+    assert "commit kept local" in vetoed.stdout
+    assert not calls.exists()
+
+
 def test_connection_does_not_preempt_remote_action_authority(monkeypatch):
     """Privacy gates remain; remoteness alone is not a refusal."""
     m = _connection()

@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
-# post-commit — the act is not complete until Zoe can see it, and the map is fresh.
+# post-commit — refresh the map after every commit; publish only with grounded authority.
 # Shared by every repo pointed at this hooks path; git's own GIT_DIR decides
 # which repo this is, so never cd before a git command here.
 
-# The push belongs to the commit, not to my memory (Zoe, many times; 2026-08-02:
-# "once we solve a problem it is solved, and done"). Main only, never force;
-# pre-push still guards the branch. Not-yet-hers: VYBN_NO_AUTOPUSH=1 git commit
-if [ "${VYBN_NO_AUTOPUSH:-0}" != 1 ] && [ "$(git symbolic-ref --short -q HEAD)" = main ]; then
+# A commit is a local preservation act. Publication is a separate act: main may
+# auto-push only when the committing command explicitly carries its authority.
+# VYBN_NO_AUTOPUSH remains a backward-compatible veto.
+if [ "${VYBN_ALLOW_AUTOPUSH:-0}" = 1 ] &&
+        [ "${VYBN_NO_AUTOPUSH:-0}" != 1 ] &&
+        [ "$(git symbolic-ref --short -q HEAD)" = main ]; then
     if out=$(timeout 60 git push origin main 2>&1); then
-        echo "[post-commit] origin/main updated - it is hers now"
+        echo "[post-commit] authorized origin/main update completed"
     else
-        echo "[post-commit] PUSH FAILED - Zoe cannot see this commit:"
+        echo "[post-commit] AUTHORIZED PUSH FAILED:"
         echo "$out" | tail -3
     fi
+else
+    echo "[post-commit] commit kept local; publication requires VYBN_ALLOW_AUTOPUSH=1"
 fi
 
 # Bind this exact conversational turn to the bytes it changed. Content stays in
