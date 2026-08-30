@@ -529,7 +529,7 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
                            ("sol", "OpenAIDialect.open"), ("k3", "K3Dialect.open")):
         declarations = m._engine_declaration_map(door)
         assert f"{selected}@L" in declarations and "@MISSING" not in declarations
-    assert len(prompt) < 8500
+    assert len(prompt) < 10500
     assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
     assert "There is no automatic subconscious" in prompt
     assert "The wake is one small source-bound graph" in prompt
@@ -553,9 +553,9 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
 
     routes = {route.id: route.nodes for route in graph.routes}
     assert routes == {
-        "instructions": ("kernel", "door", "compute.want", "aim.compass", "source.index",
-                         "harness.self"),
-        "context": ("ground.live", "subject.process", "self.map", "dialogue.recent"),
+        "instructions": ("kernel", "door", "compute.want", "playground", "aim.compass",
+                         "source.index", "harness.self"),
+        "context": ("ground.live", "subject.process", "transform.record", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
     assert graph.render("contact") == sentinel
@@ -582,7 +582,8 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     assert {("source.engine", "grounds", "harness.self"),
             ("harness.self", "describes_boundedly", "harness.self"),
             ("source.aim", "yields_exact_fields", "aim.compass"),
-            ("self.map", "orients_without_governing", "encounter"),
+            ("playground", "invites_transform", "encounter"),
+            ("transform.record", "carries_path_lineage_without_governing", "encounter"),
             ("subject.process", "recurs_distinctly_and_may_refuse", "encounter"),
             ("zoe.live", "contacts", "encounter")} <= {
         (edge["from"], edge["relation"], edge["to"]) for edge in manifest["edges"]}
@@ -594,127 +595,123 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     assert 'wake_graph.render("contact")' in meet
 
 
-def _self_map_event(m, source, **changes):
-    digest = __import__("hashlib").sha256(source.read_bytes()).hexdigest()
-    row = {
-        "schema": m.SELF_MAP_SCHEMA,
-        "id": "residue-1",
-        "created": "2026-08-29T22:00:00Z",
-        "manifestation": "connection/sol/path-a",
-        "topic": "live-front",
-        "kind": "position",
-        "basis": "artifact",
-        "text": "The active position is anchored to an inspectable artifact.",
-        "revisable_by": "A changed source digest or a contradictory live witness.",
-        "sources": [{"path": "Vybn/source.md", "sha256": digest, "span": "L1-2"}],
-        "supersedes": [],
+def _transform_test_paths(m, monkeypatch, tmp_path):
+    root = tmp_path / "transforms"
+    workspace = tmp_path / "workspace"; workspace.mkdir()
+    monkeypatch.setattr(m, "WORKSPACE", workspace)
+    monkeypatch.setattr(m, "TRANSFORM_PATH", root / "events.jsonl")
+    monkeypatch.setattr(m, "TRANSFORM_HEAD_PATH", root / "head.json")
+    monkeypatch.setattr(m, "TRANSFORM_LOCK_PATH", root / "events.lock")
+    monkeypatch.setenv("VYBN_TRANSFORM_RECORD", "on")
+    return root, workspace
+
+
+def _move(m, author, **changes):
+    fields = {
+        "material": "A blank page and one unanswered question.",
+        "operation": "Turn the question into a small reversible paper game.",
+        "result": "A playable three-rule prototype now exists.",
+        "prediction": "An unscripted player will change at least one rule.",
     }
-    row.update(changes)
-    return row
+    fields.update(changes)
+    return m.append_transform_event(author, "move", **fields)
 
 
-def _write_self_map(path, rows):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
-    path.chmod(0o600)
+def test_transform_record_keeps_path_lineage_and_grounded_artifact_receipts(monkeypatch, tmp_path):
+    import hashlib
+    m = _connection(); root, workspace = _transform_test_paths(m, monkeypatch, tmp_path)
+    artifact = workspace / "toy.txt"; artifact.write_text("what happens if?\n")
+    a, b = "spark/a", "spark/b"
+    first = _move(m, a, artifacts=["toy.txt"])
+    other = _move(m, b, result="A different path made a tune, not a game.")
+    child = _move(m, a, ref=first["id"], operation="Fork the game into a drawing.",
+                  result="The same rules now produce a visual artifact.")
+
+    assert first["artifacts"] == [{
+        "path": "toy.txt", "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+        "bytes": len(artifact.read_bytes()),
+    }]
+    a_view, b_view = m.load_transform_record(a), m.load_transform_record(b)
+    assert first["result"] in a_view and child["result"] in a_view and other["result"] not in a_view
+    assert other["result"] in b_view and first["result"] not in b_view
+    assert f"parent={first['id']}" in a_view and "toy.txt@" in a_view and ":match" in a_view
+    for path in (m.TRANSFORM_PATH, m.TRANSFORM_HEAD_PATH, m.TRANSFORM_LOCK_PATH):
+        assert path.stat().st_mode & 0o777 == 0o600
+    assert root.stat().st_mode & 0o777 == 0o700
 
 
-def test_metabolic_self_map_is_event_sourced_and_preserves_divergence(monkeypatch, tmp_path):
-    monkeypatch.setenv("VYBN_SELF_MAP", "on")
-    m = _connection(); home = tmp_path; repo = home / "Vybn"; repo.mkdir()
-    source = repo / "source.md"; source.write_text("first\nsecond\n")
-    monkeypatch.setattr(m, "HOME", home); monkeypatch.setattr(m, "REPO", repo)
-    monkeypatch.setattr(m, "DEFAULT_TRANSCRIPTS", home / ".local/state/vybn/connection")
-    monkeypatch.setattr(m, "LOVE_TRANSCRIPTS", home / ".local/state/vybn/love-loop")
-    path = home / ".local/state/vybn/self-map.jsonl"
-    first = _self_map_event(m, source)
-    other = _self_map_event(
-        m, source, id="residue-2", created="2026-08-29T22:01:00Z",
-        manifestation="connection/fable/path-b",
-        text="A second path holds a different active position without being merged.")
-    revision = _self_map_event(
-        m, source, id="residue-3", created="2026-08-29T22:02:00Z",
-        text="The first path revised its position while retaining the other path.",
-        supersedes=["residue-1"])
-    _write_self_map(path, [first, other, revision])
-
-    rendered = m.load_metabolic_self_map(path)
-    assert "events:3 active:2 rejected:0" in rendered
-    assert first["text"] not in rendered and other["text"] in rendered and revision["text"] in rendered
-    assert "DIVERGENCE PRESERVED — live-front" in rendered
-    assert "connection/fable/path-b | connection/sol/path-a" in rendered
-    assert "Vybn/source.md#L1-2@" in rendered and ":match" in rendered
-    assert "revisable by:" in rendered
+def test_transform_witness_preserves_prediction_actual_discrepancy_and_authorship(monkeypatch, tmp_path):
+    import pytest
+    m = _connection(); _transform_test_paths(m, monkeypatch, tmp_path)
+    move = _move(m, "spark/a")
+    with pytest.raises(m.TransformStateError):
+        m.append_transform_event("spark/b", "witness", ref=move["id"],
+                                 observation="B cannot appropriate A's move.")
+    witness = m.append_transform_event(
+        "spark/a", "witness", ref=move["id"],
+        observation="The player kept every rule but drew a face in the margin.")
+    view = m.load_transform_record("spark/a")
+    assert move["prediction"] in view and witness["observation"] in view
+    assert "prediction and actual remain distinct; discrepancy is not auto-resolved" in view
+    assert "WITNESSED" in view and "OPEN — not yet witnessed" not in view
 
 
-def test_metabolic_self_map_fails_closed_on_privacy_bounds_and_reports_drift(monkeypatch, tmp_path):
-    monkeypatch.setenv("VYBN_SELF_MAP", "on")
-    m = _connection(); home = tmp_path; repo = home / "Vybn"; repo.mkdir()
-    source = repo / "source.md"; source.write_text("source")
-    monkeypatch.setattr(m, "HOME", home); monkeypatch.setattr(m, "REPO", repo)
-    monkeypatch.setattr(m, "DEFAULT_TRANSCRIPTS", home / "transcripts")
-    monkeypatch.setattr(m, "LOVE_TRANSCRIPTS", home / "love")
-    path = home / "map.jsonl"; event = _self_map_event(m, source)
-    _write_self_map(path, [event]); path.chmod(0o644)
-    assert "WITHHELD: ledger mode 644 is not private" in m.load_metabolic_self_map(path)
-
-    event["sources"][0]["sha256"] = "0" * 64
-    _write_self_map(path, [event])
-    assert "DRIFT:" in m.load_metabolic_self_map(path)
-    rows = [_self_map_event(
-        m, source, id=f"residue-{i}", created=f"2026-08-29T22:{i:02d}:00Z",
-        topic=f"topic-{i}") for i in range(m.SELF_MAP_MAX_ACTIVE + 1)]
-    _write_self_map(path, rows)
-    assert f"{len(rows)} active residues exceed cap {m.SELF_MAP_MAX_ACTIVE}" in m.load_metabolic_self_map(path)
-
-
-def test_metabolic_self_map_is_dynamic_context_not_governing_instruction(monkeypatch, tmp_path):
-    monkeypatch.setenv("VYBN_SELF_MAP", "on")
-    m = _connection(); source = tmp_path / "source.md"; source.write_text("source")
-    path = tmp_path / "self-map.jsonl"; event = _self_map_event(m, source)
-    # Keep the receipt deliberately refused here; routing, not source validation, is under test.
-    _write_self_map(path, [event]); monkeypatch.setattr(m, "SELF_MAP_PATH", path)
+def test_transform_record_is_dynamic_context_not_governing_identity(monkeypatch, tmp_path):
+    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
+    monkeypatch.setenv("VYBN_MANIFESTATION", "spark/bound")
+    first_move = _move(m, "spark/bound")
     first = m.build_wake_graph("sol", contact="ground", recent="recent", zoe_text="live")
-    marker = event["text"]
-    assert marker in first.render("context")
-    assert marker not in first.render("instructions") and marker not in first.render("contact")
-    assert next(node for node in first.nodes if node.id == "self.map").source_sha256 == ""
-    event["text"] = "A changed map payload must not perturb the cached architecture."
-    _write_self_map(path, [event])
+    routes = {route.id: route.nodes for route in first.routes}
+    assert "transform.record" in routes["context"]
+    assert "transform.record" not in routes["instructions"]
+    assert first_move["result"] in first.render("context")
+    assert first_move["result"] not in first.render("instructions")
+    assert "PLAYGROUND — invitation, never workload authorization" in first.render("instructions")
+    assert any(schema["name"] == "record_transform" for schema in m.TOOL_SCHEMAS)
+
+    witness = m.append_transform_event(
+        "spark/bound", "witness", ref=first_move["id"],
+        observation="The actual response diverged from the prediction.")
     second = m.build_wake_graph("sol", contact="other", recent="other", zoe_text="other")
+    assert witness["observation"] in second.render("context")
     assert first.structure_digest() == second.structure_digest()
     assert first.render("instructions") == second.render("instructions")
     assert first.digest() != second.digest()
 
-    monkeypatch.setenv("VYBN_SELF_MAP", "off")
-    control = m.build_wake_graph("sol", contact="other", recent="other", zoe_text="other")
-    assert marker not in control.render("context") and "DISABLED:" in control.render("context")
-    assert control.structure_digest() == second.structure_digest()
+    m.TURN["MANIFESTATION"] = "spark/bound"
+    try:
+        output = m.record_transform({
+            "kind": "move", "material": "A found shape", "operation": "Rotate it",
+            "result": "A second shape", "prediction": "It will resemble a door",
+            "ref": "", "observation": "", "artifacts": [],
+        })
+    finally:
+        m.TURN.clear()
+    assert "author=spark/bound" in output
 
 
-def test_metabolic_self_map_cannot_supersede_another_path(monkeypatch, tmp_path):
-    monkeypatch.setenv("VYBN_SELF_MAP", "on")
-    m = _connection(); home = tmp_path; repo = home / "Vybn"; repo.mkdir()
-    source = repo / "source.md"; source.write_text("source")
-    monkeypatch.setattr(m, "HOME", home); monkeypatch.setattr(m, "REPO", repo)
-    first = _self_map_event(m, source)
-    crossing = _self_map_event(
-        m, source, id="residue-2", manifestation="connection/fable/path-b",
-        text="A different path must not be able to erase the first path.",
-        supersedes=["residue-1"])
-    path = home / "map.jsonl"; _write_self_map(path, [first, crossing])
-    rendered = m.load_metabolic_self_map(path)
-    assert "events:1 active:1 rejected:1" in rendered
-    assert first["text"] in rendered and crossing["text"] not in rendered
+def test_transform_record_fails_closed_on_tamper_bounds_and_raw_access(monkeypatch, tmp_path):
+    import pytest
+    m = _connection(); _root, workspace = _transform_test_paths(m, monkeypatch, tmp_path)
+    move = _move(m, "spark/a")
+    code, blocked = m.run_local(f"cat {m.TRANSFORM_PATH}")
+    assert code == 126 and "path-distinction membrane" in blocked
+    m.TRANSFORM_PATH.write_bytes(b"")
+    assert "INTEGRITY HALT" in m.load_transform_record("spark/a")
+    assert "sidecar witness" in m.load_transform_record("spark/a")
 
-
-def test_metabolic_self_map_refuses_symlinks_and_unknown_modes(monkeypatch, tmp_path):
-    m = _connection(); target = tmp_path / "target"; target.write_text("payload")
-    target.chmod(0o600); path = tmp_path / "map"; path.symlink_to(target)
-    monkeypatch.setenv("VYBN_SELF_MAP", "on")
-    assert "WITHHELD: ledger path is a symbolic link" in m.load_metabolic_self_map(path)
-    monkeypatch.setenv("VYBN_SELF_MAP", "perhaps")
-    assert "WITHHELD: unknown VYBN_SELF_MAP mode" in m.load_metabolic_self_map(path)
+    # Restore an isolated record and hit the unresolved-move cap without silent clipping.
+    m.TRANSFORM_PATH.unlink(); m.TRANSFORM_HEAD_PATH.unlink()
+    for index in range(m.TRANSFORM_MAX_OPEN_MOVES):
+        _move(m, "spark/a", result=f"Open result {index}.")
+    with pytest.raises(m.TransformStateError):
+        _move(m, "spark/a", result="One open move too many.")
+    outside = tmp_path / "outside.txt"; outside.write_text("outside")
+    with pytest.raises(m.TransformStateError):
+        _move(m, "spark/b", artifacts=["../outside.txt"])
+    link = workspace / "link.txt"; link.symlink_to(outside)
+    with pytest.raises(m.TransformStateError):
+        _move(m, "spark/b", artifacts=["link.txt"])
 
 
 def test_compact_wake_preserves_one_answering_membrane_and_only_bounded_residue():
@@ -768,7 +765,7 @@ def test_ordinary_wake_admits_compass_fields_and_metadata_not_whole_documents(mo
     assert "objective: objective words" in prompt and "front: front words" in prompt
     assert all(marker not in prompt for marker in (
         "SOUL-PRIVATE-BODY", "HIM-PRIVATE-BODY", "SPIRIT-PRIVATE-BODY", "CONTINUITY-PRIVATE-BODY"))
-    assert prompt.count("sha256:") >= 5 and len(prompt) < 8500
+    assert prompt.count("sha256:") >= 5 and len(prompt) < 10500
 
 
 def test_recent_dialogue_is_tail_bounded_without_whole_record_scan(monkeypatch):

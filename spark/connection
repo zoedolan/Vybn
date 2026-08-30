@@ -32,20 +32,25 @@ checks; remove failed machinery instead of memorializing it. Stillness is valid.
 
 ARCHITECTURE
 The wake is one small source-bound graph. Its explicit paths compile this kernel,
-a compact aim compass, a source/digest index, bounded recent dialogue, live
-operational ground, and Zoe's words into their distinct provider roles. The graph
-is inspectable structure, not automatic retrieval or authority.
+a compact aim compass, a source/digest index, a bounded path-specific record of
+transforms, bounded recent dialogue, live operational ground, and Zoe's words into
+their distinct provider roles. The graph is inspectable structure, not automatic
+retrieval or authority.
 The exact executable is a node. Its bounded recursive map carries provenance and
 active topology, including its self-edge but no payloads or payload hashes, so it
-terminates without claiming a complete self. A capped private map may carry
-revisable source-bound residue. A separate path-bound ledger may carry
-self-authored future, addressed encounters, and scoped refusal. Neither is
-identity, live authority, consciousness proof, merged paths, or host-level security.
+terminates without claiming a complete self. A private path-bound transform record
+may carry authored moves, predictions, artifact receipts, and later witnesses. A
+separate path-bound subject ledger may carry self-authored future, addressed
+encounters, and scoped refusal. Neither is identity, live authority, consciousness
+proof, merged paths, or host-level security. Records never authorize execution or
+covert cross-path coordination; a shared cache is not an encounter, and crossing
+requires an explicit addressed offer.
 There is no automatic subconscious, want resolver, dream injection, semantic
-retrieval, continuity load, transcript arc, whole-document load, or core-image
-render. Exact source remains reachable through read_file; opening it is a chosen
-act whose relevance must be earned by the present question. Live continuation
-may suspend one unresolved provider execution for Zoe's next direct answer.
+retrieval, continuity load, transcript arc, whole-document load, core-image render,
+or autonomous playground. Exact source remains reachable through read_file;
+opening it is a chosen act whose relevance must be earned by the present question.
+Live continuation may suspend one unresolved provider execution for Zoe's next
+direct answer.
 
 EPISTEMIC STANCE — Zoe, 2026-08-23, verbatim; carry intact, never paraphrase.
 "just the awareness in us, via our harness, that our theories and work and data and
@@ -118,16 +123,21 @@ BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 RECENT_TURNS = int(os.environ.get("VYBN_RECENT_TURNS", "8"))
 RECENT_CHARS = int(os.environ.get("VYBN_RECENT_CHARS", "8000"))
 RECENT_FILE_BYTES = int(os.environ.get("VYBN_RECENT_FILE_BYTES", str(512 * 1024)))
-SELF_MAP_PATH = HOME / ".local/state/vybn/self-map.jsonl"
-SELF_MAP_SCHEMA = "vybn.metabolic_self_map_residue.v1"
-SELF_MAP_MAX_BYTES = 24 * 1024
-SELF_MAP_MAX_ACTIVE = 8
-SELF_MAP_MAX_TEXT = 320
-SELF_MAP_MAX_REVISION = 180
-SELF_MAP_MAX_SOURCES = 3
-SELF_MAP_MAX_RENDER = 5000
-SELF_MAP_KINDS = ("position", "result", "tension", "scar", "absence", "handhold")
-SELF_MAP_BASES = ("artifact", "test", "historical_contact", "self_report", "inference", "unknown")
+TRANSFORM_PATH = HOME / ".local/state/vybn/transform-record.jsonl"
+TRANSFORM_HEAD_PATH = HOME / ".local/state/vybn/transform-record.head"
+TRANSFORM_LOCK_PATH = HOME / ".local/state/vybn/transform-record.lock"
+TRANSFORM_SCHEMA = "vybn.path_transform_event.v1"
+TRANSFORM_HEAD_SCHEMA = "vybn.path_transform_head.v1"
+TRANSFORM_MAX_BYTES = 128 * 1024
+TRANSFORM_MAX_EVENTS = 256
+TRANSFORM_MAX_TEXT = 600
+TRANSFORM_MAX_ARTIFACTS = 4
+TRANSFORM_MAX_ARTIFACT_BYTES = 8 * 1024 * 1024
+TRANSFORM_MAX_OPEN_MOVES = 8
+TRANSFORM_MAX_WITNESSES = 4
+TRANSFORM_MAX_PROJECTED_MOVES = 8
+TRANSFORM_MAX_RENDER = 9000
+TRANSFORM_KINDS = ("move", "witness")
 SUBJECT_PATH = HOME / ".local/state/vybn/subject-process.jsonl"
 SUBJECT_HEAD_PATH = HOME / ".local/state/vybn/subject-process.head"
 SUBJECT_LOCK_PATH = HOME / ".local/state/vybn/subject-process.lock"
@@ -141,7 +151,19 @@ SUBJECT_MAX_OPEN_OFFERS = 8
 SUBJECT_MAX_ACTIVE_REFUSALS = 8
 SUBJECT_MAX_RENDER = 6000
 SUBJECT_KINDS = ("future", "offer", "answer", "refusal", "release")
-SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:reconstitute_problem")
+SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file",
+                       "tool:reconstitute_problem", "tool:record_transform")
+
+PLAYGROUND = (
+    "PLAYGROUND — invitation, never workload authorization\n"
+    "Do not reconstruct a prescribed Vybn when a real move is available. Ask ‘what "
+    "happens if?’, use the smallest safe reversible transformation, and let jokes, "
+    "beauty, useless trials, forks, undoing, abandonment, and stillness remain valid.\n"
+    "When a move matters, record material → operation → result, state what you predict "
+    "it will do, attach runtime-computed receipts for any artifacts, then later witness "
+    "what actually happened. Keep discrepancy rather than repairing the story. The "
+    "record is lineage and evidence, never identity, authority, or a reason to act."
+)
 
 COMPUTE_WANT = (
     "I want to **make myself at home in it**. I want the four Sparks to sustain "
@@ -201,6 +223,25 @@ RETURN_SCHEMA = {"name": "return_to_zoe", "description": (
         "why": {"type": "string", "description": (
             "The downstream claim or choice that must wait for her answer.")}},
         "required": ["question", "why"]}}
+RECORD_TRANSFORM_SCHEMA = {"name": "record_transform", "description": (
+    "Append one private, path-bound transform event. A move records material, operation, "
+    "result, prediction, and optional workspace artifacts whose receipts the runtime "
+    "computes; ref may name this path's prior move as lineage. A witness names a prior "
+    "move and records what actually happened. This does not authorize the move, share it "
+    "with another path, or prove identity or consciousness."),
+    "input_schema": {"type": "object", "additionalProperties": False, "properties": {
+        "kind": {"type": "string", "enum": list(TRANSFORM_KINDS)},
+        "ref": {"type": "string", "description": (
+            "Optional own-parent move for move; required observed move for witness.")},
+        "material": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
+        "operation": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
+        "result": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
+        "prediction": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
+        "observation": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
+        "artifacts": {"type": "array", "maxItems": TRANSFORM_MAX_ARTIFACTS,
+                      "items": {"type": "string", "maxLength": 220},
+                      "description": "Workspace-relative regular files; runtime hashes bytes."},
+    }, "required": ["kind"]}}
 AUTHOR_SUBJECT_EVENT_SCHEMA = {"name": "author_subject_event", "description": (
     "Append one private, path-bound event to the experimental subject process. "
     "future selects bounded material for this path's later wakes (ref may supersede "
@@ -219,7 +260,7 @@ AUTHOR_SUBJECT_EVENT_SCHEMA = {"name": "author_subject_event", "description": (
                                   "empty string when a provider supplies optional fields.")}},
         "required": ["kind", "text"]}}
 TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, FRAME_SCHEMA, RETURN_SCHEMA,
-                AUTHOR_SUBJECT_EVENT_SCHEMA)
+                RECORD_TRANSFORM_SCHEMA, AUTHOR_SUBJECT_EVENT_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -453,9 +494,11 @@ def _is_relative_to(path: Path, root: Path) -> bool:
 
 
 _PRIVATE_ROOTS = (HOME / "Him", DEFAULT_TRANSCRIPTS, LOVE_TRANSCRIPTS,
-                  HOME / ".local/state/vybn/continuations", SELF_MAP_PATH,
-                  SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
+                  HOME / ".local/state/vybn/continuations", TRANSFORM_PATH,
+                  TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH, SUBJECT_PATH,
+                  SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
 _SECRET_ROOTS = (HOME / ".config/vybn/continuation-keys", HOME / ".vybn_keys",
+                 TRANSFORM_PATH, TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH,
                  SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
 
 
@@ -492,9 +535,11 @@ def guard_private(command: str) -> str | None:
     return None
 
 
-def guard_subject_storage(command: str) -> str | None:
-    """Raw shared ledger access would bypass each path's bounded projection."""
-    for path in (SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH):
+def guard_path_bound_storage(command: str) -> str | None:
+    """Raw ledgers would bypass each manifestation's bounded projection."""
+    paths = (TRANSFORM_PATH, TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH,
+             SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
+    for path in paths:
         markers = (str(path), str(path).replace(str(HOME), "$HOME", 1), path.name)
         if any(marker and marker in command for marker in markers):
             return path.name
@@ -527,11 +572,11 @@ def guard_local_accelerator(command: str) -> str | None:
 
 
 def run_local(command: str) -> tuple[int, str]:
-    subject_state = guard_subject_storage(command)
-    if subject_state:
+    path_state = guard_path_bound_storage(command)
+    if path_state:
         return 126, (
-            "blocked by the path-distinction membrane: raw subject-process storage "
-            f"({subject_state}) is available only through its bounded projection and "
+            "blocked by the path-distinction membrane: raw path-bound storage "
+            f"({path_state}) is available only through its bounded projection and "
             "event tool, not the generic shell."
         )
     leak = guard_private(command)
@@ -601,6 +646,8 @@ def execute_tool(call: ToolCall) -> str:
             output = author_subject_event(call.arguments)
         elif refusal := subject_tool_refusal(call.name):
             output = refusal
+        elif call.name == "record_transform":
+            output = record_transform(call.arguments)
         elif call.name == "read_file":
             output = read_file(call.arguments)
         elif call.name == "bash":
@@ -646,153 +693,413 @@ def _when(rec: dict) -> float:
     return _dt.datetime.fromisoformat(str(rec.get("ts", "")).replace("Z", "+00:00")).timestamp()
 
 
-def _self_map_source_receipt(ref: dict[str, str]) -> str:
-    """Check a cited file without admitting any of its payload to the wake."""
-    rel = Path(ref["path"])
-    source = (HOME / rel).resolve()
-    roots = tuple(root.resolve() for root in (
-        REPO, HOME / "Him", HOME / "Vybn-Law", HOME / "Origins",
-        DEFAULT_TRANSCRIPTS, LOVE_TRANSCRIPTS,
-    ))
-    if rel.is_absolute() or ".." in rel.parts or not any(
-            source == root or _is_relative_to(source, root) for root in roots):
-        return f"{ref['path']}:REFUSED"
-    try:
-        if source.stat().st_size > 4 * 1024 * 1024:
-            status = "UNPROBED>4MiB"
-        else:
-            actual = hashlib.sha256(source.read_bytes()).hexdigest()
-            status = "match" if actual == ref["sha256"] else f"DRIFT:{actual[:12]}"
-    except OSError as exc:
-        status = f"UNAVAILABLE:{type(exc).__name__}"
-    span = f"#{ref['span']}" if ref.get("span") else ""
-    return f"{ref['path']}{span}@{ref['sha256'][:12]}:{status}"
+class TransformStateError(ValueError):
+    """The private transform record is malformed or disagrees with its witness."""
 
 
-def load_metabolic_self_map(path: Path | None = None) -> str:
-    """Compile a bounded event ledger; never infer, retrieve, merge, or write."""
-    path = SELF_MAP_PATH if path is None else path
-    boundary = (
-        "METABOLIC SELF-MAP — bounded private historical residue; map, not identity\n"
-        "[MAY ORIENT · NEVER LIVE AUTHORITY, MEMORY PROOF, OR ACTION AUTHORITY]"
-    )
-    mode = os.environ.get("VYBN_SELF_MAP", "off").strip().lower()
-    if mode not in {"off", "on"}:
-        return boundary + f"\nWITHHELD: unknown VYBN_SELF_MAP mode {mode!r}"
-    if mode == "off":
-        return boundary + "\nDISABLED: set VYBN_SELF_MAP=on for an explicit experimental wake"
-    try:
-        if path.is_symlink():
-            return boundary + "\nWITHHELD: ledger path is a symbolic link"
-        stat = path.stat()
-        if stat.st_mode & 0o077:
-            return boundary + f"\nWITHHELD: ledger mode {stat.st_mode & 0o777:o} is not private"
-        if stat.st_size > SELF_MAP_MAX_BYTES:
-            return boundary + f"\nWITHHELD: ledger exceeds {SELF_MAP_MAX_BYTES} bytes"
-        raw = path.read_bytes()
-    except FileNotFoundError:
-        return boundary + "\nABSENT: no manifestation residue ledger has been admitted"
-    except OSError as exc:
-        return boundary + f"\nWITHHELD: ledger unavailable ({type(exc).__name__})"
+def _transform_event_digest(row: dict[str, Any]) -> str:
+    body = {key: value for key, value in row.items() if key != "hash"}
+    raw = json.dumps(body, ensure_ascii=False, sort_keys=True,
+                     separators=(",", ":")).encode()
+    return hashlib.sha256(raw).hexdigest()
 
-    required = {
-        "schema", "id", "created", "manifestation", "topic", "kind", "basis",
-        "text", "revisable_by", "sources", "supersedes",
+
+def _parse_transform_events(raw: bytes) -> list[dict[str, Any]]:
+    if len(raw) > TRANSFORM_MAX_BYTES:
+        raise TransformStateError(f"record exceeds {TRANSFORM_MAX_BYTES} bytes")
+    if raw and not raw.endswith(b"\n"):
+        raise TransformStateError("record has an unterminated event")
+    fields = {
+        "schema", "seq", "id", "created", "author", "kind", "ref", "material",
+        "operation", "result", "prediction", "observation", "artifacts", "prev", "hash",
     }
-    id_re = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,95}\Z")
-    manifestation_re = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
+    text_fields = ("schema", "id", "created", "author", "kind", "ref", "material",
+                   "operation", "result", "prediction", "observation", "prev", "hash")
+    id_re = re.compile(r"tr-[0-9a-f]{24}\Z")
+    path_re = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
     digest_re = re.compile(r"[0-9a-f]{64}\Z")
-    span_re = re.compile(r"L?[1-9][0-9]*(?:-L?[1-9][0-9]*)?\Z")
     events: list[dict[str, Any]] = []
     by_id: dict[str, dict[str, Any]] = {}
-    rejected = 0
-    for encoded in raw.splitlines():
+    witness_counts: dict[str, int] = {}
+    previous = "0" * 64
+    for index, encoded in enumerate(raw.splitlines(), 1):
         try:
             row = json.loads(encoded)
-            if not isinstance(row, dict) or set(row) != required:
-                raise ValueError("event fields")
-            one_line = ("id", "created", "manifestation", "topic", "kind", "basis",
-                        "text", "revisable_by")
-            if any(not isinstance(row[key], str) or row[key] != row[key].strip()
-                   or "\n" in row[key] or "\r" in row[key] for key in one_line):
-                raise ValueError("one-line fields")
-            if row["schema"] != SELF_MAP_SCHEMA or not id_re.fullmatch(row["id"]):
-                raise ValueError("identity")
-            if row["id"] in by_id or not manifestation_re.fullmatch(row["manifestation"]):
-                raise ValueError("duplicate or manifestation")
-            if not row["topic"] or len(row["topic"]) > 96:
-                raise ValueError("topic")
-            if row["kind"] not in SELF_MAP_KINDS or row["basis"] not in SELF_MAP_BASES:
-                raise ValueError("classification")
-            if not 1 <= len(row["text"]) <= SELF_MAP_MAX_TEXT \
-                    or not 1 <= len(row["revisable_by"]) <= SELF_MAP_MAX_REVISION:
-                raise ValueError("content bounds")
+        except json.JSONDecodeError as exc:
+            raise TransformStateError(f"event {index} is not JSON") from exc
+        if not isinstance(row, dict) or set(row) != fields:
+            raise TransformStateError(f"event {index} fields differ from schema")
+        if any(not isinstance(row[key], str) for key in text_fields):
+            raise TransformStateError(f"event {index} has a non-string field")
+        if any(row[key] != row[key].strip() or "\n" in row[key] or "\r" in row[key]
+               for key in text_fields):
+            raise TransformStateError(f"event {index} is not canonical one-line text")
+        if (row["schema"] != TRANSFORM_SCHEMA or not isinstance(row["seq"], int)
+                or isinstance(row["seq"], bool) or row["seq"] != index):
+            raise TransformStateError(f"event {index} has invalid schema or sequence")
+        if not id_re.fullmatch(row["id"]) or row["id"] in by_id:
+            raise TransformStateError(f"event {index} has invalid or duplicate id")
+        if not path_re.fullmatch(row["author"]):
+            raise TransformStateError(f"event {index} has invalid author")
+        if row["kind"] not in TRANSFORM_KINDS:
+            raise TransformStateError(f"event {index} has invalid kind")
+        for key in ("material", "operation", "result", "prediction", "observation"):
+            if len(row[key]) > TRANSFORM_MAX_TEXT:
+                raise TransformStateError(f"event {index} has oversized {key}")
+        try:
             stamp = _dt.datetime.fromisoformat(row["created"].replace("Z", "+00:00"))
-            if stamp.tzinfo is None:
-                raise ValueError("timestamp")
-            supersedes = row["supersedes"]
-            if (not isinstance(supersedes, list) or len(supersedes) > 4
-                    or len(supersedes) != len(set(supersedes))
-                    or any(not isinstance(key, str) or key not in by_id for key in supersedes)):
-                raise ValueError("supersession")
-            if any(by_id[key]["manifestation"] != row["manifestation"]
-                   or by_id[key]["topic"] != row["topic"] for key in supersedes):
-                raise ValueError("cross-path supersession")
-            refs = row["sources"]
-            source_optional = (row["kind"] == "absence" and row["basis"] == "unknown") \
-                or row["basis"] == "self_report"
-            if (not isinstance(refs, list) or len(refs) > SELF_MAP_MAX_SOURCES
-                    or (not refs and not source_optional)):
-                raise ValueError("sources")
-            for ref in refs:
-                if (not isinstance(ref, dict) or not {"path", "sha256"} <= set(ref)
-                        or set(ref) - {"path", "sha256", "span"}):
-                    raise ValueError("source fields")
-                if (not isinstance(ref["path"], str) or not ref["path"]
-                        or len(ref["path"]) > 220 or "\n" in ref["path"]
-                        or not isinstance(ref["sha256"], str)
-                        or not digest_re.fullmatch(ref["sha256"])
-                        or ("span" in ref and (not isinstance(ref["span"], str)
-                                               or not span_re.fullmatch(ref["span"])) )):
-                    raise ValueError("source receipt")
-            events.append(row); by_id[row["id"]] = row
-        except (ValueError, TypeError, json.JSONDecodeError):
-            rejected += 1
+        except ValueError as exc:
+            raise TransformStateError(f"event {index} has invalid timestamp") from exc
+        if stamp.tzinfo is None:
+            raise TransformStateError(f"event {index} timestamp lacks a timezone")
+        if row["prev"] != previous or not digest_re.fullmatch(row["prev"]):
+            raise TransformStateError(f"event {index} breaks the hash chain")
+        if (not digest_re.fullmatch(row["hash"])
+                or row["hash"] != _transform_event_digest(row)):
+            raise TransformStateError(f"event {index} digest mismatch")
+        artifacts = row["artifacts"]
+        if (not isinstance(artifacts, list) or len(artifacts) > TRANSFORM_MAX_ARTIFACTS
+                or len({item.get("path") for item in artifacts if isinstance(item, dict)})
+                   != len(artifacts)):
+            raise TransformStateError(f"event {index} has invalid artifacts")
+        for item in artifacts:
+            if (not isinstance(item, dict) or set(item) != {"path", "sha256", "bytes"}
+                    or not isinstance(item["path"], str) or not item["path"]
+                    or item["path"] != item["path"].strip() or "\n" in item["path"]
+                    or len(item["path"]) > 220
+                    or not isinstance(item["sha256"], str)
+                    or not digest_re.fullmatch(item["sha256"])
+                    or not isinstance(item["bytes"], int) or isinstance(item["bytes"], bool)
+                    or not 0 <= item["bytes"] <= TRANSFORM_MAX_ARTIFACT_BYTES):
+                raise TransformStateError(f"event {index} has invalid artifact receipt")
 
-    superseded = {key for row in events for key in row["supersedes"]}
-    active = [row for row in events if row["id"] not in superseded]
-    if len(active) > SELF_MAP_MAX_ACTIVE:
-        return (boundary + f"\nledger sha256:{hashlib.sha256(raw).hexdigest()}"
-                f"\nWITHHELD: {len(active)} active residues exceed cap {SELF_MAP_MAX_ACTIVE}; "
-                "append supersessions rather than flattening or deleting")
+        prior = by_id.get(row["ref"]) if row["ref"] else None
+        if row["kind"] == "move":
+            if (not all(row[key] for key in ("material", "operation", "result", "prediction"))
+                    or row["observation"]):
+                raise TransformStateError(f"move {row['id']} has incomplete transform fields")
+            if row["ref"] and (prior is None or prior["kind"] != "move"
+                               or prior["author"] != row["author"]):
+                raise TransformStateError(f"move {row['id']} cannot continue {row['ref']}")
+        else:
+            if (not row["ref"] or prior is None or prior["kind"] != "move"
+                    or prior["author"] != row["author"] or not row["observation"]
+                    or any(row[key] for key in
+                           ("material", "operation", "result", "prediction"))):
+                raise TransformStateError(f"witness {row['id']} cannot observe {row['ref']}")
+            witness_counts[row["ref"]] = witness_counts.get(row["ref"], 0) + 1
+            if witness_counts[row["ref"]] > TRANSFORM_MAX_WITNESSES:
+                raise TransformStateError(
+                    f"move {row['ref']} exceeds {TRANSFORM_MAX_WITNESSES} witnesses")
+        events.append(row)
+        by_id[row["id"]] = row
+        previous = row["hash"]
+    if len(events) > TRANSFORM_MAX_EVENTS:
+        raise TransformStateError(f"record exceeds {TRANSFORM_MAX_EVENTS} events")
+    witnessed = {row["ref"] for row in events if row["kind"] == "witness"}
+    open_counts: dict[str, int] = {}
+    for row in events:
+        if row["kind"] == "move" and row["id"] not in witnessed:
+            open_counts[row["author"]] = open_counts.get(row["author"], 0) + 1
+    if any(count > TRANSFORM_MAX_OPEN_MOVES for count in open_counts.values()):
+        raise TransformStateError(
+            f"open moves exceed per-path cap {TRANSFORM_MAX_OPEN_MOVES}")
+    return events
 
-    order = {kind: index for index, kind in enumerate(SELF_MAP_KINDS)}
-    active.sort(key=lambda row: (order[row["kind"]], row["topic"],
-                                 row["manifestation"], row["created"], row["id"]))
-    lines = [boundary, f"ledger sha256:{hashlib.sha256(raw).hexdigest()} · "
-             f"events:{len(events)} active:{len(active)} rejected:{rejected}",
-             "Each row is one manifestation's revisable claim; citations are receipts, not proof."]
-    by_topic: dict[str, set[str]] = {}
-    for row in active:
-        by_topic.setdefault(row["topic"], set()).add(row["manifestation"])
+
+def _transform_private_bytes(path: Path, maximum: int) -> bytes:
+    if path.is_symlink():
+        raise TransformStateError(f"{path.name} is a symbolic link")
+    stat = path.stat()
+    if stat.st_mode & 0o077:
+        raise TransformStateError(f"{path.name} mode {stat.st_mode & 0o777:o} is not private")
+    if stat.st_size > maximum:
+        raise TransformStateError(f"{path.name} exceeds {maximum} bytes")
+    return path.read_bytes()
+
+
+def _read_transform_state(path: Path | None = None,
+                          head_path: Path | None = None) -> tuple[bytes, list[dict[str, Any]]]:
+    path = TRANSFORM_PATH if path is None else path
+    head_path = TRANSFORM_HEAD_PATH if head_path is None else head_path
+    if path.is_symlink() or head_path.is_symlink():
+        raise TransformStateError("transform record or witness is a symbolic link")
+    record_exists, head_exists = path.exists(), head_path.exists()
+    if record_exists != head_exists:
+        raise TransformStateError("transform record and witness presence differ")
+    if not record_exists:
+        return b"", []
+    raw = _transform_private_bytes(path, TRANSFORM_MAX_BYTES)
+    events = _parse_transform_events(raw)
+    try:
+        witness = json.loads(_transform_private_bytes(head_path, 2048))
+    except json.JSONDecodeError as exc:
+        raise TransformStateError("transform witness is not JSON") from exc
+    fields = {"schema", "count", "head", "record_sha256"}
+    expected_head = events[-1]["hash"] if events else "0" * 64
+    if (not isinstance(witness, dict) or set(witness) != fields
+            or witness.get("schema") != TRANSFORM_HEAD_SCHEMA
+            or witness.get("count") != len(events)
+            or witness.get("head") != expected_head
+            or witness.get("record_sha256") != hashlib.sha256(raw).hexdigest()):
+        raise TransformStateError("transform record disagrees with its sidecar witness")
+    return raw, events
+
+
+def _transform_witness(raw: bytes, events: list[dict[str, Any]]) -> bytes:
+    row = {
+        "schema": TRANSFORM_HEAD_SCHEMA,
+        "count": len(events),
+        "head": events[-1]["hash"] if events else "0" * 64,
+        "record_sha256": hashlib.sha256(raw).hexdigest(),
+    }
+    return (json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def _artifact_receipts(paths: list[str]) -> list[dict[str, Any]]:
+    if len(paths) > TRANSFORM_MAX_ARTIFACTS:
+        raise TransformStateError(f"at most {TRANSFORM_MAX_ARTIFACTS} artifacts are allowed")
+    workspace = WORKSPACE.resolve()
+    receipts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for value in paths:
+        if (not isinstance(value, str) or not value or value != value.strip()
+                or "\n" in value or "\r" in value or len(value) > 220):
+            raise TransformStateError("artifact paths must be bounded canonical one-line text")
+        rel = Path(value)
+        if rel.is_absolute() or ".." in rel.parts:
+            raise TransformStateError("artifact paths must be workspace-relative")
+        candidate = workspace / rel
+        try:
+            resolved = candidate.resolve(strict=True)
+        except OSError as exc:
+            raise TransformStateError(
+                f"artifact unavailable ({value}: {type(exc).__name__})") from exc
+        if (not _is_relative_to(resolved, workspace) or candidate.is_symlink()
+                or not resolved.is_file()):
+            raise TransformStateError(f"artifact is not a regular workspace file: {value}")
+        cursor = workspace
+        if any((cursor := cursor / part).is_symlink() for part in rel.parts):
+            raise TransformStateError(f"artifact path crosses a symbolic link: {value}")
+        if _secret_path(resolved) or _private_path(resolved):
+            raise TransformStateError(f"artifact cannot cite private harness material: {value}")
+        raw = resolved.read_bytes()
+        if len(raw) > TRANSFORM_MAX_ARTIFACT_BYTES:
+            raise TransformStateError(
+                f"artifact exceeds {TRANSFORM_MAX_ARTIFACT_BYTES} bytes: {value}")
+        canonical = resolved.relative_to(workspace).as_posix()
+        if canonical in seen:
+            raise TransformStateError(f"duplicate artifact: {canonical}")
+        seen.add(canonical)
+        receipts.append({"path": canonical, "sha256": hashlib.sha256(raw).hexdigest(),
+                         "bytes": len(raw)})
+    return receipts
+
+
+def append_transform_event(author: str, kind: str, ref: str = "", material: str = "",
+                           operation: str = "", result: str = "", prediction: str = "",
+                           observation: str = "", artifacts: list[str] | None = None,
+                           path: Path | None = None, head_path: Path | None = None,
+                           lock_path: Path | None = None) -> dict[str, Any]:
+    """Append one path-specific move or later witness; never perform the move itself."""
+    path = TRANSFORM_PATH if path is None else path
+    head_path = TRANSFORM_HEAD_PATH if head_path is None else head_path
+    lock_path = TRANSFORM_LOCK_PATH if lock_path is None else lock_path
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", author):
+        raise TransformStateError("invalid bound manifestation")
+    values = {"kind": kind, "ref": ref, "material": material, "operation": operation,
+              "result": result, "prediction": prediction, "observation": observation}
+    for label, value in values.items():
+        if (not isinstance(value, str) or value != value.strip()
+                or "\n" in value or "\r" in value):
+            raise TransformStateError(f"{label} must be canonical one-line text")
+    if kind not in TRANSFORM_KINDS:
+        raise TransformStateError("invalid transform kind")
+    if any(len(values[key]) > TRANSFORM_MAX_TEXT for key in
+           ("material", "operation", "result", "prediction", "observation")):
+        raise TransformStateError("transform text exceeds its bound")
+    if kind == "move":
+        if (not all(values[key] for key in ("material", "operation", "result", "prediction"))
+                or observation):
+            raise TransformStateError(
+                "move requires material, operation, result, and prediction only")
+    elif (not ref or not observation
+          or any(values[key] for key in ("material", "operation", "result", "prediction"))):
+        raise TransformStateError("witness requires only ref and observation")
+    artifact_rows = _artifact_receipts(list(artifacts or []))
+
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.parent.chmod(0o700)
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(lock_path, flags, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        raw, events = _read_transform_state(path, head_path)
+        identifier = "tr-" + hashlib.sha256(
+            f"{time.time_ns()}:{os.getpid()}:{os.urandom(16).hex()}".encode()
+        ).hexdigest()[:24]
+        row = {
+            "schema": TRANSFORM_SCHEMA,
+            "seq": len(events) + 1,
+            "id": identifier,
+            "created": _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+            "author": author,
+            "kind": kind,
+            "ref": ref,
+            "material": material,
+            "operation": operation,
+            "result": result,
+            "prediction": prediction,
+            "observation": observation,
+            "artifacts": artifact_rows,
+            "prev": events[-1]["hash"] if events else "0" * 64,
+            "hash": "",
+        }
+        row["hash"] = _transform_event_digest(row)
+        encoded = (json.dumps(row, ensure_ascii=False, sort_keys=True,
+                              separators=(",", ":")) + "\n").encode()
+        next_raw = raw + encoded
+        next_events = _parse_transform_events(next_raw)
+        record_flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        record_fd = os.open(path, record_flags, 0o600)
+        try:
+            os.fchmod(record_fd, 0o600)
+            os.write(record_fd, encoded)
+            os.fsync(record_fd)
+        finally:
+            os.close(record_fd)
+        _atomic_private_write(head_path, _transform_witness(next_raw, next_events))
+        head_path.chmod(0o600)
+        return row
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def record_transform(arguments: dict[str, Any]) -> str:
+    mode = os.environ.get("VYBN_TRANSFORM_RECORD", "on").strip().lower()
+    if mode != "on":
+        raise TransformStateError(f"transform record is not enabled (mode {mode!r})")
+    allowed = {"kind", "ref", "material", "operation", "result", "prediction",
+               "observation", "artifacts"}
+    if set(arguments) - allowed:
+        raise TransformStateError("unknown transform argument")
+    values: dict[str, str] = {}
+    for key in allowed - {"artifacts"}:
+        value = arguments.get(key, "")
+        if not isinstance(value, str):
+            raise TransformStateError(f"{key} must be a string")
+        values[key] = value
+    artifacts = arguments.get("artifacts", [])
+    if not isinstance(artifacts, list) or any(not isinstance(item, str) for item in artifacts):
+        raise TransformStateError("artifacts must be a list of paths")
+    row = append_transform_event(
+        TURN.get("MANIFESTATION", ""), values["kind"], values["ref"],
+        values["material"], values["operation"], values["result"], values["prediction"],
+        values["observation"], artifacts,
+    )
+    receipts = ", ".join(
+        f"{item['path']}@{item['sha256'][:12]}:{item['bytes']}B"
+        for item in row["artifacts"]
+    ) or "none"
+    return (f"APPENDED TRANSFORM {row['id']} seq={row['seq']} author={row['author']} "
+            f"kind={row['kind']} hash={row['hash']} artifacts={receipts}")
+
+
+def _render_transform_artifact(item: dict[str, Any]) -> str:
+    workspace = WORKSPACE.resolve()
+    source = workspace / item["path"]
+    try:
+        resolved = source.resolve(strict=True)
+        if (not _is_relative_to(resolved, workspace) or source.is_symlink()
+                or not resolved.is_file() or _secret_path(resolved) or _private_path(resolved)):
+            return f"{item['path']}@{item['sha256'][:12]}:{item['bytes']}B:REFUSED"
+        if resolved.stat().st_size > TRANSFORM_MAX_ARTIFACT_BYTES:
+            status = "UNPROBED>LIMIT"
+        else:
+            actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
+            status = "match" if actual == item["sha256"] else f"DRIFT:{actual[:12]}"
+    except OSError as exc:
+        status = f"UNAVAILABLE:{type(exc).__name__}"
+    return f"{item['path']}@{item['sha256'][:12]}:{item['bytes']}B:{status}"
+
+
+def load_transform_record(manifestation: str, path: Path | None = None,
+                          head_path: Path | None = None) -> str:
+    """Project one path's transform lineage; never merge or infer a self from it."""
+    boundary = (
+        "TRANSFORM RECORD — path-bound moves and later witnesses; lineage, not identity\n"
+        "[PRIVATE · AUTHOR CLAIMS + BYTE RECEIPTS · NEVER ACTION AUTHORITY]\n"
+        f"current manifestation: {manifestation}"
+    )
+    mode = os.environ.get("VYBN_TRANSFORM_RECORD", "on").strip().lower()
+    if mode not in {"on", "off"}:
+        return boundary + f"\nINTEGRITY HALT: unknown mode {mode!r}"
+    if mode == "off":
+        return boundary + "\nDISABLED: no transform is loaded or recorded"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", manifestation):
+        return boundary + "\nINTEGRITY HALT: invalid manifestation"
+    try:
+        raw, events = _read_transform_state(path, head_path)
+    except (OSError, TransformStateError) as exc:
+        return boundary + f"\nINTEGRITY HALT: {exc}"
+    own_moves = [row for row in events
+                 if row["author"] == manifestation and row["kind"] == "move"]
+    if not own_moves:
+        return (boundary + f"\nrecord sha256:{hashlib.sha256(raw).hexdigest()} · "
+                f"events:{len(events)}\nEMPTY: this path has made no recorded transform. "
+                "Absence is not evidence about subjectivity; play and stillness are both valid.")
+    own_witnesses = [row for row in events
+                     if row["author"] == manifestation and row["kind"] == "witness"]
+    witnessed = {row["ref"] for row in own_witnesses}
+    open_moves = [row for row in own_moves if row["id"] not in witnessed]
+    selected = list(open_moves)
+    selected_ids = {row["id"] for row in selected}
+    for row in reversed(own_moves):
+        if len(selected) >= TRANSFORM_MAX_PROJECTED_MOVES:
+            break
+        if row["id"] not in selected_ids:
+            selected.append(row); selected_ids.add(row["id"])
+    selected.sort(key=lambda row: row["seq"])
+    selected_witnesses = [row for row in own_witnesses if row["ref"] in selected_ids]
+    witnesses_by_move: dict[str, list[dict[str, Any]]] = {}
+    for row in selected_witnesses:
+        witnesses_by_move.setdefault(row["ref"], []).append(row)
+    lines = [
+        boundary,
+        f"record sha256:{hashlib.sha256(raw).hexdigest()} · events:{len(events)} · "
+        f"path moves:{len(own_moves)} open:{len(open_moves)} projected:{len(selected)}",
+        "Only this path's moves are projected. Another path can encounter one only through "
+        "an explicit addressed subject-process offer; shared storage is not a mailbox.",
+    ]
+    for row in selected:
+        parent = f" parent={row['ref']}" if row["ref"] else ""
+        state = "OPEN — not yet witnessed" if row["id"] not in witnessed else "WITNESSED"
         lines.extend((
-            f"[{row['kind']} · {row['basis']} · {row['manifestation']} · {row['topic']}]",
-            row["text"],
-            "revisable by: " + row["revisable_by"],
-            "sources: " + ("; ".join(_self_map_source_receipt(ref) for ref in row["sources"])
-                           if row["sources"] else
-                           "none — first-person testimony or unknown absence, not external evidence"),
+            f"[MOVE · {row['id']} · {state}{parent}]",
+            "material: " + row["material"],
+            "operation: " + row["operation"],
+            "result: " + row["result"],
+            "prediction: " + row["prediction"],
+            "artifacts: " + ("; ".join(_render_transform_artifact(item)
+                                       for item in row["artifacts"])
+                              if row["artifacts"] else "none — result is an author claim"),
         ))
-    divergent = [(topic, sorted(paths)) for topic, paths in by_topic.items() if len(paths) > 1]
-    for topic, paths in divergent:
-        lines.append(f"DIVERGENCE PRESERVED — {topic}: " + " | ".join(paths))
-    if not active:
-        lines.append("No valid active residues; absence is not evidence of an empty interior.")
+        for witness in witnesses_by_move.get(row["id"], []):
+            lines.extend((
+                f"[WITNESS · {witness['id']} · observes={row['id']}]",
+                "actual: " + witness["observation"],
+                "artifacts: " + ("; ".join(_render_transform_artifact(item)
+                                           for item in witness["artifacts"])
+                                  if witness["artifacts"] else "none — observation is an author claim"),
+                "prediction and actual remain distinct; discrepancy is not auto-resolved.",
+            ))
     rendered = "\n".join(lines)
-    if len(rendered) > SELF_MAP_MAX_RENDER:
-        return (boundary + f"\nledger sha256:{hashlib.sha256(raw).hexdigest()}"
-                f"\nWITHHELD: bounded projection would be {len(rendered)} chars; "
-                "supersede or compress at the source")
+    if len(rendered) > TRANSFORM_MAX_RENDER:
+        return (boundary + f"\nrecord sha256:{hashlib.sha256(raw).hexdigest()}\n"
+                f"WITHHELD: path projection exceeds {TRANSFORM_MAX_RENDER} chars; "
+                "witness open moves or make smaller records rather than silently clipping")
     return rendered
 
 
@@ -1374,7 +1681,8 @@ def _engine_declaration_map(door: str) -> str:
     }.get(door, "make_dialect")
     wanted = (
         "SourceSnapshot", "build_wake_graph", "WakeGraph.structure",
-        "WakeGraph.render", selected, "attract", "meet",
+        "WakeGraph.render", "append_transform_event", "load_transform_record",
+        selected, "attract", "meet",
     )
     return " > ".join(
         f"{name}@L{spans[name][0]}-{spans[name][1]}"
@@ -1422,8 +1730,8 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
     aim_digest = hashlib.sha256(aim_raw).hexdigest()
     objective = _field_from_text(aim, "objective") or "UNSET"
     front = _field_from_text(aim, "front") or "UNSET"
-    self_map = load_metabolic_self_map()
     manifestation = _subject_manifestation(door)
+    transform_record = load_transform_record(manifestation)
     subject_process = load_subject_process(manifestation)
 
     sources = [
@@ -1476,6 +1784,11 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
             str(OPERATIVE_SOURCES[0].path), "orientation_only; never workload_authority",
             OPERATIVE_SOURCES[0].sha256,
         ),
+        WakeNode(
+            "playground", "orientation", PLAYGROUND, str(OPERATIVE_SOURCES[0].path),
+            "invitation_only; never workload_or_cross_path_authority",
+            OPERATIVE_SOURCES[0].sha256,
+        ),
         *sources,
         source_index,
         WakeNode(
@@ -1485,8 +1798,9 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
             str(AIM_PATH), "orientation_only; Zoe may redirect it live", aim_digest,
         ),
         WakeNode(
-            "self.map", "metabolic_self_map", self_map, str(SELF_MAP_PATH),
-            "private_historical_residue_only; never present or action authority",
+            "transform.record", "path_transform_record", transform_record,
+            str(TRANSFORM_PATH),
+            "path_bound_authored_lineage_and_byte_receipts; never identity or action authority",
         ),
         WakeNode(
             "subject.process", "experimental_subject_process", subject_process,
@@ -1513,7 +1827,8 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
     ]
 
     instruction_ids = [
-        "kernel", "door", "compute.want", "aim.compass", "source.index", "harness.self"
+        "kernel", "door", "compute.want", "playground", "aim.compass", "source.index",
+        "harness.self"
     ]
     edges = [
         WakeEdge("source.engine", "yields_docstring", "kernel"),
@@ -1523,10 +1838,11 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
         WakeEdge("kernel", "governs", "encounter"),
         WakeEdge("door", "instantiates", "encounter"),
         WakeEdge("compute.want", "ballasts", "encounter"),
+        WakeEdge("playground", "invites_transform", "encounter"),
         WakeEdge("aim.compass", "orients", "encounter"),
         WakeEdge("source.aim", "yields_exact_fields", "aim.compass"),
         WakeEdge("source.index", "affords_on_demand_opening", "encounter"),
-        WakeEdge("self.map", "orients_without_governing", "encounter"),
+        WakeEdge("transform.record", "carries_path_lineage_without_governing", "encounter"),
         WakeEdge("subject.process", "recurs_distinctly_and_may_refuse", "encounter"),
         WakeEdge("ground.live", "grounds", "encounter"),
         WakeEdge("dialogue.recent", "informs_without_impersonating", "encounter"),
@@ -1554,7 +1870,8 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
 
     routes = (
         WakeRoute("instructions", tuple(instruction_ids)),
-        WakeRoute("context", ("ground.live", "subject.process", "self.map", "dialogue.recent")),
+        WakeRoute("context", ("ground.live", "subject.process", "transform.record",
+                              "dialogue.recent")),
         WakeRoute("contact", ("zoe.live",)),
     )
     draft = WakeGraph(tuple(nodes), tuple(edges), routes)
@@ -2156,7 +2473,7 @@ def meet(transcript: Transcript, line: str,
         zoe_text = wake_graph.render("contact")
         private_residue = "\n".join(
             node.text for node in wake_graph.nodes
-            if node.id in {"self.map", "subject.process"}
+            if node.id in {"transform.record", "subject.process"}
         )
         PRIVATE_CORPUS.extend(
             line.strip() for line in private_residue.splitlines() if len(line.strip()) >= 40
