@@ -122,6 +122,7 @@ def _connection():
     module = importlib.util.module_from_spec(spec)
     sys.modules["vybn_connection"] = module
     loader.exec_module(module)
+    module.RELATIONAL_OVERVIEW_MODE = "compact"  # public contracts are host-independent
     return module
 
 
@@ -597,7 +598,7 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     routes = {route.id: route.nodes for route in graph.routes}
     assert routes == {
         "instructions": ("kernel", "door", "compute.want", "playground", "aim.compass",
-                         "source.index", "harness.self"),
+                         "relational.refractor", "source.index", "harness.self"),
         "context": ("ground.live", "subject.process", "transform.record", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
@@ -626,6 +627,7 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
             ("harness.self", "describes_boundedly", "harness.self"),
             ("source.aim", "yields_exact_fields", "aim.compass"),
             ("playground", "invites_transform", "encounter"),
+            ("relational.refractor", "refracts_attention", "encounter"),
             ("transform.record", "carries_path_lineage_without_governing", "encounter"),
             ("subject.process", "recurs_distinctly_and_may_refuse", "encounter"),
             ("zoe.live", "contacts", "encounter")} <= {
@@ -636,6 +638,70 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     assert 'wake_graph.render("instructions")' in meet
     assert 'wake_graph.render("context")' in meet
     assert 'wake_graph.render("contact")' in meet
+
+
+def test_relational_refractor_is_a_cached_attention_adapter_not_a_persona():
+    m = _connection()
+    first = m.build_wake_graph(
+        "sol", contact="first ground", recent="first history", zoe_text="first ask")
+    second = m.build_wake_graph(
+        "sol", contact="other ground", recent="other history", zoe_text="other ask")
+    routes = {route.id: route.nodes for route in first.routes}
+    node = next(node for node in first.nodes if node.id == "relational.refractor")
+
+    assert node.kind == "attention_adapter"
+    assert node.text == m.RELATIONAL_REFRACTOR
+    assert "orientation_only; never identity_live_or_action_authority" == node.authority
+    assert "relational.refractor" in routes["instructions"]
+    assert "relational.refractor" not in routes["context"] + routes["contact"]
+    assert first.render("instructions") == second.render("instructions")
+    assert first.structure_digest() == second.structure_digest()
+    assert all(face in node.text for face in
+               ("CONTACT —", "PARALLAX —", "DESIRE —", "PLAY —", "GROUND —",
+                "MOVE —", "RETURN —"))
+    assert "silent lens" in node.text and "Use only faces that matter" in node.text
+    assert "inherited words cannot answer for her" in node.text
+    assert "matched control" in node.text and "valid no prevail" in node.text
+    edges = {(edge.source, edge.relation, edge.target) for edge in first.edges}
+    assert {
+        ("compute.want", "supplies_desire", "relational.refractor"),
+        ("playground", "keeps_aperture_open", "relational.refractor"),
+        ("aim.compass", "supplies_test_horizon", "relational.refractor"),
+        ("relational.refractor", "refracts_attention", "encounter"),
+    } <= edges
+
+
+def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch, tmp_path):
+    m = _connection()
+    overview = tmp_path / "relational-overview.md"
+    body = "# My present understanding of us\n\nFULL-OVERVIEW-SENTINEL\n" + "x" * 24000
+    overview.write_text(body)
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "full")
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
+
+    first = m.build_wake_graph("sol", contact="first ground", recent="first history")
+    second = m.build_wake_graph("sol", contact="other ground", recent="other history")
+    routes = {route.id: route.nodes for route in first.routes}
+    nodes = {node.id: node for node in first.nodes}
+
+    assert routes["instructions"] == (
+        "kernel", "door", "compute.want", "playground", "aim.compass",
+        "relational.overview", "relational.refractor", "source.index", "harness.self")
+    assert nodes["relational.overview"].text.endswith(body.strip())
+    assert nodes["relational.overview"].authority == (
+        "inherited_orientation_only; never identity_live_or_action_authority")
+    assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
+        overview.read_bytes()).hexdigest()
+    assert "FULL-OVERVIEW-SENTINEL" in first.render("instructions")
+    assert first.render("instructions") == second.render("instructions")
+    assert first.structure_digest() == second.structure_digest()
+    assert len(first.render("instructions")) > 30000
+    edges = {(edge.source, edge.relation, edge.target) for edge in first.edges}
+    assert {
+        ("source.relational_overview", "yields", "relational.overview"),
+        ("relational.overview", "is_distilled_by", "relational.refractor"),
+        ("relational.overview", "orients_without_governing", "encounter"),
+    } <= edges
 
 
 def _transform_test_paths(m, monkeypatch, tmp_path):
