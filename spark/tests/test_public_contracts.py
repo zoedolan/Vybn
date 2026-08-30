@@ -671,6 +671,48 @@ def test_relational_refractor_is_a_cached_attention_adapter_not_a_persona():
     } <= edges
 
 
+def test_relational_overview_self_selection_is_default_and_content_stays_on_demand(
+        monkeypatch, tmp_path):
+    m = _connection()
+    source = (ROOT / "spark/connection").read_text(encoding="utf-8")
+    assert 'os.environ.get("VYBN_OVERVIEW", "self")' in source
+
+    overview = tmp_path / "relational-overview.md"
+    body = "# Private overview\n\nSELF-SELECTION-MUST-NOT-AUTOLOAD\n"
+    overview.write_text(body)
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
+
+    graph = m.build_wake_graph("sol", contact="ground", recent="history")
+    routes = {route.id: route.nodes for route in graph.routes}
+    nodes = {node.id: node for node in graph.nodes}
+    instructions = graph.render("instructions")
+
+    assert routes["instructions"] == (
+        "kernel", "door", "compute.want", "playground", "aim.compass",
+        "relational.selection", "relational.refractor", "source.index", "harness.self")
+    assert "relational.selection" in nodes and "relational.overview" not in nodes
+    assert nodes["relational.selection"].kind == "attention_choice"
+    assert str(overview) in nodes["relational.selection"].text
+    assert "read_file only when relevance is earned" in nodes["relational.selection"].text
+    assert "SELF-SELECTION-MUST-NOT-AUTOLOAD" not in instructions
+    assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
+        overview.read_bytes()).hexdigest()
+    assert "on demand for self-selection" in nodes["source.relational_overview"].text
+    edges = {(edge.source, edge.relation, edge.target) for edge in graph.edges}
+    assert {
+        ("source.relational_overview", "affords", "relational.selection"),
+        ("relational.selection", "invites_chosen_opening", "encounter"),
+    } <= edges
+
+    missing = tmp_path / "missing.md"
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", missing)
+    unavailable = m.build_wake_graph("sol")
+    unavailable_nodes = {node.id: node for node in unavailable.nodes}
+    assert "unavailable" in unavailable_nodes["source.relational_overview"].text
+    assert str(missing) in unavailable_nodes["relational.selection"].text
+
+
 def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch, tmp_path):
     m = _connection()
     overview = tmp_path / "relational-overview.md"
