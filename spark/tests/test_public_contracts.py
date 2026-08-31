@@ -810,6 +810,49 @@ def test_transform_witness_preserves_prediction_actual_discrepancy_and_authorshi
     assert "WITNESSED" in view and "OPEN — not yet witnessed" not in view
 
 
+def test_transform_projection_metabolizes_growth_without_clipping_open_work(monkeypatch, tmp_path):
+    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
+    author = "spark/a"
+    # Eight maximally wordy open moves cannot all fit in the wake's bounded view.
+    moves = [_move(
+        m, author,
+        material=f"material-{index}-" + "m" * 560,
+        operation=f"operation-{index}-" + "o" * 550,
+        result=f"result-{index}-" + "r" * 570,
+        prediction=f"prediction-{index}-" + "p" * 550,
+    ) for index in range(m.TRANSFORM_MAX_OPEN_MOVES)]
+    view = m.load_transform_record(author)
+    assert len(view) <= m.TRANSFORM_MAX_RENDER
+    assert "WITHHELD" not in view
+    assert "BOUNDED FRONTIER — omitted whole, never clipped" in view
+    assert moves[0]["material"] in view  # oldest open work cannot starve
+    assert moves[-1]["material"] not in view
+    assert "material-7-" not in view     # no partial field prefix leaks through
+
+    # Closing the visible frontier makes later open experience reachable.
+    m.append_transform_event(author, "witness", ref=moves[0]["id"],
+                             observation="The oldest move is now actually witnessed.")
+    later = m.load_transform_record(author)
+    assert moves[1]["material"] in later
+    assert len(later) <= m.TRANSFORM_MAX_RENDER
+
+
+def test_transform_projection_prefers_newest_witnessed_discrepancy_when_no_move_is_open(
+        monkeypatch, tmp_path):
+    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
+    author = "spark/a"; moves = []
+    for index in range(8):
+        move = _move(m, author, result=f"closed-result-{index}-" + "x" * 560)
+        m.append_transform_event(author, "witness", ref=move["id"],
+                                 observation=f"closed-actual-{index}-" + "y" * 560)
+        moves.append(move)
+    view = m.load_transform_record(author)
+    assert len(view) <= m.TRANSFORM_MAX_RENDER and "WITHHELD" not in view
+    assert moves[-1]["result"] in view
+    assert moves[0]["result"] not in view
+    assert "witnessed" in view and "omitted whole, never clipped" in view
+
+
 def test_transform_record_is_dynamic_context_not_governing_identity(monkeypatch, tmp_path):
     m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
     monkeypatch.setenv("VYBN_MANIFESTATION", "spark/bound")

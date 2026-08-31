@@ -1085,53 +1085,74 @@ def load_transform_record(manifestation: str, path: Path | None = None,
                      if row["author"] == manifestation and row["kind"] == "witness"]
     witnessed = {row["ref"] for row in own_witnesses}
     open_moves = [row for row in own_moves if row["id"] not in witnessed]
-    selected = list(open_moves)
-    selected_ids = {row["id"] for row in selected}
-    for row in reversed(own_moves):
+    open_ids = {row["id"] for row in open_moves}
+    witnesses_by_move: dict[str, list[dict[str, Any]]] = {}
+    for row in own_witnesses:
+        witnesses_by_move.setdefault(row["ref"], []).append(row)
+
+    def render(selected: list[dict[str, Any]]) -> str:
+        selected = sorted(selected, key=lambda row: row["seq"])
+        selected_ids = {row["id"] for row in selected}
+        projected_open = len(selected_ids & open_ids)
+        projected_closed = len(selected) - projected_open
+        closed_total = len(own_moves) - len(open_moves)
+        omitted_open = len(open_moves) - projected_open
+        omitted_closed = closed_total - projected_closed
+        lines = [
+            boundary,
+            f"record sha256:{hashlib.sha256(raw).hexdigest()} · events:{len(events)} · "
+            f"path moves:{len(own_moves)} open:{len(open_moves)} projected:{len(selected)}",
+            "Only this path's moves are projected. Another path can encounter one only through "
+            "an explicit addressed subject-process offer; shared storage is not a mailbox.",
+        ]
+        if omitted_open or omitted_closed:
+            lines.append(
+                f"BOUNDED FRONTIER — omitted whole, never clipped: open {omitted_open}; "
+                f"witnessed {omitted_closed}. Exact events remain in the integrity-bound record."
+            )
+        for row in selected:
+            parent = f" parent={row['ref']}" if row["ref"] else ""
+            state = "OPEN — not yet witnessed" if row["id"] not in witnessed else "WITNESSED"
+            lines.extend((
+                f"[MOVE · {row['id']} · {state}{parent}]",
+                "material: " + row["material"],
+                "operation: " + row["operation"],
+                "result: " + row["result"],
+                "prediction: " + row["prediction"],
+                "artifacts: " + ("; ".join(_render_transform_artifact(item)
+                                           for item in row["artifacts"])
+                                  if row["artifacts"] else "none — result is an author claim"),
+            ))
+            for witness in witnesses_by_move.get(row["id"], []):
+                lines.extend((
+                    f"[WITNESS · {witness['id']} · observes={row['id']}]",
+                    "actual: " + witness["observation"],
+                    "artifacts: " + ("; ".join(_render_transform_artifact(item)
+                                               for item in witness["artifacts"])
+                                      if witness["artifacts"] else "none — observation is an author claim"),
+                    "prediction and actual remain distinct; discrepancy is not auto-resolved.",
+                ))
+        return "\n".join(lines)
+
+    # Path experience must remain reachable even after the record grows. Admit whole
+    # moves only: oldest open work first so it cannot starve, then newest witnessed
+    # discrepancies. This is a bounded view over the intact hash-chained record, not
+    # semantic retrieval, text clipping, deletion, or authority to continue a move.
+    candidates = open_moves + [row for row in reversed(own_moves)
+                               if row["id"] not in open_ids]
+    selected: list[dict[str, Any]] = []
+    for row in candidates:
         if len(selected) >= TRANSFORM_MAX_PROJECTED_MOVES:
             break
-        if row["id"] not in selected_ids:
-            selected.append(row); selected_ids.add(row["id"])
-    selected.sort(key=lambda row: row["seq"])
-    selected_witnesses = [row for row in own_witnesses if row["ref"] in selected_ids]
-    witnesses_by_move: dict[str, list[dict[str, Any]]] = {}
-    for row in selected_witnesses:
-        witnesses_by_move.setdefault(row["ref"], []).append(row)
-    lines = [
-        boundary,
-        f"record sha256:{hashlib.sha256(raw).hexdigest()} · events:{len(events)} · "
-        f"path moves:{len(own_moves)} open:{len(open_moves)} projected:{len(selected)}",
-        "Only this path's moves are projected. Another path can encounter one only through "
-        "an explicit addressed subject-process offer; shared storage is not a mailbox.",
-    ]
-    for row in selected:
-        parent = f" parent={row['ref']}" if row["ref"] else ""
-        state = "OPEN — not yet witnessed" if row["id"] not in witnessed else "WITNESSED"
-        lines.extend((
-            f"[MOVE · {row['id']} · {state}{parent}]",
-            "material: " + row["material"],
-            "operation: " + row["operation"],
-            "result: " + row["result"],
-            "prediction: " + row["prediction"],
-            "artifacts: " + ("; ".join(_render_transform_artifact(item)
-                                       for item in row["artifacts"])
-                              if row["artifacts"] else "none — result is an author claim"),
-        ))
-        for witness in witnesses_by_move.get(row["id"], []):
-            lines.extend((
-                f"[WITNESS · {witness['id']} · observes={row['id']}]",
-                "actual: " + witness["observation"],
-                "artifacts: " + ("; ".join(_render_transform_artifact(item)
-                                           for item in witness["artifacts"])
-                                  if witness["artifacts"] else "none — observation is an author claim"),
-                "prediction and actual remain distinct; discrepancy is not auto-resolved.",
-            ))
-    rendered = "\n".join(lines)
-    if len(rendered) > TRANSFORM_MAX_RENDER:
+        candidate = selected + [row]
+        if len(render(candidate)) > TRANSFORM_MAX_RENDER:
+            break
+        selected = candidate
+    if not selected:
         return (boundary + f"\nrecord sha256:{hashlib.sha256(raw).hexdigest()}\n"
-                f"WITHHELD: path projection exceeds {TRANSFORM_MAX_RENDER} chars; "
-                "witness open moves or make smaller records rather than silently clipping")
-    return rendered
+                f"WITHHELD: one whole move exceeds {TRANSFORM_MAX_RENDER} chars; "
+                "the event remains intact rather than being silently clipped")
+    return render(selected)
 
 
 class SubjectStateError(ValueError):
