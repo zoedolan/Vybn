@@ -577,6 +577,9 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
     assert "There is no automatic subconscious" in prompt
     assert "The wake is one small source-bound graph" in prompt
+    assert "Runtime continuity is reconstructed from several stores" in prompt
+    assert "which authority expired, and what remains unknown" in prompt
+    assert "or cell proves only its declared bytes, state, and scope" in prompt
     assert "exact executable bytes remain available through read_file" in prompt
 
     drift = tmp_path / "source"; drift.write_bytes(b"changed")
