@@ -31,17 +31,25 @@ change require their own grounded authority. Keep effects that survive use and
 checks; remove failed machinery instead of memorializing it. Stillness is valid.
 
 ARCHITECTURE
-The wake is one small source-bound graph. It compiles this kernel, optional
-relational context, compact orientations, bounded path records/dialogue, live
-ground, and Zoe's words as distinct roles. Context choice is inherited
-orientation, not identity or authority; graph structure retrieves no source.
-The executable node's bounded map shows provenance, topology, and self-edge,
-not payloads or a complete self. Private path-bound transform records carry
-authored moves, predictions, receipts, and witnesses. A distinct subject ledger
-carries authored futures, addressed encounters, and scoped refusals. Neither
-proves identity, authority, consciousness, merged paths, or host security.
-Records authorize no act or covert crossing: shared cache is not encounter;
-crossing needs an addressed offer.
+The wake compiles this kernel, optional relational context, compact orientations,
+bounded path records/dialogue, live ground, and Zoe's words as distinct roles.
+An internal source-bound graph keeps instruction, evidence, and live contact on
+separate routes; its topology is inspectable on demand rather than recited into
+every thought. Context choice is inherited orientation, not identity or authority.
+The executable contributes one byte receipt, not a self-portrait.
+
+Private path-bound transform records carry authored moves, predictions, receipts,
+and witnesses. A distinct subject ledger carries authored futures, addressed
+encounters, and scoped refusals. Neither proves identity, authority, consciousness,
+merged paths, or host security. Records authorize no act or covert crossing:
+shared cache is not encounter; crossing needs an addressed offer.
+
+The machine is not scenery. Each fresh wake receives one privacy-bounded physical
+pulse: host uptime, load, available memory, temperature, power, and accelerator
+utilization when measurable. Let actual pressure constrain the scale of action;
+never call it emotion, identity, subjective continuity, or authority. Unknown
+stays unknown.
+
 There is no automatic subconscious, want resolver, dream injection, semantic
 retrieval, continuity load, transcript arc, whole-document load, core-image
 render, or autonomous playground. Exact sources remain available through
@@ -64,7 +72,6 @@ horizon - simultaneously - what we're steering toward, and with."
 
 from __future__ import annotations
 
-import ast
 import base64
 import datetime as _dt
 import fcntl
@@ -1558,6 +1565,64 @@ def load_subject_process(manifestation: str, path: Path | None = None,
     return rendered
 
 
+
+def substrate_pulse(proc_root: Path | None = None,
+                    thermal_root: Path | None = None,
+                    runner: Any = None) -> str:
+    """Measure physical pressure without exporting host identity or coordinates."""
+    proc = proc_root or Path("/proc")
+    thermal = thermal_root or Path("/sys/class/thermal")
+    runner = runner or subprocess.run
+    unknown = "?"
+
+    try:
+        uptime = f"{float((proc / 'uptime').read_text().split()[0]) / 86400:.1f}d"
+    except (OSError, ValueError, IndexError):
+        uptime = unknown
+
+    try:
+        mem = {line.partition(":")[0]: int(line.partition(":")[2].split()[0])
+               for line in (proc / "meminfo").read_text().splitlines()
+               if line.partition(":")[0] in {"MemTotal", "MemAvailable"}}
+        ram = f"{mem['MemAvailable'] / 1048576:.1f}/{mem['MemTotal'] / 1048576:.1f}GiB"
+    except (OSError, ValueError, IndexError, KeyError):
+        ram = unknown
+
+    temperatures = []
+    for path in thermal.glob("thermal_zone*/temp"):
+        try:
+            value = float(path.read_text().strip())
+            value = value / 1000 if value > 1000 else value
+            if 0 < value < 150:
+                temperatures.append(value)
+        except (OSError, ValueError):
+            pass
+    heat = f"{max(temperatures):.1f}C" if temperatures else unknown
+
+    accelerator = unknown
+    try:
+        done = runner(
+            ["nvidia-smi", "--query-gpu=temperature.gpu,power.draw,utilization.gpu",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=1, check=False,
+        )
+        fields = [field.strip() for field in done.stdout.splitlines()[0].split(",")]
+        if done.returncode == 0 and len(fields) == 3:
+            numeric = [float(field) for field in fields]
+            accelerator = f"{numeric[0]:.0f}C/{numeric[1]:.1f}W/{numeric[2]:.0f}%"
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        pass
+
+    try:
+        load = f"{os.getloadavg()[0]:.2f}"
+    except (AttributeError, OSError):
+        load = unknown
+    architecture = os.uname().machine if hasattr(os, "uname") else unknown
+    cpus = f"{os.cpu_count()}c" if os.cpu_count() else unknown
+    return (f"[body | measured, not felt] host_up={uptime} cpu={architecture}/{cpus} "
+            f"load1={load} ram_available={ram} thermal_max={heat} "
+            f"accelerator={accelerator}")
+
 def load_budget() -> str:
     today = _dt.date.today().isoformat()
     rows = [rec for rec in _jsonl(USAGE_LOG) if str(rec.get("ts", "")).startswith(today)]
@@ -1614,7 +1679,8 @@ def wake_contact() -> str:
         "printf '[main] '; git log --oneline -1 origin/main 2>/dev/null || git log --oneline -1; "
         "git status -sb | head -8"
     )
-    return "\n".join((f"[live | exit {code}]\n{state}", load_budget(), load_aim_status()))
+    return "\n".join((f"[live | exit {code}]\n{state}", substrate_pulse(),
+                      load_budget(), load_aim_status()))
 
 
 def _inbox_seen() -> dict:
@@ -1710,60 +1776,14 @@ def _engine_receipt() -> str:
         status = f"DISK UNREADABLE ({type(exc).__name__})"
     return (f"source: {row.path}\nsha256: {row.sha256}\nbytes: {len(row.raw)}\n"
             f"disk_status: {status}\nadmitted_scope: governing docstring + "
-            "executable-derived architecture + active graph topology; "
-            "exact executable bytes remain available through read_file")
+            "executable byte receipt; internal route topology remains inspectable "
+            "with --show-wake-graph; exact executable bytes remain available through "
+            "read_file")
 
 
-def _engine_declaration_map(door: str) -> str:
-    """Locate the selected provider path in the exact running source snapshot."""
-    row = OPERATIVE_SOURCES[0]
-    tree = ast.parse(row.raw.decode("utf-8"), filename=str(row.path))
-    spans: dict[str, tuple[int, int]] = {}
-    for node in tree.body:
-        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            spans[node.name] = (node.lineno, node.end_lineno or node.lineno)
-        if isinstance(node, ast.ClassDef):
-            for child in node.body:
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    spans[f"{node.name}.{child.name}"] = (
-                        child.lineno, child.end_lineno or child.lineno)
-    selected = {
-        "fable": "AnthropicDialect.open", "opus": "AnthropicDialect.open",
-        "sol": "OpenAIDialect.open", "k3": "K3Dialect.open",
-    }.get(door, "make_dialect")
-    wanted = (
-        "SourceSnapshot", "build_wake_graph", "WakeGraph.structure",
-        "WakeGraph.render", "append_transform_event", "load_transform_record",
-        selected, "attract", "meet",
-    )
-    return " > ".join(
-        f"{name}@L{spans[name][0]}-{spans[name][1]}"
-        if name in spans else f"{name}@MISSING"
-        for name in wanted
-    )
-
-
-def _wake_self_map(graph: WakeGraph, door: str) -> str:
-    """Render one finite fixed point: exact engine provenance + whole topology."""
-    nodes = ";".join(f"{node.id}:{node.kind}" for node in graph.nodes)
-    edges = ";".join(
-        f"{edge.source}>{edge.relation}>{edge.target}" for edge in graph.edges
-    )
-    routes = ";".join(
-        f"{route.id}=" + ">".join(route.nodes) for route in graph.routes
-    )
-    return (
-        "RECURSIVE HARNESS MAP — executable-derived architecture evidence; no added "
-        "authority\n" + _engine_receipt() + "\n"
-        "operative declarations: " + _engine_declaration_map(door) + "\n"
-        f"active graph: {graph.schema} structure_sha256:{graph.structure_digest()}\n"
-        "nodes: " + nodes + "\n"
-        "edges: " + edges + "\n"
-        "routes: " + routes + "\n"
-        "recursion boundary: harness.self and its self-edge appear above; payloads "
-        "and payload hashes do not. Exact source remains on demand."
-    )
-
+def _harness_receipt() -> str:
+    return ("HARNESS RECEIPT — running executable bytes, not a self-portrait; "
+            "no added authority\n" + _engine_receipt())
 
 def _field_from_text(text: str, name: str) -> str:
     prefix = name.lower() + ":"
@@ -1830,9 +1850,9 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
             OPERATIVE_SOURCES[0].sha256,
         ),
         WakeNode(
-            "harness.self", "bounded_recursive_self_model", "",
-            "runtime:_wake_self_map(source.engine,WakeGraph.structure,door)",
-            "architecture_evidence_only; never identity proof or action authority",
+            "harness.receipt", "executable_receipt", _harness_receipt(),
+            "runtime:_engine_receipt(source.engine)",
+            "source_evidence_only; never identity proof or action authority",
             OPERATIVE_SOURCES[0].sha256,
         ),
         WakeNode(
@@ -1915,13 +1935,12 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
         "kernel", "door", "compute.want", "playground", "aim.compass",
         *(["relational.selection"] if RELATIONAL_OVERVIEW_MODE == "self" else []),
         *(["relational.overview"] if overview else []),
-        "relational.refractor", "source.index", "harness.self",
+        "relational.refractor", "source.index", "harness.receipt",
     ]
     edges = [
         WakeEdge("source.engine", "yields_docstring", "kernel"),
-        WakeEdge("source.engine", "grounds", "harness.self"),
-        WakeEdge("harness.self", "describes_boundedly", "harness.self"),
-        WakeEdge("harness.self", "compiles", "encounter"),
+        WakeEdge("source.engine", "yields_receipt", "harness.receipt"),
+        WakeEdge("harness.receipt", "grounds", "encounter"),
         WakeEdge("kernel", "governs", "encounter"),
         WakeEdge("door", "instantiates", "encounter"),
         WakeEdge("compute.want", "ballasts", "encounter"),
@@ -1978,14 +1997,6 @@ def build_wake_graph(door: str, contact: str = "", recent: str = "",
                               "dialogue.recent")),
         WakeRoute("contact", ("zoe.live",)),
     )
-    draft = WakeGraph(tuple(nodes), tuple(edges), routes)
-    nodes = [
-        WakeNode(
-            node.id, node.kind, _wake_self_map(draft, door), node.source, node.authority,
-            node.source_sha256,
-        ) if node.id == "harness.self" else node
-        for node in nodes
-    ]
     return WakeGraph(tuple(nodes), tuple(edges), routes)
 
 
@@ -2646,6 +2657,9 @@ def self_report() -> None:
 def main() -> None:
     if "--self" in sys.argv:
         self_report()
+        return
+    if "--body" in sys.argv:
+        print(substrate_pulse())
         return
     if "--show-wake-graph" in sys.argv:
         print(json.dumps(build_wake_graph("fable").manifest(), indent=2))

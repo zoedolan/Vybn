@@ -18,6 +18,12 @@ ts=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 echo "=== SUBSTRATE PROBE @ $ts ==="
 echo
 
+# Reuse the connection's compact physical-pressure measurement; retain the
+# distinct anti-drift checks below rather than mistaking them for duplicates.
+echo "--- body (local physical pressure) ---"
+"$(dirname "$0")/connection" --body 2>/dev/null || echo "  (unavailable)"
+echo
+
 echo "--- services (discovered by listening port) ---"
 ss -tlnp 2>/dev/null | awk '/:(8000|8100|8101|8420|3001) /{print $4, $6}' | \
   while read addr proc; do

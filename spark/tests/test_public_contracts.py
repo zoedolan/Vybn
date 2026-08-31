@@ -480,6 +480,52 @@ def test_sol_uses_explicit_provider_cache_policy(monkeypatch):
     assert "instructions" not in sent
 
 
+def test_physical_pulse_is_bounded_ground_not_machine_identity(tmp_path, monkeypatch):
+    m = _connection()
+    proc = tmp_path / "proc"; proc.mkdir()
+    (proc / "uptime").write_text("172800.0 0\n")
+    (proc / "meminfo").write_text(
+        "MemTotal:       131072000 kB\nMemAvailable:   117440512 kB\n")
+    thermal = tmp_path / "thermal"; zone = thermal / "thermal_zone0"; zone.mkdir(parents=True)
+    (zone / "temp").write_text("51500\n")
+
+    class Done:
+        returncode = 0
+        stdout = "47, 11.5, 0\n"
+
+    monkeypatch.setattr(m.os, "getloadavg", lambda: (0.25, 0.20, 0.10))
+    monkeypatch.setattr(m.os, "cpu_count", lambda: 20)
+    monkeypatch.setattr(m.os, "uname", lambda: type("Uname", (), {"machine": "aarch64"})())
+    pulse = m.substrate_pulse(proc, thermal, lambda *a, **k: Done())
+    assert pulse == ("[body | measured, not felt] host_up=2.0d cpu=aarch64/20c "
+                     "load1=0.25 ram_available=112.0/125.0GiB thermal_max=51.5C "
+                     "accelerator=47C/11.5W/0%")
+    assert all(secret not in pulse for secret in (
+        "127.0.0.1", "/home/", "hostname", "pid=", "spark-"))
+    assert "measured, not felt" in pulse
+
+    empty = tmp_path / "empty"; empty.mkdir()
+    unknown = m.substrate_pulse(empty, empty,
+        lambda *a, **k: (_ for _ in ()).throw(OSError("absent")))
+    assert "host_up=?" in unknown and "ram_available=?" in unknown
+    assert "thermal_max=?" in unknown and "accelerator=?" in unknown
+
+    monkeypatch.setattr(m, "run_local", lambda command: (0, "[clock] now"))
+    monkeypatch.setattr(m, "substrate_pulse", lambda: "[body] PHYSICAL-SENTINEL")
+    monkeypatch.setattr(m, "load_budget", lambda: "[budget]")
+    monkeypatch.setattr(m, "load_aim_status", lambda: "[aim]")
+    contact = m.wake_contact()
+    assert contact.splitlines() == [
+        "[live | exit 0]", "[clock] now", "[body] PHYSICAL-SENTINEL", "[budget]", "[aim]"]
+
+
+def test_substrate_probe_reuses_body_measurement_without_erasing_distinct_ground():
+    source = (ROOT / "spark/substrate_probe.sh").read_text()
+    assert 'connection" --body' in source
+    for distinct_check in ("deep memory index", "walk daemon", "organism_state", "repos (HEAD)"):
+        assert distinct_check in source
+
+
 def test_budget_distinguishes_total_input_from_fresh_input(tmp_path, monkeypatch):
     m = _connection(); log = tmp_path / "usage.jsonl"
     rows = [
@@ -564,19 +610,16 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     digest = __import__("hashlib").sha256(source).hexdigest()
     assert prompt.startswith("COMPACT SOURCE-BOUND KERNEL\n")
     assert f"sha256: {digest}" in prompt and f"bytes: {len(source)}" in prompt
-    assert ("admitted_scope: governing docstring + executable-derived architecture "
-            "+ active graph topology") in prompt
+    assert ("admitted_scope: governing docstring + executable byte receipt") in prompt
     assert "def meet(" not in prompt and "class OpenAIDialect" not in prompt
-    assert "operative declarations:" in prompt and "OpenAIDialect.open@L" in prompt
-    for door, selected in (("fable", "AnthropicDialect.open"),
-                           ("opus", "AnthropicDialect.open"),
-                           ("sol", "OpenAIDialect.open"), ("k3", "K3Dialect.open")):
-        declarations = m._engine_declaration_map(door)
-        assert f"{selected}@L" in declarations and "@MISSING" not in declarations
-    assert len(prompt) < 10500
+    assert "HARNESS RECEIPT" in prompt and "running executable bytes, not a self-portrait" in prompt
+    assert "RECURSIVE HARNESS MAP" not in prompt and "operative declarations:" not in prompt
+    assert not hasattr(m, "_engine_declaration_map") and not hasattr(m, "_wake_self_map")
+    assert len(prompt) < 8500
     assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
     assert "There is no automatic subconscious" in prompt
-    assert "The wake is one small source-bound graph" in prompt
+    assert "An internal source-bound graph" in prompt
+    assert "The machine is not scenery" in prompt
     assert "Runtime continuity is reconstructed from several stores" in prompt
     assert "which authority expired, and what remains unknown" in prompt
     assert "or cell proves only its declared bytes, state, and scope" in prompt
@@ -601,7 +644,7 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     routes = {route.id: route.nodes for route in graph.routes}
     assert routes == {
         "instructions": ("kernel", "door", "compute.want", "playground", "aim.compass",
-                         "relational.refractor", "source.index", "harness.self"),
+                         "relational.refractor", "source.index", "harness.receipt"),
         "context": ("ground.live", "subject.process", "transform.record", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
@@ -620,14 +663,13 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     assert nodes["zoe.live"]["payload_sha256"] == __import__("hashlib").sha256(
         sentinel.encode()).hexdigest()
     assert nodes["source.engine"]["source_sha256"] == m.OPERATIVE_SOURCES[0].sha256
-    self_node = next(node for node in graph.nodes if node.id == "harness.self")
-    assert f"structure_sha256:{graph.structure_digest()}" in self_node.text
-    assert "harness.self>describes_boundedly>harness.self" in self_node.text
-    assert "payloads and payload hashes do not" in self_node.text
-    assert m._wake_self_map(graph, "sol") == self_node.text
+    receipt_node = next(node for node in graph.nodes if node.id == "harness.receipt")
+    assert receipt_node.text == m._harness_receipt()
+    assert "running executable bytes, not a self-portrait" in receipt_node.text
+    assert not any(node.id == "harness.self" for node in graph.nodes)
     assert sentinel not in json.dumps(graph.structure())
-    assert {("source.engine", "grounds", "harness.self"),
-            ("harness.self", "describes_boundedly", "harness.self"),
+    assert {("source.engine", "yields_receipt", "harness.receipt"),
+            ("harness.receipt", "grounds", "encounter"),
             ("source.aim", "yields_exact_fields", "aim.compass"),
             ("playground", "invites_transform", "encounter"),
             ("relational.refractor", "refracts_attention", "encounter"),
@@ -693,7 +735,7 @@ def test_relational_overview_self_selection_is_default_and_content_stays_on_dema
 
     assert routes["instructions"] == (
         "kernel", "door", "compute.want", "playground", "aim.compass",
-        "relational.selection", "relational.refractor", "source.index", "harness.self")
+        "relational.selection", "relational.refractor", "source.index", "harness.receipt")
     assert "relational.selection" in nodes and "relational.overview" not in nodes
     assert nodes["relational.selection"].kind == "attention_choice"
     assert str(overview) in nodes["relational.selection"].text
@@ -731,7 +773,7 @@ def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch
 
     assert routes["instructions"] == (
         "kernel", "door", "compute.want", "playground", "aim.compass",
-        "relational.overview", "relational.refractor", "source.index", "harness.self")
+        "relational.overview", "relational.refractor", "source.index", "harness.receipt")
     assert nodes["relational.overview"].text.endswith(body.strip())
     assert nodes["relational.overview"].authority == (
         "inherited_orientation_only; never identity_live_or_action_authority")
