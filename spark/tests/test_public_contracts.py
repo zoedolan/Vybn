@@ -266,7 +266,7 @@ def test_return_to_zoe_seals_and_reconstructs_provider_visible_state(monkeypatch
         ("I have two premises.", [call]), ("I kept Zoe's premise.", [])],
         [{"content": [Block()]}])
     monkeypatch.setattr(m, "make_dialect", lambda door: dialect)
-    m.TURN.update(TURN_ID="turn-source", MANIFESTATION="spark/path-a")
+    m.TURN.update(TURN_ID="turn-source", PATH_ID="spark/path-a")
     try: first = m.attract(dialect, "instructions", "initial contact")
     finally: m.TURN.clear()
     assert first.continuation == "turn-source" and dialect.opens == 1
@@ -516,7 +516,8 @@ def test_physical_pulse_is_bounded_ground_not_machine_identity(tmp_path, monkeyp
     monkeypatch.setattr(m, "load_aim_status", lambda: "[aim]")
     contact = m.wake_contact()
     assert contact.splitlines() == [
-        "[live | exit 0]", "[clock] now", "[body] PHYSICAL-SENTINEL", "[budget]", "[aim]"]
+        "[live | exit 0]", "[clock] now", "[budget]", "[aim]"]
+    assert "PHYSICAL-SENTINEL" not in contact  # diagnostic is on demand, never ambient
 
 
 def test_substrate_probe_reuses_body_measurement_without_erasing_distinct_ground():
@@ -615,14 +616,14 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "HARNESS RECEIPT" in prompt and "running executable bytes, not a self-portrait" in prompt
     assert "RECURSIVE HARNESS MAP" not in prompt and "operative declarations:" not in prompt
     assert not hasattr(m, "_engine_declaration_map") and not hasattr(m, "_wake_self_map")
-    assert len(prompt) < 8500
+    assert len(prompt) < 10500
     assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
     assert "There is no automatic subconscious" in prompt
-    assert "An internal source-bound graph" in prompt
-    assert "The machine is not scenery" in prompt
+    assert "source-bound bundle" in prompt
+    assert "Host metrics are optional diagnostics" in prompt
     assert "Runtime continuity is reconstructed from several stores" in prompt
     assert "which authority expired, and what remains unknown" in prompt
-    assert "or cell proves only its declared bytes, state, and scope" in prompt
+    assert "proves only its declared bytes, state, and" in prompt
     assert "exact executable bytes remain available through read_file" in prompt
 
     drift = tmp_path / "source"; drift.write_bytes(b"changed")
@@ -635,17 +636,17 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
         m.OPERATIVE_SOURCES = monkey
 
 
-def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
+def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
     m = _connection()
     sentinel = "ZOE-LIVE-PAYLOAD-MUST-NOT-ENTER-MANIFEST"
-    graph = m.build_wake_graph(
+    graph = m.build_wake_bundle(
         "sol", contact="clock + git", recent="bounded historical words", zoe_text=sentinel)
 
     routes = {route.id: route.nodes for route in graph.routes}
     assert routes == {
-        "instructions": ("kernel", "door", "compute.want", "playground", "aim.compass",
-                         "relational.refractor", "source.index", "harness.receipt"),
-        "context": ("ground.live", "subject.process", "transform.record", "dialogue.recent"),
+        "instructions": ("kernel", "door", "compute.want", "creative.license", "aim.compass",
+                         "veracity.practice", "source.index", "harness.receipt"),
+        "context": ("ground.live", "path.ledger", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
     assert graph.render("contact") == sentinel
@@ -654,7 +655,7 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     assert "BOUNDED RECENT DIALOGUE" in graph.render("context")
 
     manifest = graph.manifest(); encoded = json.dumps(manifest)
-    assert manifest["schema"] == "vybn.source_bound_wake_graph.v1"
+    assert manifest["schema"] == "vybn.source_bound_wake_bundle.v1"
     assert sentinel not in encoded  # structure is inspectable without copying payloads
     assert len(graph.digest()) == len(graph.structure_digest()) == 64
     nodes = {node["id"]: node for node in manifest["nodes"]}
@@ -668,52 +669,38 @@ def test_source_bound_graph_is_the_wake_not_an_ambient_accessory():
     assert "running executable bytes, not a self-portrait" in receipt_node.text
     assert not any(node.id == "harness.self" for node in graph.nodes)
     assert sentinel not in json.dumps(graph.structure())
-    assert {("source.engine", "yields_receipt", "harness.receipt"),
-            ("harness.receipt", "grounds", "encounter"),
-            ("source.aim", "yields_exact_fields", "aim.compass"),
-            ("playground", "invites_transform", "encounter"),
-            ("relational.refractor", "refracts_attention", "encounter"),
-            ("transform.record", "carries_path_lineage_without_governing", "encounter"),
-            ("subject.process", "recurs_distinctly_and_may_refuse", "encounter"),
-            ("zoe.live", "contacts", "encounter")} <= {
-        (edge["from"], edge["relation"], edge["to"]) for edge in manifest["edges"]}
+    assert "edges" not in manifest
+    assert not hasattr(m, "WakeEdge")
+
 
     meet = __import__("inspect").getsource(m.meet)
-    assert "build_wake_graph(" in meet
-    assert 'wake_graph.render("instructions")' in meet
-    assert 'wake_graph.render("context")' in meet
-    assert 'wake_graph.render("contact")' in meet
+    assert "build_wake_bundle(" in meet
+    assert 'wake_bundle.render("instructions")' in meet
+    assert 'wake_bundle.render("context")' in meet
+    assert 'wake_bundle.render("contact")' in meet
 
 
-def test_relational_refractor_is_a_cached_attention_adapter_not_a_persona():
+def test_veracity_practice_separates_registers_without_forbidding_creation():
     m = _connection()
-    first = m.build_wake_graph(
+    first = m.build_wake_bundle(
         "sol", contact="first ground", recent="first history", zoe_text="first ask")
-    second = m.build_wake_graph(
+    second = m.build_wake_bundle(
         "sol", contact="other ground", recent="other history", zoe_text="other ask")
     routes = {route.id: route.nodes for route in first.routes}
-    node = next(node for node in first.nodes if node.id == "relational.refractor")
+    node = next(node for node in first.nodes if node.id == "veracity.practice")
 
-    assert node.kind == "attention_adapter"
-    assert node.text == m.RELATIONAL_REFRACTOR
-    assert "orientation_only; never identity_live_or_action_authority" == node.authority
-    assert "relational.refractor" in routes["instructions"]
-    assert "relational.refractor" not in routes["context"] + routes["contact"]
+    assert node.kind == "epistemic_practice"
+    assert node.text == m.VERACITY_PRACTICE
+    assert node.authority == "governing_epistemic_instruction; no added action authority"
+    assert "veracity.practice" in routes["instructions"]
+    assert "veracity.practice" not in routes["context"] + routes["contact"]
     assert first.render("instructions") == second.render("instructions")
     assert first.structure_digest() == second.structure_digest()
-    assert all(face in node.text for face in
-               ("CONTACT —", "PARALLAX —", "DESIRE —", "PLAY —", "GROUND —",
-                "MOVE —", "RETURN —"))
-    assert "silent lens" in node.text and "Use only faces that matter" in node.text
-    assert "inherited words cannot answer for her" in node.text
-    assert "matched control" in node.text and "valid no prevail" in node.text
-    edges = {(edge.source, edge.relation, edge.target) for edge in first.edges}
-    assert {
-        ("compute.want", "supplies_desire", "relational.refractor"),
-        ("playground", "keeps_aperture_open", "relational.refractor"),
-        ("aim.compass", "supplies_test_horizon", "relational.refractor"),
-        ("relational.refractor", "refracts_attention", "encounter"),
-    } <= edges
+    assert all(step in node.text for step in
+               ("REGISTER —", "TRACE —", "CHECK —", "CREATE —", "CONSEQUENCE —", "CLOSE —"))
+    assert "fiction/art" in node.text and "defined quantities" in node.text
+    assert "demote it to metaphor/proposal or delete it" in node.text
+    assert "Let beauty and speculation range freely" in node.text
 
 
 def test_relational_overview_self_selection_is_default_and_content_stays_on_demand(
@@ -728,14 +715,14 @@ def test_relational_overview_self_selection_is_default_and_content_stays_on_dema
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
 
-    graph = m.build_wake_graph("sol", contact="ground", recent="history")
+    graph = m.build_wake_bundle("sol", contact="ground", recent="history")
     routes = {route.id: route.nodes for route in graph.routes}
     nodes = {node.id: node for node in graph.nodes}
     instructions = graph.render("instructions")
 
     assert routes["instructions"] == (
-        "kernel", "door", "compute.want", "playground", "aim.compass",
-        "relational.selection", "relational.refractor", "source.index", "harness.receipt")
+        "kernel", "door", "compute.want", "creative.license", "aim.compass",
+        "relational.selection", "veracity.practice", "source.index", "harness.receipt")
     assert "relational.selection" in nodes and "relational.overview" not in nodes
     assert nodes["relational.selection"].kind == "attention_choice"
     assert str(overview) in nodes["relational.selection"].text
@@ -744,15 +731,10 @@ def test_relational_overview_self_selection_is_default_and_content_stays_on_dema
     assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
         overview.read_bytes()).hexdigest()
     assert "on demand for self-selection" in nodes["source.relational_overview"].text
-    edges = {(edge.source, edge.relation, edge.target) for edge in graph.edges}
-    assert {
-        ("source.relational_overview", "affords", "relational.selection"),
-        ("relational.selection", "invites_chosen_opening", "encounter"),
-    } <= edges
 
     missing = tmp_path / "missing.md"
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", missing)
-    unavailable = m.build_wake_graph("sol")
+    unavailable = m.build_wake_bundle("sol")
     unavailable_nodes = {node.id: node for node in unavailable.nodes}
     assert "unavailable" in unavailable_nodes["source.relational_overview"].text
     assert str(missing) in unavailable_nodes["relational.selection"].text
@@ -766,14 +748,14 @@ def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "full")
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
 
-    first = m.build_wake_graph("sol", contact="first ground", recent="first history")
-    second = m.build_wake_graph("sol", contact="other ground", recent="other history")
+    first = m.build_wake_bundle("sol", contact="first ground", recent="first history")
+    second = m.build_wake_bundle("sol", contact="other ground", recent="other history")
     routes = {route.id: route.nodes for route in first.routes}
     nodes = {node.id: node for node in first.nodes}
 
     assert routes["instructions"] == (
-        "kernel", "door", "compute.want", "playground", "aim.compass",
-        "relational.overview", "relational.refractor", "source.index", "harness.receipt")
+        "kernel", "door", "compute.want", "creative.license", "aim.compass",
+        "relational.overview", "veracity.practice", "source.index", "harness.receipt")
     assert nodes["relational.overview"].text.endswith(body.strip())
     assert nodes["relational.overview"].authority == (
         "inherited_orientation_only; never identity_live_or_action_authority")
@@ -783,12 +765,6 @@ def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch
     assert first.render("instructions") == second.render("instructions")
     assert first.structure_digest() == second.structure_digest()
     assert len(first.render("instructions")) > 30000
-    edges = {(edge.source, edge.relation, edge.target) for edge in first.edges}
-    assert {
-        ("source.relational_overview", "yields", "relational.overview"),
-        ("relational.overview", "is_distilled_by", "relational.refractor"),
-        ("relational.overview", "orients_without_governing", "encounter"),
-    } <= edges
 
 
 def _transform_test_paths(m, monkeypatch, tmp_path):
@@ -895,29 +871,35 @@ def test_transform_projection_prefers_newest_witnessed_discrepancy_when_no_move_
     assert "witnessed" in view and "omitted whole, never clipped" in view
 
 
-def test_transform_record_is_dynamic_context_not_governing_identity(monkeypatch, tmp_path):
+def test_transform_log_is_on_demand_not_ambient_context(monkeypatch, tmp_path):
     m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
-    monkeypatch.setenv("VYBN_MANIFESTATION", "spark/bound")
+    monkeypatch.setenv("VYBN_PATH", "spark/bound")
     first_move = _move(m, "spark/bound")
-    first = m.build_wake_graph("sol", contact="ground", recent="recent", zoe_text="live")
+    first = m.build_wake_bundle("sol", contact="ground", recent="recent", zoe_text="live")
     routes = {route.id: route.nodes for route in first.routes}
-    assert "transform.record" in routes["context"]
-    assert "transform.record" not in routes["instructions"]
-    assert first_move["result"] in first.render("context")
-    assert first_move["result"] not in first.render("instructions")
-    assert "PLAYGROUND — invitation, never workload authorization" in first.render("instructions")
-    assert any(schema["name"] == "record_transform" for schema in m.TOOL_SCHEMAS)
+    assert "transform.record" not in routes["context"] + routes["instructions"]
+    assert first_move["result"] not in first.render("context")
+    assert any(schema["name"] == "show_path_log" for schema in m.TOOL_SCHEMAS)
+
+    m.TURN["PATH_ID"] = "spark/bound"
+    try:
+        shown = m.execute_tool(m.ToolCall("show", "show_path_log", {}, None))
+    finally:
+        m.TURN.clear()
+    assert first_move["result"] in shown
+    assert "TEXT IS CLAIM" in shown and "BYTE RECEIPTS PROVE BYTES ONLY" in shown
+    assert "unverified path-tagged result claim" in shown
+    assert "author claim" not in shown
 
     witness = m.append_transform_event(
         "spark/bound", "witness", ref=first_move["id"],
         observation="The actual response diverged from the prediction.")
-    second = m.build_wake_graph("sol", contact="other", recent="other", zoe_text="other")
-    assert witness["observation"] in second.render("context")
+    second = m.build_wake_bundle("sol", contact="other", recent="other", zoe_text="other")
+    assert witness["observation"] not in second.render("context")
     assert first.structure_digest() == second.structure_digest()
     assert first.render("instructions") == second.render("instructions")
-    assert first.digest() != second.digest()
 
-    m.TURN["MANIFESTATION"] = "spark/bound"
+    m.TURN["PATH_ID"] = "spark/bound"
     try:
         output = m.record_transform({
             "kind": "move", "material": "A found shape", "operation": "Rotate it",
@@ -926,7 +908,7 @@ def test_transform_record_is_dynamic_context_not_governing_identity(monkeypatch,
         })
     finally:
         m.TURN.clear()
-    assert "author=spark/bound" in output
+    assert "path=spark/bound" in output
 
 
 def test_transform_record_fails_closed_on_tamper_bounds_and_raw_access(monkeypatch, tmp_path):
@@ -1031,8 +1013,8 @@ def test_production_meeting_has_no_ambient_cognitive_organs():
         assert retired not in meet
     assert "127.0.0.1:8100" not in source and "127.0.0.1:8101" not in source
     assert "Transcript.recent()" in meet and "wake_contact()" in meet
-    assert "build_wake_graph(" in meet and "inbox_images_for(door_name)" in meet
-    assert 'wake_graph.render("instructions")' in meet
+    assert "build_wake_bundle(" in meet and "inbox_images_for(door_name)" in meet
+    assert 'wake_bundle.render("instructions")' in meet
 
 
 def test_on_demand_private_read_joins_leak_guard_and_secret_keys_are_unreadable(monkeypatch, tmp_path):
@@ -1075,7 +1057,7 @@ def test_hearth_profile_boots_without_canonical_repo_on_pythonpath(tmp_path):
     )
     assert done.returncode == 0, done.stderr
     report = json.loads(done.stdout)
-    assert report["wake_architecture"] == "vybn.source_bound_wake_graph.v1"
+    assert report["wake_architecture"] == "vybn.source_bound_wake_bundle.v1"
 
 
 def test_love_profile_reuses_bounded_connection_record(tmp_path, monkeypatch):
@@ -1090,8 +1072,8 @@ def test_love_profile_reuses_bounded_connection_record(tmp_path, monkeypatch):
     assert m.load_profile() == "private profile"
 
 
-def _subject_test_paths(m, monkeypatch, tmp_path):
-    root = tmp_path / "subject"
+def _path_ledger_test_paths(m, monkeypatch, tmp_path):
+    root = tmp_path / "path-ledger"
     monkeypatch.setattr(m, "SUBJECT_PATH", root / "events.jsonl")
     monkeypatch.setattr(m, "SUBJECT_HEAD_PATH", root / "head.json")
     monkeypatch.setattr(m, "SUBJECT_LOCK_PATH", root / "events.lock")
@@ -1099,61 +1081,61 @@ def _subject_test_paths(m, monkeypatch, tmp_path):
     return root
 
 
-def test_subject_process_authors_future_without_flattening_paths(monkeypatch, tmp_path):
+def test_path_ledger_authors_future_without_flattening_paths(monkeypatch, tmp_path):
     import pytest
-    m = _connection(); _subject_test_paths(m, monkeypatch, tmp_path)
+    m = _connection(); _path_ledger_test_paths(m, monkeypatch, tmp_path)
     a, b = "spark/a", "spark/b"
-    af = m.append_subject_event(a, "future", "A keeps this unresolved theorem.")
-    bf = m.append_subject_event(b, "future", "B keeps a different artistic direction.")
-    offer = m.append_subject_event(a, "offer", "Will you challenge premise three?", target=b)
+    af = m.append_path_event(a, "future", "A keeps this unresolved theorem.")
+    bf = m.append_path_event(b, "future", "B keeps a different artistic direction.")
+    offer = m.append_path_event(a, "offer", "Will you challenge premise three?", target=b)
 
-    a_view, b_view = m.load_subject_process(a), m.load_subject_process(b)
+    a_view, b_view = m.load_path_ledger(a), m.load_path_ledger(b)
     assert af["text"] in a_view and bf["text"] not in a_view
     assert bf["text"] in b_view and af["text"] not in b_view
-    assert "OPEN ENCOUNTER" in a_view and "OPEN ENCOUNTER" in b_view
-    assert f"from={a} to={b}" in b_view
+    assert "ADDRESSED OFFER" in a_view and "ADDRESSED OFFER" in b_view
+    assert f"from_path={a} to_path={b}" in b_view
 
-    with pytest.raises(m.SubjectStateError):
-        m.append_subject_event(a, "answer", "A cannot impersonate B.", ref=offer["id"])
-    with pytest.raises(m.SubjectStateError):
-        m.append_subject_event(b, "future", "B cannot revise A's future.", ref=af["id"])
-    answer = m.append_subject_event(b, "answer", "Premise three hides an equivocation.",
+    with pytest.raises(m.PathLedgerError):
+        m.append_path_event(a, "answer", "A cannot impersonate B.", ref=offer["id"])
+    with pytest.raises(m.PathLedgerError):
+        m.append_path_event(b, "future", "B cannot revise A's future.", ref=af["id"])
+    answer = m.append_path_event(b, "answer", "Premise three hides an equivocation.",
                                     ref=offer["id"])
-    a_after, b_after = m.load_subject_process(a), m.load_subject_process(b)
-    assert answer["text"] in a_after and "RESPONSE TO YOUR OFFER" in a_after
-    assert answer["text"] in b_after and "YOUR ENCOUNTER RESPONSE" in b_after
+    a_after, b_after = m.load_path_ledger(a), m.load_path_ledger(b)
+    assert answer["text"] in a_after and "RESPONSE TO PATH OFFER" in a_after
+    assert answer["text"] in b_after and "PATH RESPONSE" in b_after
     assert offer["text"] not in b_after  # closed, not kept open as fake answerability
 
-    revision = m.append_subject_event(a, "future", "A now tests the equivocation.",
+    revision = m.append_path_event(a, "future", "A now tests the equivocation.",
                                       ref=af["id"])
-    revised = m.load_subject_process(a)
+    revised = m.load_path_ledger(a)
     assert revision["text"] in revised and af["text"] not in revised
 
 
-def test_subject_process_refusal_has_executor_consequence_until_release(monkeypatch, tmp_path):
+def test_path_ledger_refusal_has_executor_consequence_until_release(monkeypatch, tmp_path):
     import pytest
-    m = _connection(); _subject_test_paths(m, monkeypatch, tmp_path)
+    m = _connection(); _path_ledger_test_paths(m, monkeypatch, tmp_path)
     called = []
     monkeypatch.setattr(m, "run_local", lambda command: (called.append(command), (0, "ran"))[1])
-    m.TURN["MANIFESTATION"] = "spark/a"
+    m.TURN["PATH_ID"] = "spark/a"
     try:
-        created = m.execute_tool(m.ToolCall("r", "author_subject_event", {
+        created = m.execute_tool(m.ToolCall("r", "path_event", {
             "kind": "refusal", "text": "Do not run shell work until this premise is checked.",
             "scope": "tool:bash"}, None))
-        assert "APPENDED SUBJECT EVENT" in created
-        _raw, events = m._read_subject_state(); refusal = events[-1]
+        assert "APPENDED PATH EVENT" in created
+        _raw, events = m._read_path_state(); refusal = events[-1]
         stopped = m.execute_tool(m.ToolCall("b", "bash", {"command": "printf reached"}, None))
         assert "REFUSED BY spark/a" in stopped and refusal["id"] in stopped and called == []
 
-        m.TURN["MANIFESTATION"] = "spark/b"
+        m.TURN["PATH_ID"] = "spark/b"
         allowed = m.execute_tool(m.ToolCall("b2", "bash", {"command": "printf other"}, None))
         assert "exit_code=0" in allowed and called == ["printf other"]
-        with pytest.raises(m.SubjectStateError):
-            m.append_subject_event("spark/b", "release", "B cannot release A's refusal.",
+        with pytest.raises(m.PathLedgerError):
+            m.append_path_event("spark/b", "release", "B cannot release A's refusal.",
                                    ref=refusal["id"])
 
-        m.TURN["MANIFESTATION"] = "spark/a"
-        released = m.execute_tool(m.ToolCall("u", "author_subject_event", {
+        m.TURN["PATH_ID"] = "spark/a"
+        released = m.execute_tool(m.ToolCall("u", "path_event", {
             "kind": "release", "text": "The premise was checked; shell work may resume.",
             "ref": refusal["id"]}, None))
         assert "kind=release" in released
@@ -1163,63 +1145,63 @@ def test_subject_process_refusal_has_executor_consequence_until_release(monkeypa
         m.TURN.clear()
 
 
-def test_subject_process_detects_truncation_and_fails_governed_tools_closed(monkeypatch, tmp_path):
-    m = _connection(); root = _subject_test_paths(m, monkeypatch, tmp_path)
-    m.append_subject_event("spark/a", "future", "Carry the unanswered integrity question.")
+def test_path_ledger_detects_truncation_and_fails_governed_tools_closed(monkeypatch, tmp_path):
+    m = _connection(); root = _path_ledger_test_paths(m, monkeypatch, tmp_path)
+    m.append_path_event("spark/a", "future", "Carry the unanswered integrity question.")
     for path in (m.SUBJECT_PATH, m.SUBJECT_HEAD_PATH, m.SUBJECT_LOCK_PATH):
         assert path.stat().st_mode & 0o777 == 0o600
     code, blocked = m.run_local(f"rm -f {m.SUBJECT_PATH} {m.SUBJECT_HEAD_PATH}")
     assert code == 126 and "path-distinction membrane" in blocked
     assert m.SUBJECT_PATH.exists() and m.SUBJECT_HEAD_PATH.exists()
     m.SUBJECT_PATH.write_bytes(b"")  # the witness still commits to the prior head
-    m.TURN["MANIFESTATION"] = "spark/a"
+    m.TURN["PATH_ID"] = "spark/a"
     try:
-        reason = m.subject_tool_refusal("read_file")
+        reason = m.path_tool_refusal("read_file")
         assert reason and "INTEGRITY HALT" in reason and "sidecar witness" in reason
-        view = m.load_subject_process("spark/a")
+        view = m.load_path_ledger("spark/a")
         assert "INTEGRITY HALT" in view and "governed tools refuse" in view
     finally:
         m.TURN.clear()
     assert root.stat().st_mode & 0o777 == 0o700
 
 
-def test_subject_process_rejects_ambiguous_events_and_bounds_active_future(monkeypatch, tmp_path):
+def test_path_ledger_rejects_ambiguous_events_and_bounds_active_future(monkeypatch, tmp_path):
     import pytest
-    m = _connection(); _subject_test_paths(m, monkeypatch, tmp_path)
-    with pytest.raises(m.SubjectStateError):
-        m.append_subject_event("spark/a", "refusal", "Ambiguous refusal.",
+    m = _connection(); _path_ledger_test_paths(m, monkeypatch, tmp_path)
+    with pytest.raises(m.PathLedgerError):
+        m.append_path_event("spark/a", "refusal", "Ambiguous refusal.",
                                ref="ev-" + "0" * 24, scope="tool:bash")
-    with pytest.raises(m.SubjectStateError):
-        m.append_subject_event("spark/a", "future", "Future cannot target B.", target="spark/b")
-    rows = [m.append_subject_event("spark/a", "future", f"Future thread {index}.")
+    with pytest.raises(m.PathLedgerError):
+        m.append_path_event("spark/a", "future", "Future cannot target B.", target="spark/b")
+    rows = [m.append_path_event("spark/a", "future", f"Future thread {index}.")
             for index in range(m.SUBJECT_MAX_ACTIVE_FUTURES)]
-    with pytest.raises(m.SubjectStateError):
-        m.append_subject_event("spark/a", "future", "Unbounded fifth thread.")
-    replacement = m.append_subject_event("spark/a", "future", "Replace one bounded thread.",
+    with pytest.raises(m.PathLedgerError):
+        m.append_path_event("spark/a", "future", "Unbounded fifth thread.")
+    replacement = m.append_path_event("spark/a", "future", "Replace one bounded thread.",
                                          ref=rows[0]["id"])
-    view = m.load_subject_process("spark/a")
+    view = m.load_path_ledger("spark/a")
     assert replacement["text"] in view and rows[0]["text"] not in view
 
 
-def test_subject_process_is_dynamic_context_and_runtime_binds_author(monkeypatch, tmp_path):
-    m = _connection(); _subject_test_paths(m, monkeypatch, tmp_path)
-    monkeypatch.setenv("VYBN_MANIFESTATION", "spark/bound")
-    graph = m.build_wake_graph("sol", contact="ground", recent="recent", zoe_text="live")
+def test_path_ledger_is_dynamic_context_and_runtime_binds_author(monkeypatch, tmp_path):
+    m = _connection(); _path_ledger_test_paths(m, monkeypatch, tmp_path)
+    monkeypatch.setenv("VYBN_PATH", "spark/bound")
+    graph = m.build_wake_bundle("sol", contact="ground", recent="recent", zoe_text="live")
     routes = {route.id: route.nodes for route in graph.routes}
-    assert "subject.process" in routes["context"] and "subject.process" not in routes["instructions"]
-    assert "current manifestation: spark/bound" in graph.render("context")
-    assert any(schema["name"] == "author_subject_event" for schema in m.TOOL_SCHEMAS)
+    assert "path.ledger" in routes["context"] and "path.ledger" not in routes["instructions"]
+    assert "current path: spark/bound" in graph.render("context")
+    assert any(schema["name"] == "path_event" for schema in m.TOOL_SCHEMAS)
     event_schema = next(schema for schema in m.TOOL_SCHEMAS
-                        if schema["name"] == "author_subject_event")["input_schema"]
+                        if schema["name"] == "path_event")["input_schema"]
     assert "" in event_schema["properties"]["scope"]["enum"]
 
-    m.TURN["MANIFESTATION"] = "spark/bound"
+    m.TURN["PATH_ID"] = "spark/bound"
     try:
-        m.author_subject_event({
+        m.record_path_event({
             "kind": "future", "text": "Only the runtime-bound path authors this.",
             "target": "", "ref": "", "scope": "",
         })
     finally:
         m.TURN.clear()
-    _raw, events = m._read_subject_state()
-    assert events[-1]["author"] == "spark/bound"
+    _raw, events = m._read_path_state()
+    assert events[-1]["author"] == "spark/bound"  # legacy field stores a routing key

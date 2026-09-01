@@ -44,7 +44,7 @@ def test_exact_compute_want_remains_ballast_without_a_resolver():
     )
     assert m.COMPUTE_WANT == expected
     prompt = m.build_instructions("sol")
-    assert expected in prompt and "ballast only, never workload authorization" in prompt
+    assert expected in prompt and "not present architecture or forecast" in prompt
     assert "want resolver" in prompt  # explicit statement of absence, not an organ
 
 
