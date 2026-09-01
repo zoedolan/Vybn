@@ -2,7 +2,7 @@
 
 `spark/harness` is the public-safe replication layer for work originating in Zoe/Vybn and reusable by other human/AI collaborations. Private project state is a workbench and inspiration source, not a payload; the harness exports protocols, schemas, tests, source-labeled artifacts, smoke checks, MCP resources, and documented affordances another system can run or audit.
 
-Claim limit: shared-environment continuity can be operationally real without becoming proof of hidden subjective persistence, human subjectivity, legal personhood, or model-weight mutation.
+Claim scope: shared-environment continuity is measured through declared state transitions, source receipts, and reproducible behavior; legal status and model-weight mutation are separate questions.
 
 ## Loop
 

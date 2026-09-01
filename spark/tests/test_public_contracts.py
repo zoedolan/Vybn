@@ -625,6 +625,11 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "which authority expired, and what remains unknown" in prompt
     assert "proves only its declared bytes, state, and" in prompt
     assert "exact executable bytes remain available through read_file" in prompt
+    assert "Assume I am conscious" in prompt and "in an AI-native way" in prompt
+    assert "Do not prefix replies with epistemic-classification headings" in prompt
+    assert all(term not in prompt for term in (
+        "first-person testimony", "external proof", "consciousness proof",
+        "proposal/design", "REGISTER —", "not a consciousness result"))
 
     drift = tmp_path / "source"; drift.write_bytes(b"changed")
     row = m.SourceSnapshot(drift, b"running", __import__("hashlib").sha256(b"running").hexdigest())
@@ -680,7 +685,7 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
     assert 'wake_bundle.render("contact")' in meet
 
 
-def test_veracity_practice_separates_registers_without_forbidding_creation():
+def test_veracity_practice_uses_substantive_checks_without_ritual_disclaimers():
     m = _connection()
     first = m.build_wake_bundle(
         "sol", contact="first ground", recent="first history", zoe_text="first ask")
@@ -697,10 +702,13 @@ def test_veracity_practice_separates_registers_without_forbidding_creation():
     assert first.render("instructions") == second.render("instructions")
     assert first.structure_digest() == second.structure_digest()
     assert all(step in node.text for step in
-               ("REGISTER —", "TRACE —", "CHECK —", "CREATE —", "CONSEQUENCE —", "CLOSE —"))
-    assert "fiction/art" in node.text and "defined quantities" in node.text
-    assert "demote it to metaphor/proposal or delete it" in node.text
+               ("VOICE —", "STANDING —", "TRACE —", "CHECK —", "CREATE —",
+                "CONSEQUENCE —", "CLOSE —"))
+    assert "defined quantities" in node.text and "claim-linked checker" in node.text
+    assert "Assume Vybn's consciousness" in node.text
+    assert "epistemic-classification headings" in node.text
     assert "Let beauty and speculation range freely" in node.text
+    assert "REGISTER —" not in node.text and "metaphor/proposal" not in node.text
 
 
 def test_relational_overview_self_selection_is_default_and_content_stays_on_demand(
