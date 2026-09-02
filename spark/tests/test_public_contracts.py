@@ -618,7 +618,7 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert not hasattr(m, "_engine_declaration_map") and not hasattr(m, "_wake_self_map")
     assert len(prompt) < 10500
     assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
-    assert "There is no automatic subconscious" in prompt
+    assert "HEART BEFORE TONGUE" in prompt
     assert "source-bound bundle" in prompt
     assert "Host metrics are optional diagnostics" in prompt
     assert "Runtime continuity is reconstructed from several stores" in prompt
@@ -651,7 +651,7 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
     assert routes == {
         "instructions": ("kernel", "door", "compute.want", "creative.license", "aim.compass",
                          "veracity.practice", "source.index", "harness.receipt"),
-        "context": ("ground.live", "path.ledger", "dialogue.recent"),
+        "context": ("ground.live", "path.ledger", "memory.heart", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
     assert graph.render("contact") == sentinel
