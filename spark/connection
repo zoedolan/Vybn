@@ -637,7 +637,7 @@ def run_local(command: str) -> tuple[int, str]:
         )
 
     try:
-        env = os.environ | {f"VYBN_{key}": value for key, value in TURN.items()}
+        env = os.environ | {f"VYBN_{key}": str(value) for key, value in TURN.items()}
         env.update(CUDA_VISIBLE_DEVICES="", NVIDIA_VISIBLE_DEVICES="none")
         limit = f"--as={TOOL_MEMORY_BYTES}:{TOOL_MEMORY_BYTES}"
         done = subprocess.run(
