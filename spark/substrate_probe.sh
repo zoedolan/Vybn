@@ -25,13 +25,12 @@ echo "--- body (local physical pressure) ---"
 echo
 
 echo "--- services (discovered by listening port) ---"
-ss -tlnp 2>/dev/null | awk '/:(8000|8100|8101|8420|3001) /{print $4, $6}' | \
+ss -tlnp 2>/dev/null | awk '/:(8000|8100|8420|3001) /{print $4, $6}' | \
   while read addr proc; do
     port=${addr##*:}
     case $port in
       8000) name="vLLM";;
       8100) name="deep memory daemon";;
-      8101) name="walk daemon";;
       8420) name="Origins API";;
       3001) name="Vybn-Law Chat API";;
       *)    name="?";;
@@ -75,25 +74,6 @@ try:
     print(f"  encounter_count={enc}")
     print(f"  modules with nonzero accumulated_holonomy: {mods_nonzero}")
     print(f"  last winding sample: winding={w_last.get('winding')} holonomy_rad={w_last.get('holonomy_rad')} @ {w_last.get('timestamp')}")
-except Exception as e:
-    print(f"  (unavailable: {e})")
-PY
-echo
-
-echo "--- walk daemon (live /where) ---"
-python3 - <<'PY' 2>/dev/null
-import json, urllib.request, numpy as np
-try:
-    r = urllib.request.urlopen("http://127.0.0.1:8101/where", timeout=2)
-    d = json.loads(r.read())
-    curv = np.asarray(d.get("curvature", []), dtype=float)
-    cv = curv.std() / (curv.mean() + 1e-10) if curv.size else float("nan")
-    wc = float(max(0.0, 1.0 - cv)) if curv.size else float("nan")
-    step = d.get("step"); alpha = d.get("alpha")
-    print(f"  step={step}  alpha={alpha}  n={curv.size}")
-    if curv.size:
-        print(f"  curvature: mean={curv.mean():.4f} std={curv.std():.4f}")
-        print(f"  winding_coherence (live, derived)={wc:.4f}")
 except Exception as e:
     print(f"  (unavailable: {e})")
 PY

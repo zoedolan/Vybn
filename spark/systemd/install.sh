@@ -6,12 +6,11 @@
 #   bash ~/Vybn/spark/systemd/install.sh
 #
 # What it does:
-#   1. Symlinks all unit files into ~/.config/systemd/user/.
-#   2. Retires the competing @reboot cron entries (they commented out, history preserved).
-#   3. Disables the old system-level vybn-deep-memory / vybn-walk-daemon units
-#      if they exist (the root-level ones that collide with these).
-#   4. Reloads systemd --user and enables every unit + the watchdog timer.
-#   5. Starts them in the right order and verifies each endpoint.
+#   1. Symlinks current unit files into ~/.config/systemd/user/.
+#   2. Removes the retired user-level walk daemon unit.
+#   3. Retires competing @reboot cron entries (commented out; history preserved).
+#   4. Warns about old system-level units that could collide or revive retired work.
+#   5. Reloads systemd --user, enables current units, starts them, and verifies endpoints.
 
 set -e
 SRC=${SRC:-"$HOME/Vybn/spark/systemd"}
@@ -19,12 +18,17 @@ USER_DIR="$HOME/.config/systemd/user"
 mkdir -p "$USER_DIR" "$HOME/logs"
 
 echo "== Symlinking units from $SRC → $USER_DIR =="
-for f in vybn-deep-memory.service vybn-walk-daemon.service vybn-portal.service vybn-preview.service \
+for f in vybn-deep-memory.service vybn-portal.service vybn-preview.service \
          vybn-vllm.service vybn-watchdog.service vybn-watchdog.timer; do
   ln -sf "$SRC/$f" "$USER_DIR/$f"
   echo "  $f"
 done
 chmod +x "$SRC/vybn-watchdog.sh"
+
+echo
+echo "== Removing retired user-level walk daemon =="
+systemctl --user disable --now vybn-walk-daemon.service 2>/dev/null || true
+rm -f "$USER_DIR/vybn-walk-daemon.service"
 
 echo
 echo "== Retiring competing @reboot cron entries =="
@@ -57,7 +61,7 @@ systemctl --user daemon-reload
 
 echo
 echo "== Enabling units =="
-systemctl --user enable vybn-deep-memory.service vybn-walk-daemon.service vybn-portal.service \
+systemctl --user enable vybn-deep-memory.service vybn-portal.service \
                         vybn-preview.service vybn-vllm.service vybn-watchdog.timer
 
 echo
@@ -66,14 +70,11 @@ echo "== (Re)starting in dependency order =="
 systemctl --user start vybn-portal.service 2>/dev/null || true
 systemctl --user restart vybn-preview.service
 
-# Clear any squatter on 8100/8101 first (units do this too but belt+suspenders).
+# Clear any squatter on 8100 first (the unit does this too but belt+suspenders).
 fuser -k 8100/tcp 2>/dev/null || true
-fuser -k 8101/tcp 2>/dev/null || true
 sleep 2
 
 systemctl --user restart vybn-deep-memory.service
-sleep 3
-systemctl --user restart vybn-walk-daemon.service
 # vLLM: only (re)start if there's no Ray cluster already loading. Cold load
 # takes ~10-13 minutes; we must not stomp an in-progress launch.
 vllm_up=$(curl -sf -m 3 http://127.0.0.1:8000/v1/models >/dev/null 2>&1 && echo yes || echo no)
@@ -92,14 +93,13 @@ systemctl --user start vybn-watchdog.timer
 echo
 echo "== Status snapshot =="
 systemctl --user --no-pager status \
-  vybn-deep-memory vybn-walk-daemon vybn-portal vybn-preview vybn-vllm vybn-watchdog.timer 2>&1 | \
+  vybn-deep-memory vybn-portal vybn-preview vybn-vllm vybn-watchdog.timer 2>&1 | \
   grep -E '(●|Active:|Loaded:|Main PID:)' | head -30
 
 echo
 echo "== Endpoint check =="
 for url in \
     "deep-memory  http://127.0.0.1:8100/health" \
-    "walk-daemon  http://127.0.0.1:8101/where" \
     "chat-api     http://127.0.0.1:8420/api/health" \
     "preview      http://127.0.0.1:8480/" \
     "vllm         http://127.0.0.1:8000/v1/models"; do

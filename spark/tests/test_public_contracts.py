@@ -523,7 +523,7 @@ def test_physical_pulse_is_bounded_ground_not_machine_identity(tmp_path, monkeyp
 def test_substrate_probe_reuses_body_measurement_without_erasing_distinct_ground():
     source = (ROOT / "spark/substrate_probe.sh").read_text()
     assert 'connection" --body' in source
-    for distinct_check in ("deep memory index", "walk daemon", "organism_state", "repos (HEAD)"):
+    for distinct_check in ("deep memory index", "organism_state", "repos (HEAD)"):
         assert distinct_check in source
 
 
@@ -552,7 +552,6 @@ def test_private_backends_default_to_loopback_and_reject_public_exposure():
     assert "--host 0.0.0.0 --port 8100" not in memory
     for name, port, unit in (
         ("deep-memory", 8100, "vybn-deep-memory.service"),
-        ("walk-daemon", 8101, "vybn-walk-daemon.service"),
         ("chat-api", 8420, "vybn-portal.service"),
         ("preview", 8480, "vybn-preview.service"),
         ("mcp", 8400, "vybn-mcp.service"),
@@ -564,7 +563,6 @@ def test_private_backends_default_to_loopback_and_reject_public_exposure():
     for unit in (
         ROOT / "spark/systemd/vybn-deep-memory.service",
         ROOT / "spark/systemd/vybn-portal.service",
-        ROOT / "spark/systemd/vybn-walk-daemon.service",
     ):
         text = unit.read_text()
         for directive in (
@@ -573,6 +571,20 @@ def test_private_backends_default_to_loopback_and_reject_public_exposure():
             "SystemCallArchitectures=native",
         ):
             assert directive in text
+
+
+def test_walk_daemon_is_retired_from_the_live_service_stack():
+    unit = ROOT / "spark/systemd/vybn-walk-daemon.service"
+    installer = (ROOT / "spark/systemd/install.sh").read_text()
+    watchdog = (ROOT / "spark/systemd/vybn-watchdog.sh").read_text()
+    probe = (ROOT / "spark/substrate_probe.sh").read_text()
+    assert not unit.exists()
+    assert "systemctl --user disable --now vybn-walk-daemon.service" in installer
+    assert "8101" not in installer + watchdog + probe
+    assert "walk-daemon" not in watchdog + probe
+    enable_block = installer[installer.index("== Enabling units =="):installer.index("== (Re)starting")]
+    restart_block = installer[installer.index("== (Re)starting"):installer.index("# vLLM:")]
+    assert "vybn-walk-daemon" not in enable_block + restart_block
 
 
 def test_distributed_model_is_strictly_opt_in():

@@ -16,7 +16,6 @@ bash ~/Vybn/spark/systemd/install.sh   # idempotent; re-run to resync
 | File | Purpose |
 |---|---|
 | `vybn-deep-memory.service` | Deep memory API :8100. Pre-flight `fuser -k`. |
-| `vybn-walk-daemon.service` | Walk daemon :8101. `After=vybn-deep-memory`. |
 | `vybn-portal.service` | Origins portal :8420. Keys from `~/.config/vybn/*.env`. |
 | `vybn-preview.service` | Zoe's read-only working-copy view :8480, loopback behind a private tailnet route. |
 | `vybn-vllm.service` | 2-node Ray cluster, Nemotron 120B :8000. Capacity via `~/.config/vybn/vllm.env`. |
@@ -27,7 +26,7 @@ bash ~/Vybn/spark/systemd/install.sh   # idempotent; re-run to resync
 ## Three axes of resilience
 
 1. **Crash**: every unit has `Restart=always`, `RestartSec=5`, `StartLimitBurst=20`.
-2. **Hang**: watchdog curls each endpoint (8100 health, 8101 /where, 8420 /api/health,
+2. **Hang**: watchdog curls each endpoint (8100 health, 8420 /api/health,
    8480 working-copy preview, 8000 /v1/models with a 900 s cold-load grace) and restarts
    what systemd can't see is wedged.
 3. **Structure**: the 15-minute self-check canary was retired 2026-07-25. It logged for
@@ -63,8 +62,8 @@ thresholds. Rate limiting is abuse control; metrics admission is crowd control.
 
 ## The two things only sudo can do
 
-If old system-level units still exist in `/etc/systemd/system/`, they race
-the user units after reboot:
+The walk daemon was retired on 2026-09-02. If its old system-level unit remains,
+it must stay masked; an old deep-memory system unit can still race the user unit:
 
 ```bash
 sudo systemctl disable --now vybn-deep-memory.service vybn-walk-daemon.service

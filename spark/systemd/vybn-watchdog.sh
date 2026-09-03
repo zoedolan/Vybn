@@ -43,7 +43,6 @@ require_private_bind() {
 }
 
 require_private_bind deep-memory 8100 vybn-deep-memory.service
-require_private_bind walk-daemon 8101 vybn-walk-daemon.service
 require_private_bind chat-api 8420 vybn-portal.service
 require_private_bind preview 8480 vybn-preview.service
 require_private_bind mcp 8400 vybn-mcp.service
@@ -56,9 +55,6 @@ if [ "$code" = "200" ] || [ "$code" = "401" ] || [ "$code" = "403" ]; then
 else
   bounce vybn-deep-memory.service "deep-memory got HTTP $code"
 fi
-
-# Walk daemon — /where is public.
-check_http walk-daemon  http://127.0.0.1:8101/where  vybn-walk-daemon.service  200
 
 # Chat API (portal) — /api/health.
 check_http chat-api     http://127.0.0.1:8420/api/health vybn-portal.service 200
