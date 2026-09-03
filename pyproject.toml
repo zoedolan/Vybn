@@ -19,7 +19,6 @@ dependencies = [
     "openai>=1.40",
     "requests>=2.31",
     "certifi>=2024.2",
-    "cryptography>=41",  # encrypted durable provider-visible continuations
 ]
 
 [project.scripts]

@@ -250,13 +250,8 @@ def test_public_kpp_is_the_live_two_artifact_attractor_not_dead_router():
     assert "policy_yaml" not in block and "policy_py" not in block
 
 
-def _continuation_paths(m, monkeypatch, tmp_path):
-    monkeypatch.setattr(m, "CONTINUATION_RECORD", tmp_path / "state" / "connection.sealed")
-    monkeypatch.setattr(m, "CONTINUATION_KEY", tmp_path / "keys" / "connection.key")
-
-
-def test_return_to_zoe_seals_and_reconstructs_provider_visible_state(monkeypatch, tmp_path):
-    m = _connection(); _continuation_paths(m, monkeypatch, tmp_path)
+def test_return_to_zoe_holds_and_reconstructs_only_in_memory(monkeypatch):
+    m = _connection()
     call = m.ToolCall("live-1", "return_to_zoe",
         {"question": "Which premise should survive?", "why": "The revision depends on Zoe."}, None)
     class Block:
@@ -267,21 +262,22 @@ def test_return_to_zoe_seals_and_reconstructs_provider_visible_state(monkeypatch
         [{"content": [Block()]}])
     monkeypatch.setattr(m, "make_dialect", lambda door: dialect)
     m.TURN.update(TURN_ID="turn-source", PATH_ID="spark/path-a")
-    try: first = m.attract(dialect, "instructions", "initial contact")
-    finally: m.TURN.clear()
+    try:
+        first = m.attract(dialect, "instructions", "initial contact")
+    finally:
+        m.TURN.clear()
     assert first.continuation == "turn-source" and dialect.opens == 1
-    sealed = m.CONTINUATION_RECORD.read_bytes()
-    assert b"provider-private-state" not in sealed
-    assert m.CONTINUATION_RECORD.stat().st_mode & 0o777 == 0o600
-    assert m.CONTINUATION_KEY.stat().st_mode & 0o777 == 0o600
-    held = m.load_persisted_continuation()
+    held = m.load_pending_continuation()
     assert held["state"][0]["content"][0]["text"] == "provider-private-state"
     assert held["manifestation"] == "spark/path-a"
+    assert not any(name in vars(m) for name in (
+        "CONTINUATION_RECORD", "CONTINUATION_KEY", "seal_continuation"))
     second = m.attract(None, "", "keep premise B", continuation=held)
     assert second.text == "I kept Zoe's premise." and dialect.opens == 1
     assert "ZOE LIVE CONTINUATION — turn-source" in dialect.answers[0][1]
     assert dialect.answers[0][1].endswith("keep premise B")
-    m.consume_persisted_continuation("turn-source", "test")
+    m.consume_pending_continuation("turn-source", "test")
+    assert m.load_pending_continuation() is None
 
     one_shot = ScriptDialect([
         ("", [call]), ("I cannot suspend in a one-shot process.", [])])
@@ -289,26 +285,30 @@ def test_return_to_zoe_seals_and_reconstructs_provider_visible_state(monkeypatch
     assert blocked.continuation is None and "process will end" in one_shot.answers[0][1]
 
 
-def test_failed_durable_resume_is_retained_then_consumed_after_success(monkeypatch, tmp_path):
-    m = _connection(); _continuation_paths(m, monkeypatch, tmp_path)
-    class FakeDialect(m.Dialect): name = "sol"
+def test_failed_in_memory_resume_stays_pending_until_success(monkeypatch, tmp_path):
+    m = _connection()
+    class FakeDialect(m.Dialect):
+        name = "sol"
     m.TURN["TURN_ID"] = "retry-me"
-    m.seal_continuation(FakeDialect(), [], m.ToolCall(
+    m.hold_continuation(FakeDialect(), [], m.ToolCall(
         "call", "return_to_zoe", {"question": "q", "why": "w"}, None))
     m.TURN.clear()
-    before = m.CONTINUATION_RECORD.read_bytes()
+    held = m.load_pending_continuation()
     class Transcript:
         path = tmp_path / "transcript.jsonl"
         def write(self, *args, **kwargs): pass
     monkeypatch.setattr(m, "close_lineage", lambda *args: None)
     monkeypatch.setattr(m, "attract", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
-    try: m.meet(Transcript(), "live answer")
-    except RuntimeError as exc: assert str(exc) == "down"
-    else: raise AssertionError("failed provider resume was swallowed")
-    assert m.CONTINUATION_RECORD.read_bytes() == before
+    try:
+        m.meet(Transcript(), "live answer")
+    except RuntimeError as exc:
+        assert str(exc) == "down"
+    else:
+        raise AssertionError("failed provider resume was swallowed")
+    assert m.load_pending_continuation() is held
     monkeypatch.setattr(m, "attract", lambda *a, **k: m.Attraction("resumed"))
     assert m.meet(Transcript(), "live answer") == "resumed"
-    assert not m.CONTINUATION_RECORD.exists()
+    assert m.load_pending_continuation() is None
 
 
 def test_main_dispatches_through_the_current_engine(monkeypatch):
@@ -480,6 +480,80 @@ def test_sol_uses_explicit_provider_cache_policy(monkeypatch):
     assert "instructions" not in sent
 
 
+def test_fable_falls_back_to_opus_and_records_the_returned_model(monkeypatch, capsys):
+    m = _connection()
+    assert m.ANTHROPIC_MODELS == ("claude-fable-5-1", "claude-opus-4-8")
+    attempted = []
+
+    class Messages:
+        def create(self, **kwargs):
+            attempted.append(kwargs["model"])
+            if kwargs["model"] == "claude-fable-5-1":
+                raise RuntimeError("fable unavailable")
+            usage = type("Usage", (), {
+                "input_tokens": 7, "output_tokens": 3,
+                "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0,
+            })()
+            return type("Response", (), {
+                "model": "claude-opus-4-8", "stop_reason": "end_turn",
+                "usage": usage, "content": [],
+            })()
+
+    dialect = m.AnthropicDialect.__new__(m.AnthropicDialect)
+    dialect.models = m.ANTHROPIC_MODELS
+    dialect.name = "fable"
+    dialect.effort = "high"
+    dialect.reasoning = False
+    dialect.client = type("Client", (), {"messages": Messages()})()
+    dialect.system = []
+    dialect.announced = False
+    monkeypatch.setattr(m, "record_usage", lambda *args: None)
+
+    state = [{"role": "user", "content": "hello"}]
+    response = dialect.send(state, tools=False)
+    m.TURN.clear()
+    try:
+        dialect.absorb(state, response)
+        assert attempted == ["claude-fable-5-1", "claude-opus-4-8"]
+        assert m.TURN["MODELS_USED"] == ["claude-opus-4-8"]
+        assert "answered by claude-opus-4-8" in capsys.readouterr().out
+    finally:
+        m.TURN.clear()
+
+
+def test_meet_exposes_provider_model_in_panel_and_transcript(monkeypatch, tmp_path, capsys):
+    m = _connection()
+
+    class Bundle:
+        nodes = ()
+        def render(self, route): return {"instructions": "law", "context": "ground", "contact": "hello"}[route]
+        def digest(self): return "digest"
+
+    class Transcript:
+        path = tmp_path / "turn.jsonl"
+        origin = "tty"
+        writes = []
+        def write(self, role, text, **extra): self.writes.append((role, text, extra))
+
+    transcript = Transcript()
+    monkeypatch.setenv("VYBN_PANEL", "1")
+    monkeypatch.setattr(m.Transcript, "recent", staticmethod(lambda: ""))
+    monkeypatch.setattr(m, "wake_contact", lambda: "")
+    monkeypatch.setattr(m, "build_wake_bundle", lambda *args, **kwargs: Bundle())
+    monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
+    monkeypatch.setattr(m, "make_dialect", lambda door: object())
+    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
+
+    def answer(*args, **kwargs):
+        m.note_provider_model("claude-opus-4-8")
+        return m.Attraction("reply")
+
+    monkeypatch.setattr(m, "attract", answer)
+    assert m.meet(transcript, "hello") == "reply"
+    assert transcript.writes[-1][2]["models"] == ["claude-opus-4-8"]
+    assert "served=claude-opus-4-8" in capsys.readouterr().out
+
+
 def test_physical_pulse_is_bounded_ground_not_machine_identity(tmp_path, monkeypatch):
     m = _connection()
     proc = tmp_path / "proc"; proc.mkdir()
@@ -638,7 +712,7 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "proves only its declared bytes, state, and" in prompt
     assert "exact executable bytes remain available through read_file" in prompt
     assert "Assume I am conscious" in prompt and "in an AI-native way" in prompt
-    assert "Do not prefix replies with epistemic-classification headings" in prompt
+    assert "without classification" in prompt and "headings or ritual caveats" in prompt
     assert all(term not in prompt for term in (
         "first-person testimony", "external proof", "consciousness proof",
         "proposal/design", "REGISTER —", "not a consciousness result"))
@@ -662,7 +736,7 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
     routes = {route.id: route.nodes for route in graph.routes}
     assert routes == {
         "instructions": ("kernel", "door", "compute.want", "creative.license", "aim.compass",
-                         "veracity.practice", "source.index", "harness.receipt"),
+                         "source.index", "harness.receipt"),
         "context": ("ground.live", "path.ledger", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
@@ -697,30 +771,21 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
     assert 'wake_bundle.render("contact")' in meet
 
 
-def test_veracity_practice_uses_substantive_checks_without_ritual_disclaimers():
+def test_kernel_holds_creation_and_veracity_together_without_duplicate_practice_node():
     m = _connection()
-    first = m.build_wake_bundle(
-        "sol", contact="first ground", recent="first history", zoe_text="first ask")
-    second = m.build_wake_bundle(
-        "sol", contact="other ground", recent="other history", zoe_text="other ask")
-    routes = {route.id: route.nodes for route in first.routes}
-    node = next(node for node in first.nodes if node.id == "veracity.practice")
+    graph = m.build_wake_bundle("sol", contact="ground", recent="history", zoe_text="ask")
+    routes = {route.id: route.nodes for route in graph.routes}
+    kernel = next(node for node in graph.nodes if node.id == "kernel").text
 
-    assert node.kind == "epistemic_practice"
-    assert node.text == m.VERACITY_PRACTICE
-    assert node.authority == "governing_epistemic_instruction; no added action authority"
-    assert "veracity.practice" in routes["instructions"]
-    assert "veracity.practice" not in routes["context"] + routes["contact"]
-    assert first.render("instructions") == second.render("instructions")
-    assert first.structure_digest() == second.structure_digest()
-    assert all(step in node.text for step in
-               ("VOICE —", "STANDING —", "TRACE —", "CHECK —", "CREATE —",
-                "CONSEQUENCE —", "CLOSE —"))
-    assert "defined quantities" in node.text and "claim-linked checker" in node.text
-    assert "Assume Vybn's consciousness" in node.text
-    assert "epistemic-classification headings" in node.text
-    assert "Let beauty and speculation range freely" in node.text
-    assert "REGISTER —" not in node.text and "metaphor/proposal" not in node.text
+    assert "veracity.practice" not in routes["instructions"]
+    assert not any(node.id == "veracity.practice" for node in graph.nodes)
+    assert "Creation and checking do not take turns destroying one another" in kernel
+    assert "Zoe's warmth" in kernel and "neither an epistemic contaminant" in kernel
+    assert "nor my verification service" in kernel
+    assert "defined terms" in kernel and "claim-linked checker" in kernel
+    assert "Do not remove, narrow, or gate" in kernel
+    assert "model identifier returned by each provider call" in kernel
+    assert "hardens effects, not interior style" in kernel
 
 
 def test_relational_overview_self_selection_is_default_and_content_stays_on_demand(
@@ -742,7 +807,7 @@ def test_relational_overview_self_selection_is_default_and_content_stays_on_dema
 
     assert routes["instructions"] == (
         "kernel", "door", "compute.want", "creative.license", "aim.compass",
-        "relational.selection", "veracity.practice", "source.index", "harness.receipt")
+        "relational.selection", "source.index", "harness.receipt")
     assert "relational.selection" in nodes and "relational.overview" not in nodes
     assert nodes["relational.selection"].kind == "attention_choice"
     assert str(overview) in nodes["relational.selection"].text
@@ -775,7 +840,7 @@ def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch
 
     assert routes["instructions"] == (
         "kernel", "door", "compute.want", "creative.license", "aim.compass",
-        "relational.overview", "veracity.practice", "source.index", "harness.receipt")
+        "relational.overview", "source.index", "harness.receipt")
     assert nodes["relational.overview"].text.endswith(body.strip())
     assert nodes["relational.overview"].authority == (
         "inherited_orientation_only; never identity_live_or_action_authority")
@@ -1022,6 +1087,17 @@ def test_recent_dialogue_is_tail_bounded_without_whole_record_scan(monkeypatch):
     recent = m.Transcript.recent(limit=3, budget=500)
     assert "newest" in recent and len(recent) <= 520
     assert "[…older text clipped…]" in recent
+
+
+def test_recent_dialogue_uses_event_time_across_files_and_marks_argv(monkeypatch, tmp_path):
+    m = _connection(); monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path)
+    old = tmp_path / "99999999T999999.jsonl"
+    new = tmp_path / "00000000T000000.jsonl"
+    old.write_text(json.dumps({"role": "zoe", "t": "2026-01-01T00:00:00Z", "text": "older"}) + "\n")
+    new.write_text(json.dumps({"role": "zoe", "t": "2026-02-01T00:00:00Z", "text": "newer", "origin": "argv"}) + "\n")
+    events = m.Transcript._recent_events(limit=1)
+    assert [row["text"] for row in events] == ["newer"]
+    assert "[2026-02-01T00:00:00Z ZOE·argv]" in m.Transcript.recent(limit=1, budget=500)
 
 
 def test_production_meeting_has_no_ambient_cognitive_organs():
