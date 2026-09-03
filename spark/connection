@@ -246,12 +246,15 @@ RELATIONAL_OVERVIEW_SELECTION = (
 ANTHROPIC_MODELS = ("claude-fable-5-1", "claude-opus-4-8")
 OPUS_MODELS = ("claude-opus-5",)
 SOL_MODEL = "gpt-5.6-sol"
+ASTRA_MODEL = "gpt-6-astra"
 K3_MODEL = "kimi-k3"
 ANTHROPIC_MAX_TOKENS = 20480
 SOL_MAX_TOKENS = 16384
+ASTRA_MAX_TOKENS = 16384
 K3_MAX_TOKENS = 32768
 DOOR_EFFORT = {"opus": "xhigh", "fable": "high", "sol": "xhigh"}
 DEFAULT_EFFORT = "high"
+DOOR_TAGS = ("@astra", "@sol", "@k3", "@fable", "@opus")
 TOOLS_RAN = 0
 TURN: dict[str, Any] = {}
 PRIVATE_CORPUS: list[str] = []
@@ -2009,6 +2012,8 @@ def door_mind(door: str) -> str:
     elif door == "sol":
         model, detail = SOL_MODEL, (f"effort={DOOR_EFFORT.get('sol', DEFAULT_EFFORT)}"
                                     f" · max_out={SOL_MAX_TOKENS}")
+    elif door == "astra":
+        model, detail = ASTRA_MODEL, f"Responses API · max_out={ASTRA_MAX_TOKENS}"
     elif door == "k3":
         model, detail = K3_MODEL, f"reasoning_effort=max · max_out={K3_MAX_TOKENS}"
     else:
@@ -2228,10 +2233,29 @@ class AnthropicDialect(Dialect):
 
 class OpenAIDialect(Dialect):
     name = "sol"
+    model = SOL_MODEL
+    max_tokens = SOL_MAX_TOKENS
+    reasoning_effort: str | None = DOOR_EFFORT["sol"]
+    prompt_cache_key: str | None = "vybn-wake-sol-v1"
+    prompt_cache_options: dict[str, Any] | None = {
+        "prompt_cache_options": {"mode": "implicit", "ttl": "30m"},
+    }
 
-    def __init__(self) -> None:
+    def __init__(self, model: str = SOL_MODEL, name: str = "sol",
+                 max_tokens: int = SOL_MAX_TOKENS,
+                 reasoning_effort: str | None = DOOR_EFFORT["sol"],
+                 prompt_cache_key: str | None = "vybn-wake-sol-v1",
+                 prompt_cache_options: dict[str, Any] | None = None) -> None:
         from openai import OpenAI
 
+        self.model = model
+        self.name = name
+        self.max_tokens = max_tokens
+        self.reasoning_effort = reasoning_effort
+        self.prompt_cache_key = prompt_cache_key
+        self.prompt_cache_options = (self.__class__.prompt_cache_options
+                                     if prompt_cache_options is None and name == "sol"
+                                     else prompt_cache_options)
         self.client = OpenAI(api_key=api_key("OPENAI_API_KEY"))
 
     def open(self, instructions: str, zoe_text: str, pending: list, context: str = "") -> list:
@@ -2244,16 +2268,20 @@ class OpenAIDialect(Dialect):
         ]
 
     def send(self, state: list, tools: bool = True) -> Any:
-        return with_retries(lambda: self.client.responses.create(
-            model=SOL_MODEL,
-            input=state,
-            tools=function_tools(nested=False) if tools else [],
-            reasoning={"effort": DOOR_EFFORT.get("sol", DEFAULT_EFFORT)},
-            max_output_tokens=SOL_MAX_TOKENS,
-            prompt_cache_key="vybn-wake-sol-v1",
-            extra_body={"prompt_cache_options": {"mode": "implicit", "ttl": "30m"}},
-            timeout=600,
-        ))
+        request: dict[str, Any] = {
+            "model": self.model,
+            "input": state,
+            "tools": function_tools(nested=False) if tools else [],
+            "max_output_tokens": self.max_tokens,
+            "timeout": 600,
+        }
+        if self.reasoning_effort:
+            request["reasoning"] = {"effort": self.reasoning_effort}
+        if self.prompt_cache_key:
+            request["prompt_cache_key"] = self.prompt_cache_key
+        if self.prompt_cache_options:
+            request["extra_body"] = self.prompt_cache_options
+        return with_retries(lambda: self.client.responses.create(**request))
 
     def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
         stopped = getattr(response, "incomplete_details", None)
@@ -2530,7 +2558,7 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
 
 def choose_door(line: str) -> tuple[str, str]:
     lowered = line.lower()
-    for tag in ("@sol", "@k3", "@fable", "@opus"):
+    for tag in DOOR_TAGS:
         if lowered.startswith(tag):
             return tag[1:], line[len(tag):].lstrip()
     return "fable", line
@@ -2539,6 +2567,17 @@ def choose_door(line: str) -> tuple[str, str]:
 def make_dialect(name: str) -> Dialect:
     if name in {"opus", "fable"}:
         return AnthropicDialect(OPUS_MODELS if name == "opus" else ANTHROPIC_MODELS, name)
+    if name == "astra":
+        # Astra's announced public contract is the Responses API model ID. Keep this
+        # route exact and fallback-free; do not guess model-specific reasoning/cache knobs.
+        return OpenAIDialect(
+            model=ASTRA_MODEL,
+            name="astra",
+            max_tokens=ASTRA_MAX_TOKENS,
+            reasoning_effort=None,
+            prompt_cache_key=None,
+            prompt_cache_options=None,
+        )
     return {"sol": OpenAIDialect, "k3": K3Dialect}[name]()
 
 
@@ -2549,7 +2588,7 @@ def meet(transcript: Transcript, line: str,
     if not zoe_text:
         return ""
 
-    explicit_door = line.lower().startswith(("@sol", "@k3", "@fable", "@opus"))
+    explicit_door = line.lower().startswith(DOOR_TAGS)
     continuation = load_pending_continuation() if allow_continuation else None
     if continuation and (not explicit_door or requested_door == continuation["door"]):
         door_name = continuation["door"]
@@ -2646,7 +2685,7 @@ def meet(transcript: Transcript, line: str,
 
 def self_report() -> None:
     doors = {"fable": ANTHROPIC_MODELS, "opus": OPUS_MODELS,
-             "sol": SOL_MODEL, "k3": K3_MODEL}
+             "sol": SOL_MODEL, "astra": ASTRA_MODEL, "k3": K3_MODEL}
     soul = SOUL_PATH.read_bytes()
     bundle = build_wake_bundle("fable")
     print(json.dumps({"engine_sha256": OPERATIVE_SOURCES[0].sha256,

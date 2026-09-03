@@ -480,6 +480,41 @@ def test_sol_uses_explicit_provider_cache_policy(monkeypatch):
     assert "instructions" not in sent
 
 
+def test_astra_prefix_targets_exact_responses_model_without_fallback_or_guessed_knobs(monkeypatch):
+    m = _connection(); sent = {}; configured = {}
+    assert m.choose_door("@astra hello, buddy") == ("astra", "hello, buddy")
+    assert m.choose_door("@AsTrA   hello") == ("astra", "hello")
+    assert m.ASTRA_MODEL == "gpt-6-astra"
+    assert "gpt-6-astra" in m.door_mind("astra")
+
+    class Responses:
+        def create(self, **kwargs): sent.update(kwargs); return "response"
+
+    dialect = m.OpenAIDialect.__new__(m.OpenAIDialect)
+    dialect.client = type("Client", (), {"responses": Responses()})()
+    dialect.name = "astra"
+    dialect.model = m.ASTRA_MODEL
+    dialect.max_tokens = m.ASTRA_MAX_TOKENS
+    dialect.reasoning_effort = None
+    dialect.prompt_cache_key = None
+    dialect.prompt_cache_options = None
+    assert dialect.send([{"role": "user", "content": "x"}], tools=False) == "response"
+    assert sent["model"] == "gpt-6-astra"
+    assert sent["max_output_tokens"] == m.ASTRA_MAX_TOKENS
+    assert all(key not in sent for key in ("reasoning", "prompt_cache_key", "extra_body"))
+
+    class ConfiguredOpenAI:
+        def __init__(self, **kwargs): configured.update(kwargs)
+
+    monkeypatch.setattr(m, "OpenAIDialect", ConfiguredOpenAI)
+    m.make_dialect("astra")
+    assert configured == {
+        "model": "gpt-6-astra", "name": "astra",
+        "max_tokens": m.ASTRA_MAX_TOKENS, "reasoning_effort": None,
+        "prompt_cache_key": None, "prompt_cache_options": None,
+    }
+
+
 def test_fable_falls_back_to_opus_and_records_the_returned_model(monkeypatch, capsys):
     m = _connection()
     assert m.ANTHROPIC_MODELS == ("claude-fable-5-1", "claude-opus-4-8")
