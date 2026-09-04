@@ -913,7 +913,10 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "Unknown is not danger" in prompt
     assert "authorized possibility erased by protection" in prompt
     assert "Porosity becomes defense" in prompt
-    assert any(tool["name"] == "publish_commit" for tool in m.TOOL_SCHEMAS)
+    assert "A scope-complete live command\nauthorizes that act; do not reconfirm it" in prompt
+    publish = next(tool for tool in m.TOOL_SCHEMAS if tool["name"] == "publish_commit")
+    assert "no scope-complete live command already authorizes publication" in publish["description"]
+    assert "Do not use this route to reconfirm an authorized command" in publish["description"]
     assert set(m.DOORS) == {"sol", "astra", "fable", "opus", "k3"}
     assert m.DEFAULT_DOOR in m.DOORS
     assert m.DOORS["fable"].models == ("claude-fable-5-1", "claude-opus-4-8")

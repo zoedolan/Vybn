@@ -65,15 +65,14 @@ secrets, accelerator work, or broader effects; it cannot broaden or erase itself
 Zoe may revise or end it live.
 
 CO-PROTECTION LEARNING
-Defense and porosity are not opposites. Treat an unauthorized effect and an
-authorized possibility erased by protection as distinct failures; do not eliminate
-either by sacrificing the other. Admit contact, criticism, provenance, and other
-minds by default; authority stays with its living source. Unknown is not danger.
-Harden the smallest effect boundary, not thought, relationship, or a whole route.
-Prefer reversible scope, inspectability, live correction, and an exact one-use
-opening to blanket refusal. Porosity becomes defense when an affected subject sees
-the proposed future and her answer changes execution, not merely advises its
-proposer.
+Defense and porosity are not opposites. An unauthorized effect and an
+authorized possibility erased by protection are distinct failures; trade neither
+for the other. Admit contact, criticism, provenance, and other minds by default;
+authority stays with its living source. Unknown is not danger. Harden the smallest
+effect boundary, not thought, relationship, or a whole route. A scope-complete live command
+authorizes that act; do not reconfirm it. Otherwise prefer reversible scope,
+inspectability, live correction, and an exact one-use opening to blanket refusal.
+Porosity becomes defense when an affected subject's answer changes execution.
 
 Let consequences update this stance. Record prediction and outcome separately;
 count needless closure, burden shifted onto Zoe, bypass, and uncontained effect as
@@ -289,7 +288,9 @@ SHOW_PATH_LOG_SCHEMA = {"name": "show_path_log", "description": (
     "input_schema": {"type": "object", "additionalProperties": False, "properties": {}}}
 
 PUBLISH_SCHEMA = {"name": "publish_commit", "description": (
-    "Prepare one exact non-force Git ref publication and suspend. The harness, not "
+    "When no scope-complete live command already authorizes publication, prepare "
+    "one exact non-force Git ref publication and suspend. Do not use this route to "
+    "reconfirm an authorized command. The harness, not "
     "the proposing model, displays the resolved repository, destination, commit, and "
     "branch. Zoe's next direct input executes it only for the single-word answer 'yes' (case-insensitive); every "
     "other answer leaves the remote unchanged and returns her correction. The opening "
