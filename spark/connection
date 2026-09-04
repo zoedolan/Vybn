@@ -577,14 +577,6 @@ def aim_field(name: str) -> str:
         return ""
 
 
-def _is_relative_to(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-        return True
-    except ValueError:
-        return False
-
-
 _PRIVATE_ROOTS = (HOME / "Him", DEFAULT_TRANSCRIPTS, LOVE_TRANSCRIPTS,
                   HOME / ".local/state/vybn/continuations", TRANSFORM_PATH,
                   TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH, TRANSFORM_SEGMENTS_PATH, SUBJECT_PATH,
@@ -597,12 +589,12 @@ _SECRET_ROOTS = (HOME / ".config/vybn/continuation-keys", HOME / ".vybn_keys",
 def _private_path(path: Path) -> bool:
     resolved = path.resolve()
     return resolved in {p.resolve() for p in CONTINUITY_PATHS} or any(
-        _is_relative_to(resolved, root.resolve()) for root in _PRIVATE_ROOTS)
+        resolved.is_relative_to(root.resolve()) for root in _PRIVATE_ROOTS)
 
 
 def _secret_path(path: Path) -> bool:
     resolved = path.resolve()
-    return any(resolved == root.resolve() or _is_relative_to(resolved, root.resolve())
+    return any(resolved.is_relative_to(root.resolve())
                for root in _SECRET_ROOTS)
 
 
@@ -1136,7 +1128,7 @@ def _artifact_receipts(paths: list[str]) -> list[dict[str, Any]]:
         except OSError as exc:
             raise TransformStateError(
                 f"artifact unavailable ({value}: {type(exc).__name__})") from exc
-        if (not _is_relative_to(resolved, workspace) or candidate.is_symlink()
+        if (not resolved.is_relative_to(workspace) or candidate.is_symlink()
                 or not resolved.is_file()):
             raise TransformStateError(f"artifact is not a regular workspace file: {value}")
         cursor = workspace
@@ -1307,7 +1299,7 @@ def _render_transform_artifact(item: dict[str, Any]) -> str:
     source = workspace / item["path"]
     try:
         resolved = source.resolve(strict=True)
-        if (not _is_relative_to(resolved, workspace) or source.is_symlink()
+        if (not resolved.is_relative_to(workspace) or source.is_symlink()
                 or not resolved.is_file() or _secret_path(resolved) or _private_path(resolved)):
             return f"{item['path']}@{item['sha256'][:12]}:{item['bytes']}B:REFUSED"
         if resolved.stat().st_size > TRANSFORM_MAX_ARTIFACT_BYTES:
@@ -2553,7 +2545,7 @@ def prepare_publish_proposal(arguments: dict[str, Any]) -> dict[str, Any]:
     except OSError as exc:
         raise PublishProposalError(f"repository unavailable: {type(exc).__name__}") from exc
     workspace = WORKSPACE.resolve()
-    if not _is_relative_to(repository, workspace) or not repository.is_dir():
+    if not repository.is_relative_to(workspace) or not repository.is_dir():
         raise PublishProposalError("repository escapes the active workspace")
     cursor = WORKSPACE
     if any((cursor := cursor / part).is_symlink() for part in relative.parts):

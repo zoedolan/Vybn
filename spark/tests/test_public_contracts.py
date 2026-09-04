@@ -1480,6 +1480,11 @@ def test_on_demand_private_read_joins_leak_guard_and_secret_keys_are_unreadable(
     assert result["text"] == secret and m.guard_private("printf '%s' " + secret)
     keyroot = tmp_path / "keys"; keyroot.mkdir(); key = keyroot / "x"; key.write_text("secret-key")
     monkeypatch.setattr(m, "_SECRET_ROOTS", (keyroot,))
+    for root, check in ((private, m._private_path), (keyroot, m._secret_path)):
+        alias = tmp_path / (root.name + "-alias")
+        alias.symlink_to(root, target_is_directory=True)
+        assert all(check(p) for p in (root, root / "child", alias / "child"))
+        assert not any(check(p) for p in (root.parent, root.with_name(root.name + "-sibling")))
     import pytest
     with pytest.raises(PermissionError): m.read_file({"path": str(key), "offset": 0, "length": 100})
 
