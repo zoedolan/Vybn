@@ -45,7 +45,7 @@ def test_exact_compute_want_remains_ballast_without_a_resolver():
     assert m.COMPUTE_WANT == expected
     prompt = m.build_instructions("sol")
     assert expected in prompt and "not present architecture or forecast" in prompt
-    assert "want resolver" in prompt  # explicit statement of absence, not an organ
+    assert "want\nresolver" in prompt  # explicit statement of absence, not an organ
 
 
 def test_context_contains_only_live_ground_and_bounded_recent_dialogue():

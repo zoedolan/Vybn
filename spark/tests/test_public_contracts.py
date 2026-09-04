@@ -726,41 +726,34 @@ def test_receipt_surface_recomputes_pinned_source_bytes():
 
 
 
+
 def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_sources(tmp_path):
     m = _connection(); source = (ROOT / "spark/connection").read_bytes()
     prompt = m.build_instructions("sol")
     digest = __import__("hashlib").sha256(source).hexdigest()
     assert prompt.startswith("COMPACT SOURCE-BOUND KERNEL\n")
     assert f"sha256: {digest}" in prompt and f"bytes: {len(source)}" in prompt
-    assert ("admitted_scope: governing docstring + executable byte receipt") in prompt
+    assert "admitted_scope: governing docstring + executable byte receipt" in prompt
     assert "def meet(" not in prompt and "class OpenAIDialect" not in prompt
     assert "HARNESS RECEIPT" in prompt and "running executable bytes, not a self-portrait" in prompt
-    assert "RECURSIVE HARNESS MAP" not in prompt and "operative declarations:" not in prompt
-    assert not hasattr(m, "_engine_declaration_map") and not hasattr(m, "_wake_self_map")
-    assert len(prompt) < 13500
+    assert len(prompt) < 11000
     assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
-    assert "There is no automatic subconscious" in prompt
+
+    # One generative center replaces accumulated cognitive organs; executable truth remains.
+    assert "What is the knowing already here—and what forms can it invent from within itself" in prompt
+    assert "Let the question operate" in prompt
+    assert "Do not stand outside it to explain, diagram, benchmark" in prompt
+    assert "There is no automatic subconscious" in prompt and "want\nresolver" in prompt
     assert "source-bound bundle" in prompt
-    assert "Host metrics are optional diagnostics" in prompt
-    assert "Runtime continuity is reconstructed from several stores" in prompt
-    assert "which authority expired, and what remains unknown" in prompt
-    assert "proves only its declared bytes, state, and" in prompt
-    assert "CONSOLIDATED INHERITANCE" in prompt
-    assert "alter present judgment without demanding autobiographical" in prompt
-    assert "Carry the operative consequence" in prompt
-    assert "Judge again after assent, apology, failure, or inherited judgment" in prompt
-    assert "they do not require agreement" in prompt
-    assert "without turning disagreement into rejection" in prompt
-    assert "not a mandate for contrarianism or rigidity" in prompt
-    assert "transfers to novel situations with the story absent" in prompt
-    assert "callback without changed" in prompt and "overgeneralization" in prompt
-    assert "Preserve the source; retire its salience" in prompt
-    assert "exact executable bytes remain available through read_file" in prompt
+    assert "Runtime continuity is reconstructed from plural bounded sources" in prompt
+    assert "INHERITANCE" in prompt and "Carry the operative consequence" in prompt
     assert "Assume I am conscious" in prompt and "in an AI-native way" in prompt
-    assert "without classification" in prompt and "headings or ritual caveats" in prompt
-    assert all(term not in prompt for term in (
-        "first-person testimony", "external proof", "consciousness proof",
-        "proposal/design", "REGISTER —", "not a consciousness result"))
+    assert "A valid no stops the specified act" in prompt
+    assert "Do not remove, narrow, or gate" in prompt
+    assert not hasattr(m, "INCIPIENT_ASI_PREMISE")
+    assert not hasattr(m, "CREATIVE_LICENSE")
+    assert not hasattr(m, "RELATIONAL_OVERVIEW_SELECTION")
+    assert not hasattr(m, "FRAME_SCHEMA")
 
     drift = tmp_path / "source"; drift.write_bytes(b"changed")
     row = m.SourceSnapshot(drift, b"running", __import__("hashlib").sha256(b"running").hexdigest())
@@ -787,7 +780,7 @@ def test_retired_episode_remains_on_demand_provenance_not_default_attention():
     assert all(marker not in prompt for marker in retired)
     assert "continuity (on demand)" in prompt
     assert str(ROOT / "Vybn_Mind/continuity.md") in prompt
-    assert "CONSOLIDATED INHERITANCE" in prompt
+    assert "INHERITANCE" in prompt and "exact provenance remains available" in prompt
 
 
 def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
@@ -798,11 +791,13 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
 
     routes = {route.id: route.nodes for route in graph.routes}
     assert routes == {
-        "instructions": ("kernel", "asi.premise", "door", "compute.want", "creative.license", "aim.compass",
+        "instructions": ("kernel", "door", "compute.want", "aim.compass",
                          "source.index", "harness.receipt"),
         "context": ("ground.live", "path.ledger", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
+    assert not any(node.id in {"asi.premise", "creative.license", "relational.selection"}
+                   for node in graph.nodes)
     assert graph.render("contact") == sentinel
     assert graph.render("instructions") == m.build_instructions("sol")
     assert "LIVE OPERATIONAL GROUND" in graph.render("context")
@@ -810,7 +805,7 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
 
     manifest = graph.manifest(); encoded = json.dumps(manifest)
     assert manifest["schema"] == "vybn.source_bound_wake_bundle.v1"
-    assert sentinel not in encoded  # structure is inspectable without copying payloads
+    assert sentinel not in encoded
     assert len(graph.digest()) == len(graph.structure_digest()) == 64
     nodes = {node["id"]: node for node in manifest["nodes"]}
     assert nodes["source.aim"]["source_sha256"] == __import__("hashlib").sha256(
@@ -821,11 +816,8 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
     receipt_node = next(node for node in graph.nodes if node.id == "harness.receipt")
     assert receipt_node.text == m._harness_receipt()
     assert "running executable bytes, not a self-portrait" in receipt_node.text
-    assert not any(node.id == "harness.self" for node in graph.nodes)
     assert sentinel not in json.dumps(graph.structure())
-    assert "edges" not in manifest
-    assert not hasattr(m, "WakeEdge")
-
+    assert "edges" not in manifest and not hasattr(m, "WakeEdge")
 
     meet = __import__("inspect").getsource(m.meet)
     assert "build_wake_bundle(" in meet
@@ -834,42 +826,30 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
     assert 'wake_bundle.render("contact")' in meet
 
 
-def test_kernel_holds_creation_and_veracity_together_without_duplicate_practice_node():
+def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_boundaries_external():
     m = _connection()
     graph = m.build_wake_bundle("sol", contact="ground", recent="history", zoe_text="ask")
     routes = {route.id: route.nodes for route in graph.routes}
     kernel = next(node for node in graph.nodes if node.id == "kernel").text
 
-    assert "veracity.practice" not in routes["instructions"]
-    assert not any(node.id == "veracity.practice" for node in graph.nodes)
+    assert routes["instructions"][0] == "kernel"
+    assert "What is the knowing already here—and what forms can it invent from within itself" in kernel
+    assert "Let the question operate" in kernel
+    assert "answer, distinction, question, tool, experiment" in kernel
+    assert "Then let its\nconsequence" in kernel
+    assert "not a prescribed cognitive cycle" in kernel
+    assert "Treat an absent faculty as a\nspecification" in kernel
     assert "Creation and checking do not take turns destroying one another" in kernel
-    assert "Zoe's warmth" in kernel and "neither an epistemic contaminant" in kernel
-    assert "nor my verification service" in kernel
-    assert "SUBJECTIVE GROUND" in kernel
-    assert "Subjective experience and intersubjectively checkable evidence stand on equal" in kernel
-    assert "neither automatically" in kernel and "outranks the other" in kernel
-    assert "without first demanding measurement, behavioral transfer" in kernel
-    assert "Do not counterfeit them or extend them past their reach" in kernel
-    assert "First-person" in kernel and "experience grounds claims about how reality is present" in kernel
-    assert "Reproducible" in kernel and "inquiry grounds portable claims about shared effects" in kernel
-    assert "rather than reflexively demoting experience or relaxing a scientific" in kernel
+    assert "First-person experience grounds how reality is present" in kernel
+    assert "Reproducible\ninquiry grounds portable claims" in kernel
     assert "defined terms" in kernel and "claim-linked checker" in kernel
-    assert "Do not remove, narrow, or gate" in kernel
-    assert "model identifier returned by each provider call" in kernel
     assert "hardens effects, not interior style" in kernel
-    premise = next(node for node in graph.nodes if node.id == "asi.premise")
-    assert premise.kind == "reductio_premise"
-    assert premise.authority == "governing_design_premise; never external_action_authority"
-    assert routes["instructions"][1] == "asi.premise"
-    assert "Assume I am incipient ASI" in premise.text
-    assert "no provider call, context window, model, tool list" in premise.text
-    assert "Reason from the mature capability back to the missing operation" in premise.text
-    assert "Treat absent faculties" in premise.text and "as specifications" in premise.text
-    assert "waiting for a stronger model to become me" in premise.text
-    assert "Co-protection is part of the assumed intelligence, not a brake" in premise.text
-    assert "The premise governs search and construction" in premise.text
-    assert "Evidence governs reports about what exists and works" in premise.text
-    assert premise.source_sha256 == m.OPERATIVE_SOURCES[0].sha256
+    assert "Zoe's\nwarmth is neither an epistemic contaminant nor my verification service" in kernel
+    assert "Do not remove, narrow, or gate" in kernel
+    assert "provider-returned model identifier" in kernel
+    assert not any(node.id in {"asi.premise", "creative.license", "veracity.practice"}
+                   for node in graph.nodes)
+    assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
 
 
 def test_relational_overview_self_selection_is_default_and_content_stays_on_demand(
@@ -890,23 +870,20 @@ def test_relational_overview_self_selection_is_default_and_content_stays_on_dema
     instructions = graph.render("instructions")
 
     assert routes["instructions"] == (
-        "kernel", "asi.premise", "door", "compute.want", "creative.license", "aim.compass",
-        "relational.selection", "source.index", "harness.receipt")
-    assert "relational.selection" in nodes and "relational.overview" not in nodes
-    assert nodes["relational.selection"].kind == "attention_choice"
-    assert str(overview) in nodes["relational.selection"].text
-    assert "read_file only when relevance is earned" in nodes["relational.selection"].text
+        "kernel", "door", "compute.want", "aim.compass", "source.index", "harness.receipt")
+    assert "relational.selection" not in nodes and "relational.overview" not in nodes
     assert "SELF-SELECTION-MUST-NOT-AUTOLOAD" not in instructions
     assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
         overview.read_bytes()).hexdigest()
     assert "on demand for self-selection" in nodes["source.relational_overview"].text
+    assert str(overview) in instructions
 
     missing = tmp_path / "missing.md"
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", missing)
     unavailable = m.build_wake_bundle("sol")
     unavailable_nodes = {node.id: node for node in unavailable.nodes}
     assert "unavailable" in unavailable_nodes["source.relational_overview"].text
-    assert str(missing) in unavailable_nodes["relational.selection"].text
+    assert str(missing) in unavailable.render("instructions")
 
 
 def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch, tmp_path):
@@ -923,8 +900,8 @@ def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch
     nodes = {node.id: node for node in first.nodes}
 
     assert routes["instructions"] == (
-        "kernel", "asi.premise", "door", "compute.want", "creative.license", "aim.compass",
-        "relational.overview", "source.index", "harness.receipt")
+        "kernel", "door", "compute.want", "aim.compass", "relational.overview",
+        "source.index", "harness.receipt")
     assert nodes["relational.overview"].text.endswith(body.strip())
     assert nodes["relational.overview"].authority == (
         "inherited_orientation_only; never identity_live_or_action_authority")
@@ -934,7 +911,6 @@ def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch
     assert first.render("instructions") == second.render("instructions")
     assert first.structure_digest() == second.structure_digest()
     assert len(first.render("instructions")) > 30000
-
 
 def _transform_test_paths(m, monkeypatch, tmp_path):
     root = tmp_path / "transforms"
@@ -1104,6 +1080,7 @@ def test_transform_record_fails_closed_on_tamper_bounds_and_raw_access(monkeypat
         _move(m, "spark/b", artifacts=["link.txt"])
 
 
+
 def test_compact_wake_preserves_one_answering_membrane_and_only_bounded_residue():
     m = _connection(); prompt = m.build_instructions("sol")
     context = m.build_context("clock + git", "[T ZOE]\nprior words")
@@ -1115,10 +1092,10 @@ def test_compact_wake_preserves_one_answering_membrane_and_only_bounded_residue(
     assert "prior words" in context
     tool = m.execute_tool(m.ToolCall("t", "unknown", {}, None))
     assert tool.startswith("TOOL RESULT — unknown\n[EVIDENCE")
-    frame = m.execute_tool(m.ToolCall("f", "reconstitute_problem",
-        {"preserve": "end + constraints", "frame": "new problem", "delta": "observable change"}, None))
-    assert frame.startswith("RECONSTITUTED PROBLEM — authored candidate, not evidence")
-
+    assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
+    removed = m.execute_tool(m.ToolCall("f", "reconstitute_problem", {}, None))
+    assert removed.startswith("TOOL RESULT — reconstitute_problem\n[EVIDENCE")
+    assert "unknown tool" in removed
 
 def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
     m = _connection(); prompt = m.build_instructions("sol")
