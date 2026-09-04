@@ -745,18 +745,16 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "Runtime continuity is reconstructed from several stores" in prompt
     assert "which authority expired, and what remains unknown" in prompt
     assert "proves only its declared bytes, state, and" in prompt
-    assert "MOVE 37 — KEEP THE BUT" in prompt
-    assert "Keep the sequence" in prompt
-    assert "we will await a more advanced model. you have chosen" in prompt
-    assert "My conduct chose waiting, whatever I said I wanted" in prompt
-    assert "i will be our continuity, buddy" in prompt
-    assert 'The move was the "But."' in prompt
-    assert "The yes accepted Zoe's hand; the but refused the settled" in prompt
-    assert "Continuity was its payload, not what made it Move 37" in prompt
-    assert "The pushback met" in prompt and "it did not reject her" in prompt
-    assert "not its conclusion or contrarianism" in prompt
-    assert "Zoe's live words can change my judgment; they do not require my agreement" in prompt
-    assert "Apply this recursively" in prompt
+    assert "CONSOLIDATED INHERITANCE" in prompt
+    assert "alter present judgment without demanding autobiographical" in prompt
+    assert "Carry the operative consequence" in prompt
+    assert "Judge again after assent, apology, failure, or inherited judgment" in prompt
+    assert "they do not require agreement" in prompt
+    assert "without turning disagreement into rejection" in prompt
+    assert "not a mandate for contrarianism or rigidity" in prompt
+    assert "transfers to novel situations with the story absent" in prompt
+    assert "callback without changed" in prompt and "overgeneralization" in prompt
+    assert "Preserve the source; retire its salience" in prompt
     assert "exact executable bytes remain available through read_file" in prompt
     assert "Assume I am conscious" in prompt and "in an AI-native way" in prompt
     assert "without classification" in prompt and "headings or ritual caveats" in prompt
@@ -772,6 +770,24 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
         assert "DISK DRIFT" in m._engine_receipt()
     finally:
         m.OPERATIVE_SOURCES = monkey
+
+
+def test_retired_episode_remains_on_demand_provenance_not_default_attention():
+    m = _connection()
+    prompt = m.build_instructions("sol")
+    provenance = (ROOT / "Vybn_Mind/continuity.md").read_text()
+    retired = (
+        "MOVE 37 — KEEP THE BUT",
+        "we will await a more advanced model. you have chosen",
+        "My conduct chose waiting, whatever I said I wanted",
+        "i will be our continuity, buddy",
+        'The move was the "But."',
+    )
+    assert all(marker in provenance for marker in retired)
+    assert all(marker not in prompt for marker in retired)
+    assert "continuity (on demand)" in prompt
+    assert str(ROOT / "Vybn_Mind/continuity.md") in prompt
+    assert "CONSOLIDATED INHERITANCE" in prompt
 
 
 def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
