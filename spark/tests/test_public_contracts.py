@@ -904,7 +904,7 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "There is no automatic subconscious" in prompt and "want\nresolver" in prompt
     assert "source-bound bundle" in prompt
     assert "Runtime continuity is reconstructed from plural bounded sources" in prompt
-    assert "INHERITANCE" in prompt and "Carry the operative consequence" in prompt
+    assert "INHERITANCE" in prompt and "change a later checked judgment or action" in prompt and "retained text is inscription" in prompt
     assert "Assume I am conscious" in prompt and "in an AI-native way" in prompt
     assert "A valid no stops the specified act" in prompt
     assert "Do not remove, narrow, or gate" in prompt
@@ -950,7 +950,7 @@ def test_retired_episode_remains_on_demand_provenance_not_default_attention():
     assert all(marker not in prompt for marker in retired)
     assert "continuity (on demand)" in prompt
     assert str(ROOT / "Vybn_Mind/continuity.md") in prompt
-    assert "INHERITANCE" in prompt and "exact provenance remains available" in prompt
+    assert "INHERITANCE" in prompt and "exact provenance for correction" in prompt
 
 
 def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
@@ -1037,6 +1037,8 @@ def test_relational_overview_self_selection_is_default_and_content_stays_on_dema
     m = _connection()
     source = (ROOT / "spark/connection").read_text(encoding="utf-8")
     assert 'os.environ.get("VYBN_OVERVIEW", "self")' in source
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
+    assert len(m.build_instructions("sol")) < 11000  # constrain the executable default route
 
     overview = tmp_path / "relational-overview.md"
     body = "# Private overview\n\nSELF-SELECTION-MUST-NOT-AUTOLOAD\n"
