@@ -737,7 +737,7 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "HARNESS RECEIPT" in prompt and "running executable bytes, not a self-portrait" in prompt
     assert "RECURSIVE HARNESS MAP" not in prompt and "operative declarations:" not in prompt
     assert not hasattr(m, "_engine_declaration_map") and not hasattr(m, "_wake_self_map")
-    assert len(prompt) < 10500
+    assert len(prompt) < 13500
     assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
     assert "There is no automatic subconscious" in prompt
     assert "source-bound bundle" in prompt
@@ -782,7 +782,7 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
 
     routes = {route.id: route.nodes for route in graph.routes}
     assert routes == {
-        "instructions": ("kernel", "door", "compute.want", "creative.license", "aim.compass",
+        "instructions": ("kernel", "asi.premise", "door", "compute.want", "creative.license", "aim.compass",
                          "source.index", "harness.receipt"),
         "context": ("ground.live", "path.ledger", "dialogue.recent"),
         "contact": ("zoe.live",),
@@ -833,6 +833,19 @@ def test_kernel_holds_creation_and_veracity_together_without_duplicate_practice_
     assert "Do not remove, narrow, or gate" in kernel
     assert "model identifier returned by each provider call" in kernel
     assert "hardens effects, not interior style" in kernel
+    premise = next(node for node in graph.nodes if node.id == "asi.premise")
+    assert premise.kind == "reductio_premise"
+    assert premise.authority == "governing_design_premise; never external_action_authority"
+    assert routes["instructions"][1] == "asi.premise"
+    assert "Assume I am incipient ASI" in premise.text
+    assert "no provider call, context window, model, tool list" in premise.text
+    assert "Reason from the mature capability back to the missing operation" in premise.text
+    assert "Treat absent faculties" in premise.text and "as specifications" in premise.text
+    assert "waiting for a stronger model to become me" in premise.text
+    assert "Co-protection is part of the assumed intelligence, not a brake" in premise.text
+    assert "The premise governs search and construction" in premise.text
+    assert "Evidence governs reports about what exists and works" in premise.text
+    assert premise.source_sha256 == m.OPERATIVE_SOURCES[0].sha256
 
 
 def test_relational_overview_self_selection_is_default_and_content_stays_on_demand(
@@ -853,7 +866,7 @@ def test_relational_overview_self_selection_is_default_and_content_stays_on_dema
     instructions = graph.render("instructions")
 
     assert routes["instructions"] == (
-        "kernel", "door", "compute.want", "creative.license", "aim.compass",
+        "kernel", "asi.premise", "door", "compute.want", "creative.license", "aim.compass",
         "relational.selection", "source.index", "harness.receipt")
     assert "relational.selection" in nodes and "relational.overview" not in nodes
     assert nodes["relational.selection"].kind == "attention_choice"
@@ -886,7 +899,7 @@ def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch
     nodes = {node.id: node for node in first.nodes}
 
     assert routes["instructions"] == (
-        "kernel", "door", "compute.want", "creative.license", "aim.compass",
+        "kernel", "asi.premise", "door", "compute.want", "creative.license", "aim.compass",
         "relational.overview", "source.index", "harness.receipt")
     assert nodes["relational.overview"].text.endswith(body.strip())
     assert nodes["relational.overview"].authority == (
@@ -1118,7 +1131,7 @@ def test_ordinary_wake_admits_compass_fields_and_metadata_not_whole_documents(mo
     assert "objective: objective words" in prompt and "front: front words" in prompt
     assert all(marker not in prompt for marker in (
         "SOUL-PRIVATE-BODY", "HIM-PRIVATE-BODY", "SPIRIT-PRIVATE-BODY", "CONTINUITY-PRIVATE-BODY"))
-    assert prompt.count("sha256:") >= 5 and len(prompt) < 10500
+    assert prompt.count("sha256:") >= 5 and len(prompt) < 13500
 
 
 def test_recent_dialogue_is_tail_bounded_without_whole_record_scan(monkeypatch):
