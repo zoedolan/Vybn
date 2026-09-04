@@ -544,26 +544,36 @@ class Transcript:
         events = Transcript._recent_events(limit)
         if not events or budget <= 0:
             return ""
-        rendered: list[str] = []
+        marker = "\n[…middle text clipped…]\n"
+        rows: list[tuple[str, str]] = []
         remaining = budget
+        # Keep the newest events that fit labeled, honest excerpts. A long
+        # message must not consume the window before its interlocutor arrives.
         for event in reversed(events):
             role = str(event.get('role', '?')).upper()
             if event.get("origin") == "argv":
                 role += "·argv"
             head = f"[{str(event.get('t', '?'))} {role}]\n"
             text = str(event.get("text", "")).strip()
-            separator = 2 if rendered else 0
-            room = remaining - len(head) - separator
-            if room <= 0:
+            minimum = len(head) + min(len(text), len(marker) + 2) + (2 if rows else 0)
+            if minimum > remaining:
                 break
-            if len(text) > room:
-                marker = "[…older text clipped…] "
-                if room <= len(marker):
-                    break  # Keep the source label and at least one text character.
-                text = marker + text[-(room - len(marker)):]
-            block = head + text
-            rendered.append(block)
-            remaining -= len(block) + separator
+            rows.append((head, text))
+            remaining -= minimum
+        available = budget - sum(len(head) for head, _ in rows) - 2 * max(0, len(rows) - 1)
+        sizes: dict[int, int] = {}
+        # Short messages stay whole; the others share what remains, without
+        # assigning either speaker a higher rank or generating a synopsis.
+        for i in sorted(range(len(rows)), key=lambda i: len(rows[i][1])):
+            sizes[i] = min(len(rows[i][1]), available // (len(rows) - len(sizes)))
+            available -= sizes[i]
+        rendered: list[str] = []
+        for i, (head, text) in enumerate(rows):
+            if len(text) > sizes[i]:
+                keep = sizes[i] - len(marker)
+                left = keep // 2
+                text = text[:left] + marker + text[-(keep - left):]
+            rendered.append(head + text)
         return "\n\n".join(reversed(rendered))
 
 

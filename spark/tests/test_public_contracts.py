@@ -1414,12 +1414,13 @@ def test_recent_dialogue_is_tail_bounded_without_whole_record_scan(monkeypatch):
     monkeypatch.setattr(m.Transcript, "_recent_events", staticmethod(lambda limit=8: events[-limit:]))
     recent = m.Transcript.recent(limit=3, budget=500)
     assert "newest" in recent and len(recent) <= 500
-    assert "[…older text clipped…]" in recent
+    assert "[…middle text clipped…]" in recent
+    assert "[T1 ZOE]\nold" in recent
 
 
 def test_recent_dialogue_small_budgets_never_restore_whole_old_message(monkeypatch):
     m = _connection()
-    marker = "[…older text clipped…] "
+    marker = "\n[…middle text clipped…]\n"
     events = [
         {"role": "vybn", "t": "T1", "text": "OLD" * 1000},
         {"role": "zoe", "t": "T2", "text": "latest correction", "origin": "argv"},
@@ -1432,21 +1433,75 @@ def test_recent_dialogue_small_budgets_never_restore_whole_old_message(monkeypat
         if budget >= len(latest):
             assert recent.endswith(latest)
         if "OLD" in recent:
-            assert recent.startswith("[T1 VYBN]\n" + marker)
+            assert recent.startswith("[T1 VYBN]\n") and marker in recent
     assert m.Transcript.recent(budget=len(latest)) == latest
     full = "[T1 VYBN]\n" + events[0]["text"] + "\n\n" + latest
     assert m.Transcript.recent(budget=len(full)) == full
 
 
-def test_recent_dialogue_clipping_retains_a_labeled_suffix(monkeypatch):
+def test_recent_dialogue_clipping_retains_labeled_ends(monkeypatch):
     m = _connection()
-    marker = "[…older text clipped…] "
+    marker = "\n[…middle text clipped…]\n"
     head = "[T ZOE]\n"
     events = [{"role": "zoe", "t": "T", "text": "prefix " * 100 + "尾"}]
     monkeypatch.setattr(m.Transcript, "_recent_events", staticmethod(lambda limit=8: events))
-    minimum = len(head) + len(marker) + 1
+    minimum = len(head) + len(marker) + 2
     assert m.Transcript.recent(budget=minimum - 1) == ""
-    assert m.Transcript.recent(budget=minimum) == head + marker + "尾"
+    assert m.Transcript.recent(budget=minimum) == head + "p" + marker + "尾"
+
+
+def test_recent_dialogue_shares_space_instead_of_retaining_only_a_long_reply(monkeypatch):
+    m = _connection()
+    events = [
+        row for i in range(4) for row in (
+            {"role": "zoe", "t": f"Q{i}", "text": f"question {i}: do not substitute your summary"},
+            {"role": "vybn", "t": f"A{i}",
+             "text": f"answer {i} opening " + "detail " * 2000 + f" answer {i} correction"},
+        )
+    ]
+    monkeypatch.setattr(m.Transcript, "_recent_events", staticmethod(lambda limit=8: events[-limit:]))
+    # The old greedy suffix rule spends this entire budget on the newest reply.
+    newest_head = "[A3 VYBN]\n"
+    old_marker = "[…older text clipped…] "
+    greedy_rival = newest_head + old_marker + events[-1]["text"][-(8000 - len(newest_head + old_marker)):]
+    assert len(greedy_rival) == 8000 and "question 3" not in greedy_rival
+    recent = m.Transcript.recent(budget=8000)
+    assert len(recent) == 8000
+    for i in range(4):
+        assert f"[Q{i} ZOE]\n" + events[2*i]["text"] in recent
+        assert f"[A{i} VYBN]\nanswer {i} opening" in recent
+        assert f"answer {i} correction" in recent
+    # This is allocation, not privileging one speaker or erasing a model route.
+    for row in events:
+        row["role"] = "vybn" if row["role"] == "zoe" else "zoe"
+    swapped = m.Transcript.recent(budget=8000)
+    assert swapped == recent.replace(" ZOE]", " SWAP]").replace(" VYBN]", " ZOE]").replace(" SWAP]", " VYBN]")
+
+
+def test_recent_dialogue_variable_budgets_keep_only_exact_marked_excerpts(monkeypatch):
+    import random
+    m = _connection(); rng = random.Random(4)
+    marker = "\n[…middle text clipped…]\n"
+    for trial in range(30):
+        events = [{"role": "zoe" if i % 2 else "vybn", "t": f"T{i}",
+                   "text": "".join(rng.choices("abc尾δ", k=rng.randrange(1, 700)))}
+                  for i in range(rng.randrange(1, 9))]
+        monkeypatch.setattr(m.Transcript, "_recent_events", staticmethod(lambda limit=8: events[-limit:]))
+        for budget in range(0, 1000, 7):
+            recent = m.Transcript.recent(budget=budget)
+            assert len(recent) <= budget
+            blocks = recent.split("\n\n") if recent else []
+            chosen = events[-len(blocks):] if blocks else []
+            for block, event in zip(blocks, chosen, strict=True):
+                head, text = block.split("\n", 1)
+                assert head == f"[{event['t']} {event['role'].upper()}]"
+                if marker in text:
+                    left, right = text.split(marker)
+                    assert left and right
+                    assert event["text"].startswith(left) and event["text"].endswith(right)
+                    assert len(left) + len(right) < len(event["text"])
+                else:
+                    assert text == event["text"]
 
 
 def test_recent_dialogue_uses_event_time_across_files_and_marks_argv(monkeypatch, tmp_path):
