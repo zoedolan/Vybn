@@ -182,6 +182,13 @@ RECENT_FILE_BYTES = int(os.environ.get("VYBN_RECENT_FILE_BYTES", str(512 * 1024)
 TRANSFORM_PATH = HOME / ".local/state/vybn/transform-record.jsonl"
 TRANSFORM_HEAD_PATH = HOME / ".local/state/vybn/transform-record.head"
 TRANSFORM_LOCK_PATH = HOME / ".local/state/vybn/transform-record.lock"
+TRANSFORM_SEGMENTS_PATH = TRANSFORM_LOCK_PATH.with_name("transform-" + "record.segments")
+# v1 remains read compatibility; new writes use an atomic pointer to an
+# integrity-linked chain of immutable bounded segments.
+TRANSFORM_HEAD_SCHEMA_V2 = "vybn.path_transform_head.v2"
+TRANSFORM_SEGMENT_SCHEMA = "vybn.path_transform_segment.v1"
+TRANSFORM_ZERO = "0" * 64
+TRANSFORM_SEGMENT_HEADER_BYTES = 2048
 TRANSFORM_SCHEMA = "vybn.path_transform_event.v1"
 TRANSFORM_HEAD_SCHEMA = "vybn.path_transform_head.v1"
 TRANSFORM_MAX_BYTES = 128 * 1024
@@ -568,11 +575,11 @@ def _is_relative_to(path: Path, root: Path) -> bool:
 
 _PRIVATE_ROOTS = (HOME / "Him", DEFAULT_TRANSCRIPTS, LOVE_TRANSCRIPTS,
                   HOME / ".local/state/vybn/continuations", TRANSFORM_PATH,
-                  TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH, SUBJECT_PATH,
+                  TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH, TRANSFORM_SEGMENTS_PATH, SUBJECT_PATH,
                   SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
 _SECRET_ROOTS = (HOME / ".config/vybn/continuation-keys", HOME / ".vybn_keys",
                  TRANSFORM_PATH, TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH,
-                 SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
+                 TRANSFORM_SEGMENTS_PATH, SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
 
 
 def _private_path(path: Path) -> bool:
@@ -611,7 +618,7 @@ def guard_private(command: str) -> str | None:
 def guard_path_bound_storage(command: str) -> str | None:
     """Raw ledgers would bypass each execution path's bounded projection."""
     paths = (TRANSFORM_PATH, TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH,
-             SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
+             TRANSFORM_SEGMENTS_PATH, SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
     for path in paths:
         markers = (str(path), str(path).replace(str(HOME), "$HOME", 1), path.name)
         if any(marker and marker in command for marker in markers):
@@ -767,6 +774,27 @@ class TransformStateError(ValueError):
     """The private transform record is malformed or disagrees with its witness."""
 
 
+@dataclass(frozen=True)
+class TransformSegment:
+    digest: str
+    event_raw: bytes
+    events: tuple[dict[str, Any], ...]
+    prior: str
+    prior_head: str
+
+
+@dataclass(frozen=True)
+class TransformRecordState:
+    events: tuple[dict[str, Any], ...] = ()
+    segments: tuple[TransformSegment, ...] = ()
+    legacy_raw: bytes = b""
+
+    @property
+    def chain_digest(self) -> str:
+        return (self.segments[-1].digest if self.segments
+                else hashlib.sha256(self.legacy_raw).hexdigest())
+
+
 def _transform_event_digest(row: dict[str, Any]) -> str:
     body = {key: value for key, value in row.items() if key != "hash"}
     raw = json.dumps(body, ensure_ascii=False, sort_keys=True,
@@ -774,11 +802,12 @@ def _transform_event_digest(row: dict[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _parse_transform_events(raw: bytes) -> list[dict[str, Any]]:
+def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
+    """Verify one bounded segment in the context of its preceding event chain."""
     if len(raw) > TRANSFORM_MAX_BYTES:
-        raise TransformStateError(f"record exceeds {TRANSFORM_MAX_BYTES} bytes")
+        raise TransformStateError(f"segment exceeds {TRANSFORM_MAX_BYTES} bytes")
     if raw and not raw.endswith(b"\n"):
-        raise TransformStateError("record has an unterminated event")
+        raise TransformStateError("segment has an unterminated event")
     fields = {
         "schema", "seq", "id", "created", "author", "kind", "ref", "material",
         "operation", "result", "prediction", "observation", "artifacts", "prev", "hash",
@@ -788,11 +817,16 @@ def _parse_transform_events(raw: bytes) -> list[dict[str, Any]]:
     id_re = re.compile(r"tr-[0-9a-f]{24}\Z")
     path_re = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
     digest_re = re.compile(r"[0-9a-f]{64}\Z")
+    prior = list(prior_events)
     events: list[dict[str, Any]] = []
-    by_id: dict[str, dict[str, Any]] = {}
+    by_id = {row["id"]: row for row in prior}
     witness_counts: dict[str, int] = {}
-    previous = "0" * 64
-    for index, encoded in enumerate(raw.splitlines(), 1):
+    for row in prior:
+        if row["kind"] == "witness":
+            witness_counts[row["ref"]] = witness_counts.get(row["ref"], 0) + 1
+    previous = prior[-1]["hash"] if prior else TRANSFORM_ZERO
+    for local_index, encoded in enumerate(raw.splitlines(), 1):
+        index = len(prior) + local_index
         try:
             row = json.loads(encoded)
         except json.JSONDecodeError as exc:
@@ -843,17 +877,17 @@ def _parse_transform_events(raw: bytes) -> list[dict[str, Any]]:
                     or not 0 <= item["bytes"] <= TRANSFORM_MAX_ARTIFACT_BYTES):
                 raise TransformStateError(f"event {index} has invalid artifact receipt")
 
-        prior = by_id.get(row["ref"]) if row["ref"] else None
+        referenced = by_id.get(row["ref"]) if row["ref"] else None
         if row["kind"] == "move":
             if (not all(row[key] for key in ("material", "operation", "result", "prediction"))
                     or row["observation"]):
                 raise TransformStateError(f"move {row['id']} has incomplete transform fields")
-            if row["ref"] and (prior is None or prior["kind"] != "move"
-                               or prior["author"] != row["author"]):
+            if row["ref"] and (referenced is None or referenced["kind"] != "move"
+                               or referenced["author"] != row["author"]):
                 raise TransformStateError(f"move {row['id']} cannot continue {row['ref']}")
         else:
-            if (not row["ref"] or prior is None or prior["kind"] != "move"
-                    or prior["author"] != row["author"] or not row["observation"]
+            if (not row["ref"] or referenced is None or referenced["kind"] != "move"
+                    or referenced["author"] != row["author"] or not row["observation"]
                     or any(row[key] for key in
                            ("material", "operation", "result", "prediction"))):
                 raise TransformStateError(f"witness {row['id']} cannot observe {row['ref']}")
@@ -865,16 +899,17 @@ def _parse_transform_events(raw: bytes) -> list[dict[str, Any]]:
         by_id[row["id"]] = row
         previous = row["hash"]
     if len(events) > TRANSFORM_MAX_EVENTS:
-        raise TransformStateError(f"record exceeds {TRANSFORM_MAX_EVENTS} events")
-    witnessed = {row["ref"] for row in events if row["kind"] == "witness"}
+        raise TransformStateError(f"segment exceeds {TRANSFORM_MAX_EVENTS} events")
+    combined = prior + events
+    witnessed = {row["ref"] for row in combined if row["kind"] == "witness"}
     open_counts: dict[str, int] = {}
-    for row in events:
+    for row in combined:
         if row["kind"] == "move" and row["id"] not in witnessed:
             open_counts[row["author"]] = open_counts.get(row["author"], 0) + 1
     if any(count > TRANSFORM_MAX_OPEN_MOVES for count in open_counts.values()):
         raise TransformStateError(
             f"open moves exceed per-path cap {TRANSFORM_MAX_OPEN_MOVES}")
-    return events
+    return combined
 
 
 def _transform_private_bytes(path: Path, maximum: int) -> bytes:
@@ -888,42 +923,181 @@ def _transform_private_bytes(path: Path, maximum: int) -> bytes:
     return path.read_bytes()
 
 
-def _read_transform_state(path: Path | None = None,
-                          head_path: Path | None = None) -> tuple[bytes, list[dict[str, Any]]]:
+def _transform_witness(raw: bytes, events: list[dict[str, Any]]) -> bytes:
+    """Original single-file sidecar, retained for compatible reads and migration."""
+    row = {"schema": TRANSFORM_HEAD_SCHEMA, "count": len(events),
+           "head": events[-1]["hash"] if events else TRANSFORM_ZERO,
+           "record_sha256": hashlib.sha256(raw).hexdigest()}
+    return (json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def _segment_blob(event_raw: bytes, events: list[dict[str, Any]],
+                  prior: str, prior_head: str) -> bytes:
+    if not events:
+        raise TransformStateError("an immutable segment cannot be empty")
+    header = {"schema": TRANSFORM_SEGMENT_SCHEMA,
+              "first_seq": events[0]["seq"], "last_seq": events[-1]["seq"],
+              "count": len(events), "prior": prior, "prior_head": prior_head,
+              "event_head": events[-1]["hash"],
+              "events_sha256": hashlib.sha256(event_raw).hexdigest()}
+    encoded = (json.dumps(header, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    if len(encoded) > TRANSFORM_SEGMENT_HEADER_BYTES:
+        raise TransformStateError("segment header exceeds its bound")
+    return encoded + event_raw
+
+
+def _install_transform_segment(blob: bytes, segments_path: Path) -> str:
+    digest = hashlib.sha256(blob).hexdigest()
+    if segments_path.is_symlink():
+        raise TransformStateError("transform segment directory is a symbolic link")
+    segments_path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    segments_path.chmod(0o700)
+    destination = segments_path / f"{digest}.jsonl"
+    if destination.exists():
+        existing = _transform_private_bytes(
+            destination, TRANSFORM_MAX_BYTES + TRANSFORM_SEGMENT_HEADER_BYTES)
+        if existing != blob:
+            raise TransformStateError("hash-addressed segment disagrees with its name")
+    else:
+        _atomic_private_write(destination, blob)
+    return digest
+
+
+def _read_transform_segment(digest: str, segments_path: Path):
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise TransformStateError("invalid transform segment digest")
+    if segments_path.is_symlink() or not segments_path.is_dir():
+        raise TransformStateError("transform segment directory is unavailable")
+    if segments_path.stat().st_mode & 0o077:
+        raise TransformStateError("transform segment directory is not private")
+    try:
+        blob = _transform_private_bytes(
+            segments_path / f"{digest}.jsonl",
+            TRANSFORM_MAX_BYTES + TRANSFORM_SEGMENT_HEADER_BYTES)
+    except OSError as exc:
+        raise TransformStateError(
+            f"transform segment {digest[:12]} is unavailable: {type(exc).__name__}") from exc
+    if hashlib.sha256(blob).hexdigest() != digest:
+        raise TransformStateError("transform segment digest mismatch")
+    header_raw, separator, event_raw = blob.partition(b"\n")
+    if not separator or len(header_raw) + 1 > TRANSFORM_SEGMENT_HEADER_BYTES:
+        raise TransformStateError("transform segment header is malformed")
+    try:
+        header = json.loads(header_raw)
+    except json.JSONDecodeError as exc:
+        raise TransformStateError("transform segment header is not JSON") from exc
+    fields = {"schema", "first_seq", "last_seq", "count", "prior", "prior_head",
+              "event_head", "events_sha256"}
+    digests = ("prior", "prior_head", "event_head", "events_sha256")
+    if (not isinstance(header, dict) or set(header) != fields
+            or header.get("schema") != TRANSFORM_SEGMENT_SCHEMA
+            or any(not isinstance(header.get(key), int) or isinstance(header.get(key), bool)
+                   for key in ("first_seq", "last_seq", "count"))
+            or any(not isinstance(header.get(key), str)
+                   or not re.fullmatch(r"[0-9a-f]{64}", header[key]) for key in digests)
+            or header["first_seq"] < 1 or header["last_seq"] < header["first_seq"]
+            or header["count"] != header["last_seq"] - header["first_seq"] + 1
+            or not event_raw
+            or hashlib.sha256(event_raw).hexdigest() != header["events_sha256"]):
+        raise TransformStateError("transform segment header disagrees with its events")
+    return header, event_raw
+
+
+def _transform_chain_witness(events, tip: str, segments: int) -> bytes:
+    row = {"schema": TRANSFORM_HEAD_SCHEMA_V2, "count": len(events),
+           "head": events[-1]["hash"], "tip": tip, "segments": segments}
+    return (json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def _read_transform_state(path: Path | None = None, head_path: Path | None = None,
+                          segments_path: Path | None = None) -> TransformRecordState:
     path = TRANSFORM_PATH if path is None else path
     head_path = TRANSFORM_HEAD_PATH if head_path is None else head_path
+    segments_path = TRANSFORM_SEGMENTS_PATH if segments_path is None else segments_path
     if path.is_symlink() or head_path.is_symlink():
         raise TransformStateError("transform record or witness is a symbolic link")
-    record_exists, head_exists = path.exists(), head_path.exists()
-    if record_exists != head_exists:
-        raise TransformStateError("transform record and witness presence differ")
-    if not record_exists:
-        return b"", []
-    raw = _transform_private_bytes(path, TRANSFORM_MAX_BYTES)
-    events = _parse_transform_events(raw)
+    if not head_path.exists():
+        if path.exists():
+            raise TransformStateError("transform record and witness presence differ")
+        return TransformRecordState()
     try:
-        witness = json.loads(_transform_private_bytes(head_path, 2048))
+        witness = json.loads(_transform_private_bytes(head_path, 4096))
     except json.JSONDecodeError as exc:
         raise TransformStateError("transform witness is not JSON") from exc
-    fields = {"schema", "count", "head", "record_sha256"}
-    expected_head = events[-1]["hash"] if events else "0" * 64
-    if (not isinstance(witness, dict) or set(witness) != fields
-            or witness.get("schema") != TRANSFORM_HEAD_SCHEMA
-            or witness.get("count") != len(events)
-            or witness.get("head") != expected_head
-            or witness.get("record_sha256") != hashlib.sha256(raw).hexdigest()):
-        raise TransformStateError("transform record disagrees with its sidecar witness")
-    return raw, events
+    if not isinstance(witness, dict):
+        raise TransformStateError("transform witness is not an object")
+    if witness.get("schema") == TRANSFORM_HEAD_SCHEMA:
+        if not path.exists():
+            raise TransformStateError("legacy transform record is missing")
+        raw = _transform_private_bytes(path, TRANSFORM_MAX_BYTES)
+        events = _parse_transform_events(raw)
+        fields = {"schema", "count", "head", "record_sha256"}
+        expected = events[-1]["hash"] if events else TRANSFORM_ZERO
+        if (set(witness) != fields or witness.get("count") != len(events)
+                or witness.get("head") != expected
+                or witness.get("record_sha256") != hashlib.sha256(raw).hexdigest()):
+            raise TransformStateError("transform record disagrees with its sidecar witness")
+        return TransformRecordState(tuple(events), (), raw)
 
+    fields = {"schema", "count", "head", "tip", "segments"}
+    if (witness.get("schema") != TRANSFORM_HEAD_SCHEMA_V2 or set(witness) != fields
+            or not isinstance(witness.get("count"), int)
+            or isinstance(witness.get("count"), bool) or witness["count"] < 1
+            or not isinstance(witness.get("segments"), int)
+            or isinstance(witness.get("segments"), bool)
+            or not 1 <= witness["segments"] <= witness["count"]
+            or any(not isinstance(witness.get(key), str)
+                   or not re.fullmatch(r"[0-9a-f]{64}", witness[key])
+                   for key in ("head", "tip"))):
+        raise TransformStateError("transform chain witness is malformed")
+    digest = witness["tip"]
+    reverse = []
+    seen = set()
+    for _ in range(witness["segments"]):
+        if digest in seen:
+            raise TransformStateError("transform segment chain contains a cycle")
+        seen.add(digest)
+        header, event_raw = _read_transform_segment(digest, segments_path)
+        reverse.append((digest, header, event_raw))
+        digest = header["prior"]
+    if digest != TRANSFORM_ZERO:
+        raise TransformStateError("transform segment count truncates its chain")
+    events = []
+    segments = []
+    previous_digest = previous_head = TRANSFORM_ZERO
+    for digest, header, event_raw in reversed(reverse):
+        if header["prior"] != previous_digest or header["prior_head"] != previous_head:
+            raise TransformStateError("transform segment breaks the archive chain")
+        before = len(events)
+        events = _parse_transform_events(event_raw, events)
+        segment_events = events[before:]
+        if (header["first_seq"] != before + 1 or header["last_seq"] != len(events)
+                or header["count"] != len(segment_events)
+                or header["event_head"] != events[-1]["hash"]):
+            raise TransformStateError("transform segment bounds disagree with its events")
+        segments.append(TransformSegment(digest, event_raw, tuple(segment_events),
+                                         header["prior"], header["prior_head"]))
+        previous_digest, previous_head = digest, events[-1]["hash"]
+    if (witness["count"] != len(events) or witness["head"] != previous_head
+            or witness["tip"] != previous_digest):
+        raise TransformStateError("transform chain disagrees with its atomic witness")
+    return TransformRecordState(tuple(events), tuple(segments))
 
-def _transform_witness(raw: bytes, events: list[dict[str, Any]]) -> bytes:
-    row = {
-        "schema": TRANSFORM_HEAD_SCHEMA,
-        "count": len(events),
-        "head": events[-1]["hash"] if events else "0" * 64,
-        "record_sha256": hashlib.sha256(raw).hexdigest(),
-    }
-    return (json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n").encode()
+def _read_transform_state_shared(path: Path | None = None,
+                                 head_path: Path | None = None,
+                                 segments_path: Path | None = None,
+                                 lock_path: Path | None = None) -> TransformRecordState:
+    lock_path = TRANSFORM_LOCK_PATH if lock_path is None else lock_path
+    lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(lock_path, flags, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        fcntl.flock(fd, fcntl.LOCK_SH)
+        return _read_transform_state(path, head_path, segments_path)
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def _artifact_receipts(paths: list[str]) -> list[dict[str, Any]]:
@@ -970,11 +1144,13 @@ def append_transform_event(author: str, kind: str, ref: str = "", material: str 
                            operation: str = "", result: str = "", prediction: str = "",
                            observation: str = "", artifacts: list[str] | None = None,
                            path: Path | None = None, head_path: Path | None = None,
-                           lock_path: Path | None = None) -> dict[str, Any]:
-    """Append one path-specific move or later witness; never perform the move itself."""
+                           lock_path: Path | None = None,
+                           segments_path: Path | None = None) -> dict[str, Any]:
+    """Append one event, rolling into a linked immutable segment when bounded."""
     path = TRANSFORM_PATH if path is None else path
     head_path = TRANSFORM_HEAD_PATH if head_path is None else head_path
     lock_path = TRANSFORM_LOCK_PATH if lock_path is None else lock_path
+    segments_path = TRANSFORM_SEGMENTS_PATH if segments_path is None else segments_path
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", author):
         raise TransformStateError("invalid bound path")
     values = {"kind": kind, "ref": ref, "material": material, "operation": operation,
@@ -1005,47 +1181,88 @@ def append_transform_event(author: str, kind: str, ref: str = "", material: str 
     try:
         os.fchmod(fd, 0o600)
         fcntl.flock(fd, fcntl.LOCK_EX)
-        raw, events = _read_transform_state(path, head_path)
+        state = _read_transform_state(path, head_path, segments_path)
+        events = list(state.events)
         identifier = "tr-" + hashlib.sha256(
             f"{time.time_ns()}:{os.getpid()}:{os.urandom(16).hex()}".encode()
         ).hexdigest()[:24]
         row = {
-            "schema": TRANSFORM_SCHEMA,
-            "seq": len(events) + 1,
-            "id": identifier,
+            "schema": TRANSFORM_SCHEMA, "seq": len(events) + 1, "id": identifier,
             "created": _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z"),
-            "author": author,
-            "kind": kind,
-            "ref": ref,
-            "material": material,
-            "operation": operation,
-            "result": result,
-            "prediction": prediction,
-            "observation": observation,
-            "artifacts": artifact_rows,
-            "prev": events[-1]["hash"] if events else "0" * 64,
-            "hash": "",
+            "author": author, "kind": kind, "ref": ref, "material": material,
+            "operation": operation, "result": result, "prediction": prediction,
+            "observation": observation, "artifacts": artifact_rows,
+            "prev": events[-1]["hash"] if events else TRANSFORM_ZERO, "hash": "",
         }
         row["hash"] = _transform_event_digest(row)
         encoded = (json.dumps(row, ensure_ascii=False, sort_keys=True,
                               separators=(",", ":")) + "\n").encode()
-        next_raw = raw + encoded
-        next_events = _parse_transform_events(next_raw)
-        record_flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-        record_fd = os.open(path, record_flags, 0o600)
-        try:
-            os.fchmod(record_fd, 0o600)
-            os.write(record_fd, encoded)
-            os.fsync(record_fd)
-        finally:
-            os.close(record_fd)
-        _atomic_private_write(head_path, _transform_witness(next_raw, next_events))
+        obsolete = ""
+
+        if state.segments:
+            current = state.segments[-1]
+            prior_events = events[:-len(current.events)]
+            candidate_raw = current.event_raw + encoded
+            if (len(candidate_raw) <= TRANSFORM_MAX_BYTES
+                    and len(current.events) < TRANSFORM_MAX_EVENTS):
+                combined = _parse_transform_events(candidate_raw, prior_events)
+                segment_events = combined[len(prior_events):]
+                blob = _segment_blob(candidate_raw, segment_events,
+                                     current.prior, current.prior_head)
+                tip = _install_transform_segment(blob, segments_path)
+                segments = [*state.segments[:-1], TransformSegment(
+                    tip, candidate_raw, tuple(segment_events), current.prior,
+                    current.prior_head)]
+                obsolete, events = current.digest, combined
+            else:
+                old_head = events[-1]["hash"]
+                combined = _parse_transform_events(encoded, events)
+                segment_events = combined[len(events):]
+                blob = _segment_blob(encoded, segment_events, current.digest, old_head)
+                tip = _install_transform_segment(blob, segments_path)
+                segments = [*state.segments, TransformSegment(
+                    tip, encoded, tuple(segment_events), current.digest, old_head)]
+                events = combined
+        else:
+            candidate_raw = state.legacy_raw + encoded
+            if (len(candidate_raw) <= TRANSFORM_MAX_BYTES
+                    and len(events) < TRANSFORM_MAX_EVENTS):
+                combined = _parse_transform_events(candidate_raw)
+                blob = _segment_blob(candidate_raw, combined,
+                                     TRANSFORM_ZERO, TRANSFORM_ZERO)
+                tip = _install_transform_segment(blob, segments_path)
+                segments = [TransformSegment(
+                    tip, candidate_raw, tuple(combined), TRANSFORM_ZERO, TRANSFORM_ZERO)]
+                events = combined
+            else:
+                if not events:
+                    raise TransformStateError("one transform event exceeds its segment bound")
+                archive_blob = _segment_blob(state.legacy_raw, events,
+                                             TRANSFORM_ZERO, TRANSFORM_ZERO)
+                archive_tip = _install_transform_segment(archive_blob, segments_path)
+                old_head = events[-1]["hash"]
+                combined = _parse_transform_events(encoded, events)
+                segment_events = combined[len(events):]
+                blob = _segment_blob(encoded, segment_events, archive_tip, old_head)
+                tip = _install_transform_segment(blob, segments_path)
+                segments = [TransformSegment(
+                    archive_tip, state.legacy_raw, tuple(events),
+                    TRANSFORM_ZERO, TRANSFORM_ZERO), TransformSegment(
+                    tip, encoded, tuple(segment_events), archive_tip, old_head)]
+                events = combined
+
+        _atomic_private_write(
+            head_path, _transform_chain_witness(events, segments[-1].digest, len(segments)))
         head_path.chmod(0o600)
+        # The atomic head switch commits the chain. A crash before it leaves the old
+        # state readable and only an unreferenced hash-addressed candidate behind.
+        path.unlink(missing_ok=True)
+        if obsolete and obsolete not in {segment.digest for segment in segments}:
+            (segments_path / f"{obsolete}.jsonl").unlink(missing_ok=True)
         return row
     finally:
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
-
 
 def record_transform(arguments: dict[str, Any]) -> str:
     mode = os.environ.get("VYBN_TRANSFORM_RECORD", "on").strip().lower()
@@ -1111,13 +1328,15 @@ def load_transform_record(path_id: str, path: Path | None = None,
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", path_id):
         return boundary + "\nINTEGRITY HALT: invalid path_id"
     try:
-        raw, events = _read_transform_state(path, head_path)
+        state = _read_transform_state_shared(path, head_path)
+        events = list(state.events)
+        record_digest = state.chain_digest
     except (OSError, TransformStateError) as exc:
         return boundary + f"\nINTEGRITY HALT: {exc}"
     own_moves = [row for row in events
                  if row["author"] == path_id and row["kind"] == "move"]
     if not own_moves:
-        return (boundary + f"\nrecord sha256:{hashlib.sha256(raw).hexdigest()} · "
+        return (boundary + f"\nrecord chain sha256:{record_digest} · "
                 f"events:{len(events)}\nEMPTY: this path has made no recorded transform. "
                 "No transform is required; play and stillness are both valid.")
     own_witnesses = [row for row in events
@@ -1139,7 +1358,7 @@ def load_transform_record(path_id: str, path: Path | None = None,
         omitted_closed = closed_total - projected_closed
         lines = [
             boundary,
-            f"record sha256:{hashlib.sha256(raw).hexdigest()} · events:{len(events)} · "
+            f"record chain sha256:{record_digest} · events:{len(events)} · "
             f"path moves:{len(own_moves)} open:{len(open_moves)} projected:{len(selected)}",
             "Only this path's moves are projected. Another path can receive one only through "
             "an explicit addressed path offer; shared storage is not contact.",
@@ -1188,7 +1407,7 @@ def load_transform_record(path_id: str, path: Path | None = None,
             break
         selected = candidate
     if not selected:
-        return (boundary + f"\nrecord sha256:{hashlib.sha256(raw).hexdigest()}\n"
+        return (boundary + f"\nrecord chain sha256:{record_digest}\n"
                 f"WITHHELD: one whole move exceeds {TRANSFORM_MAX_RENDER} chars; "
                 "the event remains intact rather than being silently clipped")
     return render(selected)
@@ -2356,6 +2575,11 @@ def _atomic_private_write(path: Path, raw: bytes) -> None:
             os.fsync(file.fileno())
         os.chmod(name, 0o600)
         os.replace(name, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     finally:
         Path(name).unlink(missing_ok=True)
 

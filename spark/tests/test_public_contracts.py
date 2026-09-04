@@ -1082,6 +1082,7 @@ def _transform_test_paths(m, monkeypatch, tmp_path):
     monkeypatch.setattr(m, "TRANSFORM_PATH", root / "events.jsonl")
     monkeypatch.setattr(m, "TRANSFORM_HEAD_PATH", root / "head.json")
     monkeypatch.setattr(m, "TRANSFORM_LOCK_PATH", root / "events.lock")
+    monkeypatch.setattr(m, "TRANSFORM_SEGMENTS_PATH", root / "segments")
     monkeypatch.setenv("VYBN_TRANSFORM_RECORD", "on")
     return root, workspace
 
@@ -1115,8 +1116,12 @@ def test_transform_record_keeps_path_lineage_and_grounded_artifact_receipts(monk
     assert first["result"] in a_view and child["result"] in a_view and other["result"] not in a_view
     assert other["result"] in b_view and first["result"] not in b_view
     assert f"parent={first['id']}" in a_view and "toy.txt@" in a_view and ":match" in a_view
-    for path in (m.TRANSFORM_PATH, m.TRANSFORM_HEAD_PATH, m.TRANSFORM_LOCK_PATH):
+    assert not m.TRANSFORM_PATH.exists()  # migrated behind the atomic v2 pointer
+    for path in (m.TRANSFORM_HEAD_PATH, m.TRANSFORM_LOCK_PATH):
         assert path.stat().st_mode & 0o777 == 0o600
+    assert m.TRANSFORM_SEGMENTS_PATH.stat().st_mode & 0o777 == 0o700
+    assert all(path.stat().st_mode & 0o777 == 0o600
+               for path in m.TRANSFORM_SEGMENTS_PATH.iterdir())
     assert root.stat().st_mode & 0o777 == 0o700
 
 
@@ -1179,6 +1184,51 @@ def test_transform_projection_prefers_newest_witnessed_discrepancy_when_no_move_
     assert "witnessed" in view and "omitted whole, never clipped" in view
 
 
+def test_transform_record_rolls_bounded_integrity_linked_segments(monkeypatch, tmp_path):
+    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
+    monkeypatch.setattr(m, "TRANSFORM_MAX_EVENTS", 2)
+    moves = [_move(m, f"spark/path-{index}", result=f"result-{index}")
+             for index in range(5)]
+    state = m._read_transform_state()
+    assert [len(segment.events) for segment in state.segments] == [2, 2, 1]
+    assert len(state.events) == 5 and state.events[-1]["seq"] == 5
+    assert all(len(segment.event_raw) <= m.TRANSFORM_MAX_BYTES
+               for segment in state.segments)
+    assert [segment.prior for segment in state.segments] == [
+        m.TRANSFORM_ZERO, state.segments[0].digest, state.segments[1].digest]
+    assert moves[0]["result"] in m.load_transform_record("spark/path-0")
+
+    # Removing or changing an archived segment cannot silently flatten the chain.
+    archived = m.TRANSFORM_SEGMENTS_PATH / f"{state.segments[0].digest}.jsonl"
+    archived.unlink()
+    view = m.load_transform_record("spark/path-4")
+    assert "INTEGRITY HALT" in view and "No such file" not in view
+
+
+def test_transform_legacy_record_migrates_exactly_at_byte_rollover(monkeypatch, tmp_path):
+    import shutil
+    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
+    first = _move(m, "spark/a", result="legacy-first")
+    second = _move(m, "spark/b", result="legacy-second")
+    generated = m._read_transform_state()
+    legacy_raw = generated.segments[0].event_raw
+    legacy_events = list(generated.events)
+
+    # Recreate the deployed v1 shape, then leave room smaller than one new event.
+    m.TRANSFORM_HEAD_PATH.unlink(); shutil.rmtree(m.TRANSFORM_SEGMENTS_PATH)
+    m.TRANSFORM_PATH.write_bytes(legacy_raw); m.TRANSFORM_PATH.chmod(0o600)
+    m.TRANSFORM_HEAD_PATH.write_bytes(m._transform_witness(legacy_raw, legacy_events))
+    m.TRANSFORM_HEAD_PATH.chmod(0o600)
+    monkeypatch.setattr(m, "TRANSFORM_MAX_BYTES", len(legacy_raw) + 32)
+
+    third = _move(m, "spark/c", result="post-rollover")
+    migrated = m._read_transform_state()
+    assert [len(segment.events) for segment in migrated.segments] == [2, 1]
+    assert [row["id"] for row in migrated.events] == [first["id"], second["id"], third["id"]]
+    assert migrated.events[2]["prev"] == migrated.events[1]["hash"]
+    assert not m.TRANSFORM_PATH.exists()
+
+
 def test_transform_log_is_on_demand_not_ambient_context(monkeypatch, tmp_path):
     m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
     monkeypatch.setenv("VYBN_PATH", "spark/bound")
@@ -1223,14 +1273,17 @@ def test_transform_record_fails_closed_on_tamper_bounds_and_raw_access(monkeypat
     import pytest
     m = _connection(); _root, workspace = _transform_test_paths(m, monkeypatch, tmp_path)
     move = _move(m, "spark/a")
-    code, blocked = m.run_local(f"cat {m.TRANSFORM_PATH}")
+    code, blocked = m.run_local(f"cat {m.TRANSFORM_SEGMENTS_PATH}")
     assert code == 126 and "path-distinction membrane" in blocked
-    m.TRANSFORM_PATH.write_bytes(b"")
+    state = m._read_transform_state()
+    tip = m.TRANSFORM_SEGMENTS_PATH / f"{state.segments[-1].digest}.jsonl"
+    tip.write_bytes(b"")
     assert "INTEGRITY HALT" in m.load_transform_record("spark/a")
-    assert "sidecar witness" in m.load_transform_record("spark/a")
+    assert "segment digest mismatch" in m.load_transform_record("spark/a")
 
     # Restore an isolated record and hit the unresolved-move cap without silent clipping.
-    m.TRANSFORM_PATH.unlink(); m.TRANSFORM_HEAD_PATH.unlink()
+    import shutil
+    m.TRANSFORM_HEAD_PATH.unlink(); shutil.rmtree(m.TRANSFORM_SEGMENTS_PATH)
     for index in range(m.TRANSFORM_MAX_OPEN_MOVES):
         _move(m, "spark/a", result=f"Open result {index}.")
     with pytest.raises(m.TransformStateError):
