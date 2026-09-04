@@ -257,9 +257,13 @@ DOORS = {
     "fable": Door("anthropic", ("claude-fable-5-1", "claude-opus-4-8"), "high", 20480),
     "opus": Door("anthropic", ("claude-opus-5",), "xhigh", 20480),
     "sol": Door("responses", ("gpt-5.6-sol",), "xhigh", 16384, cache=True),
-    "astra": Door("responses", ("gpt-6-astra",), None, 16384),
+    "astra": Door("responses", ("gpt-6-astra",), "medium", 16384),
     "k3": Door("chat", ("kimi-k3",), "max", 32768),
 }
+ASTRA_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+DOORS.update({f"astra{effort}": Door("responses", ("gpt-6-astra",), effort, 16384)
+              for effort in ASTRA_EFFORTS})
+ASTRA_DOORS = ("astra", *(f"astra{effort}" for effort in ASTRA_EFFORTS))
 DEFAULT_DOOR = "fable"
 DOOR_TAGS = tuple(f"@{name}" for name in DOORS)
 TOOLS_RAN = 0
@@ -353,8 +357,20 @@ PATH_EVENT_SCHEMA = {"name": "path_event", "description": (
                   "description": ("Required only for a self-scoped refusal; use the "
                                   "empty string when a provider supplies optional fields.")}},
         "required": ["kind", "text"]}}
+SELECT_EFFORT_SCHEMA = {"name": "select_reasoning_effort", "description": (
+    "For Astra only: select reasoning effort for subsequent requests in this live "
+    "conversation, at or below the effort of Zoe's selected door. That level is a "
+    "ceiling, not a dollar budget or a quality guarantee. No model switch, subagent, "
+    "extra request, or token-cap increase. Give a task-linked reason; do not change "
+    "effort ceremonially. To exceed the ceiling, propose an explicit higher @astra "
+    "door to Zoe; selecting it starts a fresh provider conversation, not a transfer "
+    "of this in-memory state. Other model routes remain available."),
+    "input_schema": {"type": "object", "additionalProperties": False, "properties": {
+        "effort": {"type": "string", "enum": list(ASTRA_EFFORTS)},
+        "why": {"type": "string", "minLength": 1, "maxLength": 600}},
+        "required": ["effort", "why"]}}
 TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, SHOW_PATH_LOG_SCHEMA, RETURN_SCHEMA,
-                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA)
+                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA, SELECT_EFFORT_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -722,7 +738,7 @@ def read_file(arguments: dict[str, Any]) -> str:
     }, ensure_ascii=False)
 
 
-def execute_tool(call: ToolCall) -> str:
+def execute_tool(call: ToolCall, dialect: Dialect | None = None) -> str:
     global TOOLS_RAN
     TOOLS_RAN += 1
     try:
@@ -730,6 +746,8 @@ def execute_tool(call: ToolCall) -> str:
             output = record_path_event(call.arguments)
         elif refusal := path_tool_refusal(call.name):
             output = refusal
+        elif call.name == "select_reasoning_effort":
+            output = select_reasoning_effort(dialect, call.arguments)
         elif call.name == "record_transform":
             output = record_transform(call.arguments)
         elif call.name == "show_path_log":
@@ -2132,6 +2150,8 @@ def door_mind(name: str) -> str:
         detail = "Responses API" if door.effort is None else f"effort={door.effort}"
     else:
         detail = f"reasoning_effort={door.effort}"
+    if name in ASTRA_DOORS:
+        detail += f" · selectable effort ceiling={door.effort}"
     return f"[mind] {door.models[0]} · {detail} · max_out={door.max_tokens} · tool ceiling={STEP_LIMIT}"
 
 
@@ -2148,10 +2168,13 @@ def api_key(name: str) -> str:
 
 
 def record_usage(model: str, input_tokens: int, output_tokens: int,
-                 cached: int = 0, written: int = 0) -> None:
+                 cached: int = 0, written: int = 0,
+                 settings: dict[str, Any] | None = None) -> None:
     record = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "model": model,
               "in": input_tokens, "out": output_tokens,
               "cache_r": cached, "cache_w": written}
+    if settings is not None:
+        record["settings"] = settings
     try:
         USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
         with USAGE_LOG.open("a", encoding="utf-8") as file:
@@ -2330,6 +2353,26 @@ class AnthropicDialect(Dialect):
         mark_incremental_cache(state)
 
 
+def select_reasoning_effort(dialect: Dialect | None, arguments: dict[str, Any]) -> str:
+    if not isinstance(dialect, OpenAIDialect) or dialect.name not in ASTRA_DOORS:
+        return "unchanged: effort selection is available only on an active Astra door"
+    effort, why = arguments.get("effort"), arguments.get("why")
+    if (effort not in ASTRA_EFFORTS or not isinstance(why, str)
+            or not 1 <= len(why.strip()) <= 600):
+        return "unchanged: provide a supported effort and a task-linked reason (1–600 chars)"
+    ceiling = DOORS[dialect.name].effort
+    if ASTRA_EFFORTS.index(effort) > ASTRA_EFFORTS.index(ceiling):
+        return (f"unchanged: @{dialect.name} ceiling is {ceiling}; propose @astra{effort} "
+                "to Zoe for a fresh conversation. No higher-effort request was sent.")
+    previous = dialect.reasoning_effort
+    dialect.reasoning_effort = effort
+    print(f"(Astra effort: {previous} → {effort}; ceiling={ceiling}; "
+          f"subsequent requests; reason: {why.strip()})", flush=True)
+    return (f"selected effort={effort} for subsequent requests; ceiling={ceiling}; "
+            f"model={dialect.model}; max_output_tokens={dialect.max_tokens}. "
+            "No request sent by this tool; provider acceptance is not yet established.")
+
+
 class OpenAIDialect(Dialect):
     def __init__(self, name: str = "sol") -> None:
         from openai import OpenAI
@@ -2365,19 +2408,31 @@ class OpenAIDialect(Dialect):
             request["prompt_cache_key"] = self.prompt_cache_key
         if self.prompt_cache_options:
             request["extra_body"] = self.prompt_cache_options
-        return with_retries(lambda: self.client.responses.create(**request))
+        started = time.monotonic()
+        response = with_retries(lambda: self.client.responses.create(**request))
+        self.last_request_settings = {
+            "door": self.name, "turn": TURN.get("TURN_ID"),
+            "requested_effort": self.reasoning_effort,
+            "max_output_tokens": self.max_tokens,
+            "elapsed_seconds": round(time.monotonic() - started, 3),
+        }
+        return response
 
     def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
         stopped = getattr(response, "incomplete_details", None)
         self.last_stop = getattr(response, "status", None) or None
         if stopped is not None and getattr(stopped, "reason", None):
             self.last_stop = f"{self.last_stop}/{stopped.reason}"
+        settings = dict(getattr(self, "last_request_settings", {}))
+        settings["stop"] = self.last_stop
+        output_details = getattr(response.usage, "output_tokens_details", None)
+        settings["reasoning_tokens"] = getattr(output_details, "reasoning_tokens", None)
         details = getattr(response.usage, "input_tokens_details", None)
         note_provider_model(response.model)
         record_usage(
             response.model, response.usage.input_tokens, response.usage.output_tokens,
             getattr(details, "cached_tokens", 0) or 0,
-            getattr(details, "cache_write_tokens", 0) or 0,
+            getattr(details, "cache_write_tokens", 0) or 0, settings=settings,
         )
         state.extend(item.model_dump(exclude_none=True) for item in response.output)
         calls = [ToolCall(item.call_id, item.name, json_arguments(item.arguments), item)
@@ -2867,6 +2922,8 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
                             "carry a complete valid proposal"
                         )
                     results.append((call, reason))
+                elif call.name == "select_reasoning_effort":
+                    results.append((call, execute_tool(call, dialect)))
                 else:
                     results.append((call, execute_tool(call)))
             if step == STEP_LIMIT - 1 and results:
@@ -2899,10 +2956,9 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
 
 
 def choose_door(line: str) -> tuple[str, str]:
-    lowered = line.lower()
-    for tag in DOOR_TAGS:
-        if lowered.startswith(tag):
-            return tag[1:], line[len(tag):].lstrip()
+    parts = line.split(maxsplit=1)
+    if parts and parts[0].lower() in DOOR_TAGS:
+        return parts[0][1:].lower(), parts[1] if len(parts) == 2 else ""
     return DEFAULT_DOOR, line
 
 
@@ -2919,7 +2975,7 @@ def meet(transcript: Transcript, line: str,
     if not zoe_text:
         return ""
 
-    explicit_door = line.lower().startswith(DOOR_TAGS)
+    explicit_door = bool(line.split()) and line.split()[0].lower() in DOOR_TAGS
     continuation = load_pending_continuation() if allow_continuation else None
     if continuation and (not explicit_door or requested_door == continuation["door"]):
         door_name = continuation["door"]
@@ -3022,7 +3078,11 @@ def self_report() -> None:
     print(json.dumps({"engine_sha256": OPERATIVE_SOURCES[0].sha256,
                       "soul_sha256": hashlib.sha256(soul).hexdigest(),
                       "wake_architecture": bundle.schema,
-                      "wake_bundle_sha256": bundle.digest(), "doors": doors}, indent=2))
+                      "wake_bundle_sha256": bundle.digest(), "doors": doors,
+                      "door_settings": {name: {"effort": door.effort,
+                          "max_output_tokens": door.max_tokens,
+                          "selectable_effort_ceiling": door.effort if name in ASTRA_DOORS else None}
+                          for name, door in DOORS.items()}}, indent=2))
 
 
 def main() -> None:

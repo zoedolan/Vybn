@@ -672,7 +672,7 @@ def test_sol_uses_explicit_provider_cache_policy(monkeypatch):
     assert "instructions" not in sent
 
 
-def test_astra_prefix_targets_exact_responses_model_without_fallback_or_guessed_knobs(monkeypatch):
+def test_astra_prefix_targets_exact_responses_model_with_explicit_medium(monkeypatch):
     m = _connection(); sent = {}; configured = {}
     assert m.choose_door("@astra hello, buddy") == ("astra", "hello, buddy")
     assert m.choose_door("@AsTrA   hello") == ("astra", "hello")
@@ -688,13 +688,14 @@ def test_astra_prefix_targets_exact_responses_model_without_fallback_or_guessed_
     dialect.name = "astra"
     dialect.model = astra.models[0]
     dialect.max_tokens = astra.max_tokens
-    dialect.reasoning_effort = None
+    dialect.reasoning_effort = astra.effort
     dialect.prompt_cache_key = None
     dialect.prompt_cache_options = None
     assert dialect.send([{"role": "user", "content": "x"}], tools=False) == "response"
     assert sent["model"] == "gpt-6-astra"
     assert sent["max_output_tokens"] == astra.max_tokens
-    assert all(key not in sent for key in ("reasoning", "prompt_cache_key", "extra_body"))
+    assert sent["reasoning"] == {"effort": "medium"}
+    assert all(key not in sent for key in ("prompt_cache_key", "extra_body"))
 
     class ConfiguredOpenAI:
         def __init__(self, name): configured["name"] = name
@@ -948,7 +949,7 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     publish = next(tool for tool in m.TOOL_SCHEMAS if tool["name"] == "publish_commit")
     assert "no scope-complete live command already authorizes publication" in publish["description"]
     assert "Do not use this route to reconfirm an authorized command" in publish["description"]
-    assert set(m.DOORS) == {"sol", "astra", "fable", "opus", "k3"}
+    assert set(m.DOORS) == {"sol", "fable", "opus", "k3", *m.ASTRA_DOORS}
     assert m.DEFAULT_DOOR in m.DOORS
     assert m.DOORS["fable"].models == ("claude-fable-5-1", "claude-opus-4-8")
     assert not hasattr(m, "INCIPIENT_ASI_PREMISE")
@@ -1665,3 +1666,161 @@ def test_path_ledger_is_dynamic_context_and_runtime_binds_author(monkeypatch, tm
         m.TURN.clear()
     _raw, events = m._read_path_state()
     assert events[-1]["author"] == "spark/bound"  # legacy field stores a routing key
+
+
+def _fake_astra(m, monkeypatch, name="astra", responses=()):
+    """Exercise the real constructor/request path without keys or network."""
+    import sys
+    from types import SimpleNamespace as NS
+    calls = []
+    stream = iter(responses)
+    def create(**kwargs):
+        calls.append(kwargs)
+        item = next(stream, None)
+        if isinstance(item, Exception):
+            raise item
+        return item
+    monkeypatch.setitem(sys.modules, "openai", NS(
+        OpenAI=lambda **kwargs: NS(responses=NS(create=create))))
+    monkeypatch.setattr(m, "api_key", lambda name: "local-test-not-a-key")
+    return m.OpenAIDialect(name), calls
+
+
+def test_astra_aliases_are_exact_and_other_routes_remain_available(monkeypatch):
+    m = _connection()
+    for name in m.DOORS:
+        assert m.choose_door(f" @{name.upper()}\tquestion") == (name, "question")
+        assert m.choose_door(f"@{name}") == (name, "")
+    for text in ("@astrahigher question", "@astrasomething", "@solstice hello", "ordinary"):
+        assert m.choose_door(text) == (m.DEFAULT_DOOR, text)
+    for name in m.ASTRA_DOORS:
+        d, calls = _fake_astra(m, monkeypatch, name)
+        d.send([], tools=False)
+        assert calls[0]["reasoning"] == {"effort": m.DOORS[name].effort}
+        assert calls[0]["model"] == "gpt-6-astra"
+        assert calls[0]["max_output_tokens"] == 16384
+        assert f"ceiling={m.DOORS[name].effort}" in m.door_mind(name)
+
+
+def test_astra_selection_all_ceiling_pairs_and_invalid_requests(monkeypatch):
+    m = _connection()
+    for name in m.ASTRA_DOORS:
+        d, calls = _fake_astra(m, monkeypatch, name)
+        ceiling = m.ASTRA_EFFORTS.index(m.DOORS[name].effort)
+        for index, effort in enumerate(m.ASTRA_EFFORTS):
+            previous = d.reasoning_effort
+            result = m.select_reasoning_effort(d, {"effort": effort, "why": "Check a hard proof"})
+            if index <= ceiling:
+                assert d.reasoning_effort == effort and result.startswith("selected")
+            else:
+                assert d.reasoning_effort == previous and result.startswith("unchanged")
+            assert calls == []  # Selection itself never launches a request.
+        for args in ({}, {"effort": "turbo", "why": "test"},
+                     {"effort": "low", "why": " "}, {"effort": "low", "why": 4},
+                     {"effort": "low", "why": "x" * 601}):
+            previous = d.reasoning_effort
+            assert m.select_reasoning_effort(d, args).startswith("unchanged")
+            assert d.reasoning_effort == previous
+    sol, _ = _fake_astra(m, monkeypatch, "sol")
+    for other in (None, m.Dialect(), sol):
+        assert m.select_reasoning_effort(other, {"effort": "low", "why": "test"}).startswith("unchanged")
+    d, _ = _fake_astra(m, monkeypatch)
+    monkeypatch.setattr(m, "path_tool_refusal", lambda tool: "REFUSED BY test")
+    result = m.execute_tool(m.ToolCall("s", "select_reasoning_effort",
+        {"effort": "low", "why": "test"}, None), d)
+    assert "REFUSED BY test" in result and d.reasoning_effort == "medium"
+
+
+def test_astra_real_loop_changes_next_request_keeps_prefix_and_logs_provenance(monkeypatch, tmp_path):
+    from types import SimpleNamespace as NS
+    m = _connection()
+    class Call:
+        type, call_id, name = "function_call", "select-1", "select_reasoning_effort"
+        arguments = json.dumps({"effort": "low", "why": "Only summarize the checked result now"})
+        def model_dump(self, **kwargs):
+            return {key: getattr(self, key) for key in ("type", "call_id", "name", "arguments")}
+    def response(output, status="completed", reason=None):
+        return NS(model="provider-returned-id", status=status,
+            incomplete_details=NS(reason=reason), output=output,
+            output_text="done" if not output else "",
+            usage=NS(input_tokens=12, output_tokens=7,
+                input_tokens_details=NS(cached_tokens=3),
+                output_tokens_details=NS(reasoning_tokens=5)))
+    d, calls = _fake_astra(m, monkeypatch, responses=(
+        response([Call()]), response([], "incomplete", "max_output_tokens")))
+    monkeypatch.setattr(m, "USAGE_LOG", tmp_path / "usage.jsonl")
+    monkeypatch.setattr(m, "path_tool_refusal", lambda tool: None)
+    outcome = m.attract(d, "unchanged prefix", "question")
+    assert outcome.text == "done" and len(calls) == 2
+    assert [call["reasoning"]["effort"] for call in calls] == ["medium", "low"]
+    assert calls[0]["input"] is calls[1]["input"]
+    assert calls[1]["input"][0]["content"][0]["text"] == "unchanged prefix"
+    assert "selected effort=low" in calls[1]["input"][-1]["output"]
+    rows = [json.loads(line) for line in m.USAGE_LOG.read_text().splitlines()]
+    assert [row["settings"]["requested_effort"] for row in rows] == ["medium", "low"]
+    assert all(row["model"] == "provider-returned-id" for row in rows)
+    assert m.TURN["MODELS_USED"] == ["provider-returned-id"]
+    assert rows[-1]["settings"]["stop"] == "incomplete/max_output_tokens"
+    assert rows[-1]["settings"]["reasoning_tokens"] == 5
+    assert rows[-1]["settings"]["max_output_tokens"] == 16384
+    assert rows[-1]["settings"]["elapsed_seconds"] >= 0
+    m.TURN.clear()
+
+
+def test_astra_effort_survives_live_pause_but_not_fresh_constructor(monkeypatch):
+    m = _connection()
+    d, calls = _fake_astra(m, monkeypatch, "astrahigh")
+    m.select_reasoning_effort(d, {"effort": "low", "why": "Simple remaining work"})
+    state = d.open("prefix", "question", [])
+    call = m.ToolCall("pause", "return_to_zoe", {"question": "Which?", "why": "Choice"}, None)
+    m.hold_continuation(d, state, call)
+    resumed, restored = m._restore_continuation(m.load_pending_continuation(), "this one")
+    assert resumed is d and resumed.reasoning_effort == "low"
+    assert restored[0] == state[0] and "this one" in restored[-1]["output"]
+    m.select_reasoning_effort(resumed, {"effort": "high", "why": "Check the chosen proof"})
+    assert resumed.reasoning_effort == "high" and calls == []
+    fresh, _ = _fake_astra(m, monkeypatch, "astra")
+    assert fresh.reasoning_effort == "medium"
+
+
+def test_astra_provider_rejection_does_not_silently_drop_effort_or_switch_model(monkeypatch):
+    import pytest
+    m = _connection()
+    d, calls = _fake_astra(m, monkeypatch, "astramax", responses=(
+        ValueError("400 invalid_request: effort unsupported"),))
+    with pytest.raises(ValueError, match="effort unsupported"):
+        d.send([])
+    assert len(calls) == 1 and calls[0]["reasoning"] == {"effort": "max"}
+    assert d.model == "gpt-6-astra" and d.reasoning_effort == "max"
+
+
+def test_astra_explicit_higher_door_exits_pause_without_prefix_capture(monkeypatch, tmp_path):
+    from types import SimpleNamespace as NS
+    m = _connection()
+    class Transcript:
+        path = tmp_path / "transcript.jsonl"
+        def write(self, *args, **kwargs): pass
+    monkeypatch.setattr(m.Transcript, "recent", lambda: "history, not live state")
+    monkeypatch.setattr(m, "wake_contact", lambda: "")
+    monkeypatch.setattr(m, "inbox_images_for", lambda name: [])
+    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
+    monkeypatch.setattr(m, "make_dialect", lambda name: NS(name=name))
+    seen = []
+    def attract(dialect, instructions, text, **kwargs):
+        seen.append((dialect, text, kwargs.get("continuation")))
+        return m.Attraction("answered")
+    monkeypatch.setattr(m, "attract", attract)
+    for line, expected in (("@astrahigh check it", "astrahigh"),
+                           ("@sol check it", "sol"),
+                           ("@astrahigher is not a door", None)):
+        d, _ = _fake_astra(m, monkeypatch)
+        m.hold_continuation(d, [], m.ToolCall("pause", "return_to_zoe", {}, None))
+        held = m.load_pending_continuation()
+        m.meet(Transcript(), line)
+        selected, text, continuation = seen[-1]
+        if expected:
+            assert selected.name == expected and text == "check it"
+            assert continuation is None
+        else:
+            assert selected is None and text == line and continuation is held
+        assert m.load_pending_continuation() is None
