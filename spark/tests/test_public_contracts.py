@@ -342,6 +342,37 @@ def test_publish_opening_balances_direct_assent_and_nonassent(monkeypatch, tmp_p
     assert "output receipt" in resolution["message"] and str(remote) not in resolution["message"]
 
 
+def test_publish_opening_does_not_publish_unreviewed_follow_tags(monkeypatch, tmp_path):
+    """An exact branch opening must not inherit Git's implicit tag publication."""
+    import subprocess
+    m = _connection(); workspace, remote, control, commit = _publication_repositories(tmp_path)
+    monkeypatch.setattr(m, "WORKSPACE", workspace)
+    subprocess.run(["git", "-C", str(workspace), "tag", "-a", "unreviewed",
+                    "-m", "not part of the branch proposal", commit], check=True)
+    subprocess.run(["git", "-C", str(workspace), "config", "push.followTags", "true"],
+                   check=True)
+    # Rival: an explicit refspec alone still inherits followTags configuration.
+    subprocess.run(["git", "-C", str(workspace), "push", "--porcelain",
+                    str(control), f"{commit}:refs/heads/main"],
+                   capture_output=True, check=True)
+    control_refs = subprocess.check_output(
+        ["git", "--git-dir", str(control), "for-each-ref", "--format=%(refname)"],
+        text=True).splitlines()
+    assert control_refs == ["refs/heads/main", "refs/tags/unreviewed"]
+    proposal = m.prepare_publish_proposal(_publish_arguments(commit))
+    resolution = m.resolve_publish_opening({"effect": proposal}, "yes")
+    assert resolution["authorized"] and resolution["attempted"]
+    assert resolution["exit_code"] == 0
+    refs = subprocess.check_output(
+        ["git", "--git-dir", str(remote), "for-each-ref",
+         "--format=%(refname) %(objectname)"], text=True).splitlines()
+    assert refs == [f"refs/heads/main {commit}"]
+    # Preserve the user's configuration; narrow this effect, not future Git use.
+    assert subprocess.check_output(
+        ["git", "-C", str(workspace), "config", "--get", "push.followTags"],
+        text=True).strip() == "true"
+
+
 def test_publish_opening_detects_scope_change_forgery_and_reuse(monkeypatch, tmp_path):
     import subprocess
     m = _connection(); workspace, remote, second, commit = _publication_repositories(tmp_path)

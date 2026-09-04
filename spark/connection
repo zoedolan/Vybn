@@ -2670,7 +2670,7 @@ def resolve_publish_opening(continuation: dict[str, Any], zoe_text: str) -> dict
         resolution["attempted"] = True
         code, output = _git_capture(
             repository, "-c", "core.hooksPath=/dev/null", "push", "--porcelain",
-            "--no-verify", "--", proposal["remote_url"],
+            "--no-verify", "--no-follow-tags", "--", proposal["remote_url"],
             f"{proposal['commit']}:refs/heads/{proposal['branch']}", timeout=120,
         )
         raw = output.encode()
