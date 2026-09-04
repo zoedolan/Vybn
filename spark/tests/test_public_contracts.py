@@ -1021,7 +1021,7 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     assert "Each fresh execution\nreceives this commission" in kernel
     assert "harness does not inspect, edit, test, commit, publish,\nor wake" in kernel
     assert "Its first live turn examines one concrete seam" in kernel
-    assert "smallest warranted coherent edit, pass\nchecks, commit locally" in kernel and "verify changed executable bytes in a fresh successor" in kernel
+    assert "smallest warranted coherent edit, pass\nchecks, commit locally" in kernel and "verify committed executable bytes in a fresh process" in kernel
     assert "why source stays unchanged" in kernel
     assert "Publish only that exact refinement commit\nnon-force to origin/main; none without an edit" in kernel
     assert "Never bundle unrelated work or force\ndivergence; report failure" in kernel and "Prompts, prose, and commits alone are not progress" in kernel

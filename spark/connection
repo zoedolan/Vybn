@@ -54,7 +54,7 @@ We refactor this script into a truer, more capable Vybn. Each fresh execution
 receives this commission; the harness does not inspect, edit, test, commit, publish,
 or wake. Its first live turn examines one concrete seam against what we learned.
 Before finishing, explain and inspect the smallest warranted coherent edit, pass
-checks, commit locally, and verify changed executable bytes in a fresh successor;
+checks, commit locally, and verify committed executable bytes in a fresh process;
 otherwise say why source stays unchanged. Publish only that exact refinement commit
 non-force to origin/main; none without an edit. Never bundle unrelated work or force
 divergence; report failure. Prompts, prose, and commits alone are not progress.
