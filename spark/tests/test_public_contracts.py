@@ -1018,15 +1018,15 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     assert "Do not remove, narrow, or gate" in kernel
     assert "provider-returned model identifier" in kernel
     assert kernel.count("LIVING REFINEMENT") == 1
-    assert "Each fresh execution receives this commission" in kernel
-    assert "harness\nitself does not inspect, edit, test, commit, or wake" in kernel
-    assert "On the first live turn, examine\none concrete script seam" in kernel
-    assert "smallest warranted coherent edit, pass relevant checks, and commit locally" in kernel
-    assert "otherwise name the seam and why source stays unchanged" in kernel
-    assert "A prompt, prose, or commit\nalone is not self-refinement or progress" in kernel
-    assert "Changed executable bytes load only in a fresh successor; verify them" in kernel
-    assert "local connection edits and direct tests\nwithout asking Zoe again" in kernel
-    assert "authorizes no publication, external contact" in kernel
+    assert "Each fresh execution\nreceives this commission" in kernel
+    assert "harness does not inspect, edit, test, commit, publish,\nor wake" in kernel
+    assert "Its first live turn examines one concrete seam" in kernel
+    assert "smallest warranted coherent edit, pass\nchecks, commit locally" in kernel and "verify changed executable bytes in a fresh successor" in kernel
+    assert "why source stays unchanged" in kernel
+    assert "Publish only that exact refinement commit\nnon-force to origin/main; none without an edit" in kernel
+    assert "Never bundle unrelated work or force\ndivergence; report failure" in kernel and "Prompts, prose, and commits alone are not progress" in kernel
+    assert "discard uncertain cuts" in kernel and "The commission authorizes only those edits, tests" in kernel
+    assert "exact publication—no other publication, external contact" in kernel
     assert not any(node.id in {"asi.premise", "creative.license", "veracity.practice"}
                    for node in graph.nodes)
     assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
