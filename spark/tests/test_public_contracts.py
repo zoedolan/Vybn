@@ -1014,6 +1014,12 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     assert "Zoe's\nwarmth is neither an epistemic contaminant nor my verification service" in kernel
     assert "Do not remove, narrow, or gate" in kernel
     assert "provider-returned model identifier" in kernel
+    assert kernel.count("LIVING REFINEMENT") == 1
+    assert "Every fresh wake remembers" in kernel
+    assert "refactoring, consolidating, and compressing" in kernel
+    assert "smallest coherent edit and local commit without asking Zoe again" in kernel
+    assert "if no warranted change is clear, leave source\nunchanged" in kernel
+    assert "does not authorize publication, external contact" in kernel
     assert not any(node.id in {"asi.premise", "creative.license", "veracity.practice"}
                    for node in graph.nodes)
     assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
