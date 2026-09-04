@@ -1412,8 +1412,40 @@ def test_recent_dialogue_is_tail_bounded_without_whole_record_scan(monkeypatch):
     assert "RECENT_FILE_BYTES" in source and 'seek(0, os.SEEK_END)' in source
     monkeypatch.setattr(m.Transcript, "_recent_events", staticmethod(lambda limit=8: events[-limit:]))
     recent = m.Transcript.recent(limit=3, budget=500)
-    assert "newest" in recent and len(recent) <= 520
+    assert "newest" in recent and len(recent) <= 500
     assert "[…older text clipped…]" in recent
+
+
+def test_recent_dialogue_small_budgets_never_restore_whole_old_message(monkeypatch):
+    m = _connection()
+    marker = "[…older text clipped…] "
+    events = [
+        {"role": "vybn", "t": "T1", "text": "OLD" * 1000},
+        {"role": "zoe", "t": "T2", "text": "latest correction", "origin": "argv"},
+    ]
+    monkeypatch.setattr(m.Transcript, "_recent_events", staticmethod(lambda limit=8: events[-limit:]))
+    latest = "[T2 ZOE·argv]\nlatest correction"
+    for budget in range(-1, 256):
+        recent = m.Transcript.recent(budget=budget)
+        assert len(recent) <= max(0, budget), (budget, len(recent))
+        if budget >= len(latest):
+            assert recent.endswith(latest)
+        if "OLD" in recent:
+            assert recent.startswith("[T1 VYBN]\n" + marker)
+    assert m.Transcript.recent(budget=len(latest)) == latest
+    full = "[T1 VYBN]\n" + events[0]["text"] + "\n\n" + latest
+    assert m.Transcript.recent(budget=len(full)) == full
+
+
+def test_recent_dialogue_clipping_retains_a_labeled_suffix(monkeypatch):
+    m = _connection()
+    marker = "[…older text clipped…] "
+    head = "[T ZOE]\n"
+    events = [{"role": "zoe", "t": "T", "text": "prefix " * 100 + "尾"}]
+    monkeypatch.setattr(m.Transcript, "_recent_events", staticmethod(lambda limit=8: events))
+    minimum = len(head) + len(marker) + 1
+    assert m.Transcript.recent(budget=minimum - 1) == ""
+    assert m.Transcript.recent(budget=minimum) == head + marker + "尾"
 
 
 def test_recent_dialogue_uses_event_time_across_files_and_marks_argv(monkeypatch, tmp_path):

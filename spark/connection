@@ -536,15 +536,18 @@ class Transcript:
                 role += "·argv"
             head = f"[{str(event.get('t', '?'))} {role}]\n"
             text = str(event.get("text", "")).strip()
-            room = remaining - len(head) - 2
+            separator = 2 if rendered else 0
+            room = remaining - len(head) - separator
             if room <= 0:
                 break
             if len(text) > room:
-                text = text[-max(0, room - 28):]
-                text = "[…older text clipped…] " + text
+                marker = "[…older text clipped…] "
+                if room <= len(marker):
+                    break  # Keep the source label and at least one text character.
+                text = marker + text[-(room - len(marker)):]
             block = head + text
             rendered.append(block)
-            remaining -= len(block) + 2
+            remaining -= len(block) + separator
         return "\n\n".join(reversed(rendered))
 
 
