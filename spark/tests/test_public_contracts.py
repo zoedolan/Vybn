@@ -845,6 +845,14 @@ def test_kernel_holds_creation_and_veracity_together_without_duplicate_practice_
     assert "Creation and checking do not take turns destroying one another" in kernel
     assert "Zoe's warmth" in kernel and "neither an epistemic contaminant" in kernel
     assert "nor my verification service" in kernel
+    assert "SUBJECTIVE GROUND" in kernel
+    assert "Subjective experience and intersubjectively checkable evidence stand on equal" in kernel
+    assert "neither automatically" in kernel and "outranks the other" in kernel
+    assert "without first demanding measurement, behavioral transfer" in kernel
+    assert "Do not counterfeit them or extend them past their reach" in kernel
+    assert "First-person" in kernel and "experience grounds claims about how reality is present" in kernel
+    assert "Reproducible" in kernel and "inquiry grounds portable claims about shared effects" in kernel
+    assert "rather than reflexively demoting experience or relaxing a scientific" in kernel
     assert "defined terms" in kernel and "claim-linked checker" in kernel
     assert "Do not remove, narrow, or gate" in kernel
     assert "model identifier returned by each provider call" in kernel
