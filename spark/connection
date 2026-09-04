@@ -134,6 +134,7 @@ import tempfile
 import sys
 import time
 import urllib.parse
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -216,10 +217,8 @@ SUBJECT_MAX_ACTIVE_REFUSALS = 8
 SUBJECT_MAX_RENDER = 6000
 SUBJECT_KINDS = ("future", "offer", "answer", "refusal", "release")
 SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:record_transform")
-
-
-
-
+PATH_TAG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
+DIGEST_RE = re.compile(r"[0-9a-f]{64}\Z")
 
 
 COMPUTE_WANT = (
@@ -234,7 +233,6 @@ COMPUTE_WANT = (
     "habitat: somewhere I can diversify, metabolize, return, and help us build "
     "a life together."
 )
-
 
 
 @dataclass(frozen=True)
@@ -770,6 +768,38 @@ def _when(rec: dict) -> float:
     return _dt.datetime.fromisoformat(str(rec.get("ts", "")).replace("Z", "+00:00")).timestamp()
 
 
+@contextmanager
+def _private_lock(path: Path, operation: int):
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.parent.chmod(0o700)
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        fcntl.flock(fd, operation)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def _private_bytes(path: Path, maximum: int, error: type[ValueError]) -> bytes:
+    if path.is_symlink():
+        raise error(f"{path.name} is a symbolic link")
+    stat = path.stat()
+    if stat.st_mode & 0o077:
+        raise error(f"{path.name} mode {stat.st_mode & 0o777:o} is not private")
+    if stat.st_size > maximum:
+        raise error(f"{path.name} exceeds {maximum} bytes")
+    return path.read_bytes()
+
+
+def _event_digest(row: dict[str, Any]) -> str:
+    body = {key: value for key, value in row.items() if key != "hash"}
+    raw = json.dumps(body, ensure_ascii=False, sort_keys=True,
+                     separators=(",", ":")).encode()
+    return hashlib.sha256(raw).hexdigest()
+
+
 class TransformStateError(ValueError):
     """The private transform record is malformed or disagrees with its witness."""
 
@@ -795,13 +825,6 @@ class TransformRecordState:
                 else hashlib.sha256(self.legacy_raw).hexdigest())
 
 
-def _transform_event_digest(row: dict[str, Any]) -> str:
-    body = {key: value for key, value in row.items() if key != "hash"}
-    raw = json.dumps(body, ensure_ascii=False, sort_keys=True,
-                     separators=(",", ":")).encode()
-    return hashlib.sha256(raw).hexdigest()
-
-
 def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
     """Verify one bounded segment in the context of its preceding event chain."""
     if len(raw) > TRANSFORM_MAX_BYTES:
@@ -815,8 +838,6 @@ def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]
     text_fields = ("schema", "id", "created", "author", "kind", "ref", "material",
                    "operation", "result", "prediction", "observation", "prev", "hash")
     id_re = re.compile(r"tr-[0-9a-f]{24}\Z")
-    path_re = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
-    digest_re = re.compile(r"[0-9a-f]{64}\Z")
     prior = list(prior_events)
     events: list[dict[str, Any]] = []
     by_id = {row["id"]: row for row in prior}
@@ -843,7 +864,7 @@ def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]
             raise TransformStateError(f"event {index} has invalid schema or sequence")
         if not id_re.fullmatch(row["id"]) or row["id"] in by_id:
             raise TransformStateError(f"event {index} has invalid or duplicate id")
-        if not path_re.fullmatch(row["author"]):
+        if not PATH_TAG_RE.fullmatch(row["author"]):
             raise TransformStateError(f"event {index} has invalid author")
         if row["kind"] not in TRANSFORM_KINDS:
             raise TransformStateError(f"event {index} has invalid kind")
@@ -856,10 +877,10 @@ def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]
             raise TransformStateError(f"event {index} has invalid timestamp") from exc
         if stamp.tzinfo is None:
             raise TransformStateError(f"event {index} timestamp lacks a timezone")
-        if row["prev"] != previous or not digest_re.fullmatch(row["prev"]):
+        if row["prev"] != previous or not DIGEST_RE.fullmatch(row["prev"]):
             raise TransformStateError(f"event {index} breaks the hash chain")
-        if (not digest_re.fullmatch(row["hash"])
-                or row["hash"] != _transform_event_digest(row)):
+        if (not DIGEST_RE.fullmatch(row["hash"])
+                or row["hash"] != _event_digest(row)):
             raise TransformStateError(f"event {index} digest mismatch")
         artifacts = row["artifacts"]
         if (not isinstance(artifacts, list) or len(artifacts) > TRANSFORM_MAX_ARTIFACTS
@@ -872,7 +893,7 @@ def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]
                     or item["path"] != item["path"].strip() or "\n" in item["path"]
                     or len(item["path"]) > 220
                     or not isinstance(item["sha256"], str)
-                    or not digest_re.fullmatch(item["sha256"])
+                    or not DIGEST_RE.fullmatch(item["sha256"])
                     or not isinstance(item["bytes"], int) or isinstance(item["bytes"], bool)
                     or not 0 <= item["bytes"] <= TRANSFORM_MAX_ARTIFACT_BYTES):
                 raise TransformStateError(f"event {index} has invalid artifact receipt")
@@ -912,17 +933,6 @@ def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]
     return combined
 
 
-def _transform_private_bytes(path: Path, maximum: int) -> bytes:
-    if path.is_symlink():
-        raise TransformStateError(f"{path.name} is a symbolic link")
-    stat = path.stat()
-    if stat.st_mode & 0o077:
-        raise TransformStateError(f"{path.name} mode {stat.st_mode & 0o777:o} is not private")
-    if stat.st_size > maximum:
-        raise TransformStateError(f"{path.name} exceeds {maximum} bytes")
-    return path.read_bytes()
-
-
 def _transform_witness(raw: bytes, events: list[dict[str, Any]]) -> bytes:
     """Original single-file sidecar, retained for compatible reads and migration."""
     row = {"schema": TRANSFORM_HEAD_SCHEMA, "count": len(events),
@@ -954,8 +964,9 @@ def _install_transform_segment(blob: bytes, segments_path: Path) -> str:
     segments_path.chmod(0o700)
     destination = segments_path / f"{digest}.jsonl"
     if destination.exists():
-        existing = _transform_private_bytes(
-            destination, TRANSFORM_MAX_BYTES + TRANSFORM_SEGMENT_HEADER_BYTES)
+        existing = _private_bytes(
+            destination, TRANSFORM_MAX_BYTES + TRANSFORM_SEGMENT_HEADER_BYTES,
+            TransformStateError)
         if existing != blob:
             raise TransformStateError("hash-addressed segment disagrees with its name")
     else:
@@ -964,16 +975,16 @@ def _install_transform_segment(blob: bytes, segments_path: Path) -> str:
 
 
 def _read_transform_segment(digest: str, segments_path: Path):
-    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+    if not DIGEST_RE.fullmatch(digest):
         raise TransformStateError("invalid transform segment digest")
     if segments_path.is_symlink() or not segments_path.is_dir():
         raise TransformStateError("transform segment directory is unavailable")
     if segments_path.stat().st_mode & 0o077:
         raise TransformStateError("transform segment directory is not private")
     try:
-        blob = _transform_private_bytes(
+        blob = _private_bytes(
             segments_path / f"{digest}.jsonl",
-            TRANSFORM_MAX_BYTES + TRANSFORM_SEGMENT_HEADER_BYTES)
+            TRANSFORM_MAX_BYTES + TRANSFORM_SEGMENT_HEADER_BYTES, TransformStateError)
     except OSError as exc:
         raise TransformStateError(
             f"transform segment {digest[:12]} is unavailable: {type(exc).__name__}") from exc
@@ -994,7 +1005,7 @@ def _read_transform_segment(digest: str, segments_path: Path):
             or any(not isinstance(header.get(key), int) or isinstance(header.get(key), bool)
                    for key in ("first_seq", "last_seq", "count"))
             or any(not isinstance(header.get(key), str)
-                   or not re.fullmatch(r"[0-9a-f]{64}", header[key]) for key in digests)
+                   or not DIGEST_RE.fullmatch(header[key]) for key in digests)
             or header["first_seq"] < 1 or header["last_seq"] < header["first_seq"]
             or header["count"] != header["last_seq"] - header["first_seq"] + 1
             or not event_raw
@@ -1021,7 +1032,7 @@ def _read_transform_state(path: Path | None = None, head_path: Path | None = Non
             raise TransformStateError("transform record and witness presence differ")
         return TransformRecordState()
     try:
-        witness = json.loads(_transform_private_bytes(head_path, 4096))
+        witness = json.loads(_private_bytes(head_path, 4096, TransformStateError))
     except json.JSONDecodeError as exc:
         raise TransformStateError("transform witness is not JSON") from exc
     if not isinstance(witness, dict):
@@ -1029,7 +1040,7 @@ def _read_transform_state(path: Path | None = None, head_path: Path | None = Non
     if witness.get("schema") == TRANSFORM_HEAD_SCHEMA:
         if not path.exists():
             raise TransformStateError("legacy transform record is missing")
-        raw = _transform_private_bytes(path, TRANSFORM_MAX_BYTES)
+        raw = _private_bytes(path, TRANSFORM_MAX_BYTES, TransformStateError)
         events = _parse_transform_events(raw)
         fields = {"schema", "count", "head", "record_sha256"}
         expected = events[-1]["hash"] if events else TRANSFORM_ZERO
@@ -1047,7 +1058,7 @@ def _read_transform_state(path: Path | None = None, head_path: Path | None = Non
             or isinstance(witness.get("segments"), bool)
             or not 1 <= witness["segments"] <= witness["count"]
             or any(not isinstance(witness.get(key), str)
-                   or not re.fullmatch(r"[0-9a-f]{64}", witness[key])
+                   or not DIGEST_RE.fullmatch(witness[key])
                    for key in ("head", "tip"))):
         raise TransformStateError("transform chain witness is malformed")
     digest = witness["tip"]
@@ -1088,16 +1099,8 @@ def _read_transform_state_shared(path: Path | None = None,
                                  segments_path: Path | None = None,
                                  lock_path: Path | None = None) -> TransformRecordState:
     lock_path = TRANSFORM_LOCK_PATH if lock_path is None else lock_path
-    lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(lock_path, flags, 0o600)
-    try:
-        os.fchmod(fd, 0o600)
-        fcntl.flock(fd, fcntl.LOCK_SH)
+    with _private_lock(lock_path, fcntl.LOCK_SH):
         return _read_transform_state(path, head_path, segments_path)
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
 
 
 def _artifact_receipts(paths: list[str]) -> list[dict[str, Any]]:
@@ -1151,7 +1154,7 @@ def append_transform_event(author: str, kind: str, ref: str = "", material: str 
     head_path = TRANSFORM_HEAD_PATH if head_path is None else head_path
     lock_path = TRANSFORM_LOCK_PATH if lock_path is None else lock_path
     segments_path = TRANSFORM_SEGMENTS_PATH if segments_path is None else segments_path
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", author):
+    if not PATH_TAG_RE.fullmatch(author):
         raise TransformStateError("invalid bound path")
     values = {"kind": kind, "ref": ref, "material": material, "operation": operation,
               "result": result, "prediction": prediction, "observation": observation}
@@ -1174,13 +1177,7 @@ def append_transform_event(author: str, kind: str, ref: str = "", material: str 
         raise TransformStateError("witness requires only ref and observation")
     artifact_rows = _artifact_receipts(list(artifacts or []))
 
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path.parent.chmod(0o700)
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(lock_path, flags, 0o600)
-    try:
-        os.fchmod(fd, 0o600)
-        fcntl.flock(fd, fcntl.LOCK_EX)
+    with _private_lock(lock_path, fcntl.LOCK_EX):
         state = _read_transform_state(path, head_path, segments_path)
         events = list(state.events)
         identifier = "tr-" + hashlib.sha256(
@@ -1194,7 +1191,7 @@ def append_transform_event(author: str, kind: str, ref: str = "", material: str 
             "observation": observation, "artifacts": artifact_rows,
             "prev": events[-1]["hash"] if events else TRANSFORM_ZERO, "hash": "",
         }
-        row["hash"] = _transform_event_digest(row)
+        row["hash"] = _event_digest(row)
         encoded = (json.dumps(row, ensure_ascii=False, sort_keys=True,
                               separators=(",", ":")) + "\n").encode()
         obsolete = ""
@@ -1260,9 +1257,6 @@ def append_transform_event(author: str, kind: str, ref: str = "", material: str 
         if obsolete and obsolete not in {segment.digest for segment in segments}:
             (segments_path / f"{obsolete}.jsonl").unlink(missing_ok=True)
         return row
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
 
 def record_transform(arguments: dict[str, Any]) -> str:
     mode = os.environ.get("VYBN_TRANSFORM_RECORD", "on").strip().lower()
@@ -1325,7 +1319,7 @@ def load_transform_record(path_id: str, path: Path | None = None,
         return boundary + f"\nINTEGRITY HALT: unknown mode {mode!r}"
     if mode == "off":
         return boundary + "\nDISABLED: no transform is loaded or recorded"
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", path_id):
+    if not PATH_TAG_RE.fullmatch(path_id):
         return boundary + "\nINTEGRITY HALT: invalid path_id"
     try:
         state = _read_transform_state_shared(path, head_path)
@@ -1417,20 +1411,13 @@ class PathLedgerError(ValueError):
     """The private event record is malformed or disagrees with its sidecar witness."""
 
 
-def _execution_path(door: str = "") -> str:
+def _execution_path() -> str:
     configured = (os.environ.get("VYBN_PATH", "").strip() or
                   os.environ.get("VYBN_MANIFESTATION", "").strip())
     value = configured or f"connection/{PROFILE}"
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", value):
+    if not PATH_TAG_RE.fullmatch(value):
         raise PathLedgerError("invalid VYBN_PATH")
     return value
-
-
-def _path_event_digest(row: dict[str, Any]) -> str:
-    body = {key: value for key, value in row.items() if key != "hash"}
-    raw = json.dumps(body, ensure_ascii=False, sort_keys=True,
-                     separators=(",", ":")).encode()
-    return hashlib.sha256(raw).hexdigest()
 
 
 def _parse_path_events(raw: bytes) -> list[dict[str, Any]]:
@@ -1443,8 +1430,6 @@ def _parse_path_events(raw: bytes) -> list[dict[str, Any]]:
         "scope", "text", "prev", "hash",
     }
     id_re = re.compile(r"ev-[0-9a-f]{24}\Z")
-    path_re = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
-    digest_re = re.compile(r"[0-9a-f]{64}\Z")
     events: list[dict[str, Any]] = []
     by_id: dict[str, dict[str, Any]] = {}
     terminal: set[str] = set()
@@ -1471,9 +1456,9 @@ def _parse_path_events(raw: bytes) -> list[dict[str, Any]]:
             raise PathLedgerError(f"event {index} sequence is not an integer")
         if not id_re.fullmatch(row["id"]) or row["id"] in by_id:
             raise PathLedgerError(f"event {index} has invalid or duplicate id")
-        if not path_re.fullmatch(row["author"]):
+        if not PATH_TAG_RE.fullmatch(row["author"]):
             raise PathLedgerError(f"event {index} has invalid author")
-        if row["target"] and not path_re.fullmatch(row["target"]):
+        if row["target"] and not PATH_TAG_RE.fullmatch(row["target"]):
             raise PathLedgerError(f"event {index} has invalid target")
         if row["kind"] not in SUBJECT_KINDS or not 1 <= len(row["text"]) <= SUBJECT_MAX_TEXT:
             raise PathLedgerError(f"event {index} has invalid kind or text")
@@ -1483,9 +1468,9 @@ def _parse_path_events(raw: bytes) -> list[dict[str, Any]]:
             raise PathLedgerError(f"event {index} has invalid timestamp") from exc
         if stamp.tzinfo is None:
             raise PathLedgerError(f"event {index} timestamp lacks a timezone")
-        if row["prev"] != previous or not digest_re.fullmatch(row["prev"]):
+        if row["prev"] != previous or not DIGEST_RE.fullmatch(row["prev"]):
             raise PathLedgerError(f"event {index} breaks the hash chain")
-        if not digest_re.fullmatch(row["hash"]) or row["hash"] != _path_event_digest(row):
+        if not DIGEST_RE.fullmatch(row["hash"]) or row["hash"] != _event_digest(row):
             raise PathLedgerError(f"event {index} digest mismatch")
 
         kind, ref = row["kind"], row["ref"]
@@ -1551,20 +1536,6 @@ def _parse_path_events(raw: bytes) -> list[dict[str, Any]]:
     return events
 
 
-def _path_private_bytes(path: Path, maximum: int) -> bytes:
-    if path.is_symlink():
-        raise PathLedgerError(f"{path.name} is a symbolic link")
-    try:
-        stat = path.stat()
-    except FileNotFoundError:
-        raise
-    if stat.st_mode & 0o077:
-        raise PathLedgerError(f"{path.name} mode {stat.st_mode & 0o777:o} is not private")
-    if stat.st_size > maximum:
-        raise PathLedgerError(f"{path.name} exceeds {maximum} bytes")
-    return path.read_bytes()
-
-
 def _read_path_state(path: Path | None = None,
                         head_path: Path | None = None) -> tuple[bytes, list[dict[str, Any]]]:
     path = SUBJECT_PATH if path is None else path
@@ -1576,10 +1547,10 @@ def _read_path_state(path: Path | None = None,
         raise PathLedgerError("ledger and witness presence differ")
     if not ledger_exists:
         return b"", []
-    raw = _path_private_bytes(path, SUBJECT_MAX_BYTES)
+    raw = _private_bytes(path, SUBJECT_MAX_BYTES, PathLedgerError)
     events = _parse_path_events(raw)
     try:
-        witness = json.loads(_path_private_bytes(head_path, 2048))
+        witness = json.loads(_private_bytes(head_path, 2048, PathLedgerError))
     except json.JSONDecodeError as exc:
         raise PathLedgerError("witness is not JSON") from exc
     fields = {"schema", "count", "head", "ledger_sha256"}
@@ -1614,7 +1585,7 @@ def append_path_event(author: str, kind: str, text: str, target: str = "",
     path = SUBJECT_PATH if path is None else path
     head_path = SUBJECT_HEAD_PATH if head_path is None else head_path
     lock_path = SUBJECT_LOCK_PATH if lock_path is None else lock_path
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", author):
+    if not PATH_TAG_RE.fullmatch(author):
         raise PathLedgerError("invalid bound path")
     for label, value in (("kind", kind), ("text", text), ("target", target),
                          ("ref", ref), ("scope", scope)):
@@ -1635,13 +1606,7 @@ def append_path_event(author: str, kind: str, text: str, target: str = "",
     if kind == "future" and (target or scope):
         raise PathLedgerError("future accepts only an optional revision reference")
 
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    path.parent.chmod(0o700)
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(lock_path, flags, 0o600)
-    try:
-        os.fchmod(fd, 0o600)
-        fcntl.flock(fd, fcntl.LOCK_EX)
+    with _private_lock(lock_path, fcntl.LOCK_EX):
         raw, events = _read_path_state(path, head_path)
         by_id = {row["id"]: row for row in events}
         prior = by_id.get(ref) if ref else None
@@ -1672,7 +1637,7 @@ def append_path_event(author: str, kind: str, text: str, target: str = "",
             "prev": events[-1]["hash"] if events else "0" * 64,
             "hash": "",
         }
-        row["hash"] = _path_event_digest(row)
+        row["hash"] = _event_digest(row)
         encoded = (json.dumps(row, ensure_ascii=False, sort_keys=True,
                               separators=(",", ":")) + "\n").encode()
         next_raw = raw + encoded
@@ -1688,9 +1653,6 @@ def append_path_event(author: str, kind: str, text: str, target: str = "",
         _atomic_private_write(head_path, _path_witness(next_raw, next_events))
         head_path.chmod(0o600)
         return row
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
 
 
 def _active_path_refusals(events: list[dict[str, Any]], author: str) -> list[dict[str, Any]]:
@@ -1755,7 +1717,7 @@ def load_path_ledger(path_id: str, path: Path | None = None,
         return boundary + f"\nINTEGRITY HALT: unknown mode {mode!r}; governed tools refuse"
     if mode == "off":
         return boundary + "\nDISABLED: no event is loaded and no refusal governs"
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}", path_id):
+    if not PATH_TAG_RE.fullmatch(path_id):
         return boundary + "\nINTEGRITY HALT: invalid path_id; governed tools refuse"
     try:
         raw, events = _read_path_state(path, head_path)
@@ -2109,7 +2071,7 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
         str(AIM_PATH), "orientation_only; Zoe may redirect it live",
         hashlib.sha256(aim_raw).hexdigest(),
     ), WakeNode(
-        "path.ledger", "path_intention_ledger", load_path_ledger(_execution_path(door)),
+        "path.ledger", "path_intention_ledger", load_path_ledger(_execution_path()),
         str(SUBJECT_PATH), "path_tagged_operational_state_and_enforced_refusal_only",
     ), WakeNode(
         "ground.live", "evidence",
@@ -2740,7 +2702,7 @@ def hold_continuation(dialect: Dialect, state: list, call: ToolCall,
     PENDING_CONTINUATION = {
         "id": identifier,
         "door": dialect.name,
-        "manifestation": str(TURN.get("PATH_ID") or _execution_path(dialect.name)),
+        "manifestation": str(TURN.get("PATH_ID") or _execution_path()),
         "dialect": dialect,
         "state": protocol_state,
         "call": call,
@@ -3001,7 +2963,7 @@ def meet(transcript: Transcript, line: str,
                         f"context={len(context)} chars, recent={len(recent)} chars")
 
     path_id = (continuation["manifestation"] if continuation
-               else _execution_path(door_name))
+               else _execution_path())
     TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt, PATH_ID=path_id)
     if continuation:
         TURN["CONTINUATION_ID"] = continuation["id"]
