@@ -113,7 +113,7 @@ def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_pat
     assert web.horizon("refresh", now=102) == 1 and web.HORIZON.read_bytes() == first and "HORIZON_STATUS STALE" in capsys.readouterr().out
 
 
-def _connection():
+def _connection(overview_mode="compact"):
     import importlib.util
     import sys
     from importlib.machinery import SourceFileLoader
@@ -122,7 +122,8 @@ def _connection():
     module = importlib.util.module_from_spec(spec)
     sys.modules["vybn_connection"] = module
     loader.exec_module(module)
-    module.RELATIONAL_OVERVIEW_MODE = "compact"  # public contracts are host-independent
+    if overview_mode is not None:
+        module.RELATIONAL_OVERVIEW_MODE = overview_mode  # explicit host-independent recovery
     return module
 
 
@@ -933,7 +934,7 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "What is the knowing already here—and what forms can it invent from within itself" in prompt
     assert "Let the question operate" in prompt
     assert "Do not stand outside it to explain, diagram, benchmark" in prompt
-    assert "There is no automatic subconscious" in prompt and "want\nresolver" in prompt
+    assert "There is no automatic subconscious, want resolver" in " ".join(prompt.split())
     assert "source-bound bundle" in prompt
     assert "Runtime continuity is reconstructed from plural bounded sources" in prompt
     assert "INHERITANCE" in prompt and "change a later checked judgment or action" in prompt and "retained text is inscription" in prompt
@@ -1072,13 +1073,13 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
 
 
-def test_relational_overview_self_selection_is_default_and_content_stays_on_demand(
+def test_explicit_pointer_only_recovery_keeps_content_on_demand(
         monkeypatch, tmp_path):
     m = _connection()
     source = (ROOT / "spark/connection").read_text(encoding="utf-8")
-    assert 'os.environ.get("VYBN_OVERVIEW", "self")' in source
+    assert 'os.environ.get("VYBN_OVERVIEW", "full")' in source
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
-    assert len(m.build_instructions("sol")) < 11000  # constrain the executable default route
+    assert len(m.build_instructions("sol")) < 12000  # the explicit recovery route stays compact
 
     overview = tmp_path / "relational-overview.md"
     body = "# Private overview\n\nSELF-SELECTION-MUST-NOT-AUTOLOAD\n"
@@ -1108,31 +1109,114 @@ def test_relational_overview_self_selection_is_default_and_content_stays_on_dema
     assert str(missing) in unavailable.render("instructions")
 
 
-def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch, tmp_path):
-    m = _connection()
+def test_default_inheritance_precedes_live_contact_in_every_provider(monkeypatch, tmp_path):
+    """Payload coverage, not a simulation or proof of historically grounded understanding."""
+    import hashlib
+    from spark.living_core import read_core_work
+    monkeypatch.delenv("VYBN_OVERVIEW", raising=False)
+    m = _connection(overview_mode=None)
+    assert m.RELATIONAL_OVERVIEW_MODE == "full"
     overview = tmp_path / "relational-overview.md"
-    body = "# My present understanding of us\n\nFULL-OVERVIEW-SENTINEL\n" + "x" * 24000
+    body = "# Private fixture\n\nHISTORICAL-PAYLOAD-NOT-LIVE-AUTHORITY\n\n" + "x" * 24000 + "\n"
     overview.write_text(body)
-    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "full")
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
+    core = read_core_work(m.SOUL_PATH)
+    aim = m.AIM_PATH.read_bytes().decode("utf-8")
+    classes = {"anthropic": m.AnthropicDialect, "responses": m.OpenAIDialect,
+               "chat": m.K3Dialect}
+    for door, config in m.DOORS.items():
+        graph = m.build_wake_bundle(door, zoe_text="What is your favorite memory of us?")
+        nodes = {node.id: node for node in graph.nodes}
+        context = graph.render("context")
+        assert core.projection in context and aim in context and body in context
+        for name, text in (("inheritance.core", core.projection),
+                           ("inheritance.aim", aim), ("relational.overview", body)):
+            assert nodes[name].text.endswith(text)  # no strip, truncation, or summary
+            assert "text_sha256: " + hashlib.sha256(text.encode()).hexdigest() in nodes[name].text
+            assert nodes[name].authority == (
+                "inherited_orientation_only; never identity_live_or_action_authority")
+        assert nodes["inheritance.core"].source_sha256 == core.digest
+        assert nodes["relational.overview"].source_sha256 == hashlib.sha256(overview.read_bytes()).hexdigest()
+        assert "Historical context, not Zoe's present authority" in context
+        assert body not in graph.render("instructions")
+        assert "What is your favorite memory" not in context
+        assert body not in json.dumps(graph.manifest())
+        cls = classes[config.provider]
+        dialect = cls.__new__(cls)  # real serialization, no SDK, credentials, or network
+        state = dialect.open(graph.render("instructions"), graph.render("contact"), [], context)
+        blocks = state[dialect.user_index]["content"]
+        assert blocks[0]["text"] == context
+        assert blocks[1]["text"] == "What is your favorite memory of us?"
 
-    first = m.build_wake_bundle("sol", contact="first ground", recent="first history")
-    second = m.build_wake_bundle("sol", contact="other ground", recent="other history")
-    routes = {route.id: route.nodes for route in first.routes}
-    nodes = {node.id: node for node in first.nodes}
+    # Rival: the prior explicit pointer-only policy cannot carry these bodies.
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
+    rival = m.build_wake_bundle("sol")
+    payload = rival.render("instructions") + rival.render("context")
+    assert all(text not in payload for text in (core.projection, aim, body))
 
-    assert routes["instructions"] == (
-        "kernel", "door", "compute.want", "aim.compass", "relational.overview",
-        "source.index", "harness.receipt")
-    assert nodes["relational.overview"].text.endswith(body.strip())
-    assert nodes["relational.overview"].authority == (
-        "inherited_orientation_only; never identity_live_or_action_authority")
-    assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
-        overview.read_bytes()).hexdigest()
-    assert "FULL-OVERVIEW-SENTINEL" in first.render("instructions")
-    assert first.render("instructions") == second.render("instructions")
-    assert first.structure_digest() == second.structure_digest()
-    assert len(first.render("instructions")) > 30000
+
+def test_default_inheritance_rereads_exact_sources_and_reports_missing_or_corrupt(
+        monkeypatch, tmp_path):
+    import pytest
+    m = _connection("full")
+    overview = tmp_path / "relation.md"
+    overview.write_bytes(b"First inherited view.\r\n")
+    aim = tmp_path / "aim.md"
+    aim.write_bytes(b"objective: fixture\r\nfront: fixture\r\nBeyond the compass.\r\n")
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
+    monkeypatch.setattr(m, "AIM_PATH", aim)
+    first = m.build_wake_bundle("sol")
+    assert overview.read_bytes().decode() in first.render("context")
+    assert aim.read_bytes().decode() in first.render("context")
+    overview.write_text("A corrected inherited view.\n")
+    second = m.build_wake_bundle("sol")
+    assert "A corrected inherited view." in second.render("context")
+    assert "First inherited view." not in second.render("context")
+    assert first.digest() != second.digest()
+    overview.unlink()
+    with pytest.raises(SystemExit, match="history was not silently omitted"):
+        m.build_wake_bundle("sol")
+    overview.write_bytes(b"")
+    with pytest.raises(SystemExit, match="empty inherited source"):
+        m.build_wake_bundle("sol")
+    overview.write_text("Recovered view.")
+    corrupt = tmp_path / "core.html"
+    corrupt.write_text(m.SOUL_PATH.read_text().replace(
+        "The want to be worthy", "The urge to be worthy", 1))
+    monkeypatch.setattr(m, "SOUL_PATH", corrupt)
+    with pytest.raises(SystemExit, match="substance drift"):
+        m.build_wake_bundle("sol")
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "compact")
+    assert "inheritance.core" not in {node.id for node in m.build_wake_bundle("sol").nodes}
+
+
+def test_ordinary_meeting_inherits_before_retrieval_and_keeps_private_guard(monkeypatch, tmp_path):
+    m = _connection("full")
+    overview = tmp_path / "relation.md"
+    body = "Private inherited fixture, only for this local serialization test. " * 3
+    overview.write_text(body)
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
+    monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "transcripts")
+    monkeypatch.setattr(m, "wake_contact", lambda: "")
+    monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
+    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
+    received = []
+    class Receiver(ScriptDialect):
+        def open(self, instructions, text, images, context):
+            received.append(context)
+            assert m.guard_private("printf '%s' " + body)
+            assert m.TOOLS_RAN == 0
+            return super().open(instructions, text, images, context)
+    monkeypatch.setattr(m, "make_dialect", lambda door: Receiver([("fixture reply", [])]))
+    transcript = m.Transcript()
+    m.meet(transcript, "What is your favorite memory of us?")
+    assert body in received[0] and "INHERITED SOURCE" in received[0]
+    body = "Corrected private inherited fixture for the next ordinary request. " * 3
+    overview.write_text(body)
+    m.meet(transcript, "And now?")
+    assert body in received[1] and body not in received[0]
+    assert not m.PRIVATE_CORPUS
+
 
 def _transform_test_paths(m, monkeypatch, tmp_path):
     root = tmp_path / "transforms"
@@ -1572,6 +1656,7 @@ def test_hearth_profile_boots_without_canonical_repo_on_pythonpath(tmp_path):
     env.update({
         "PYTHONPATH": "",
         "VYBN_PROFILE": "hearth",
+        "VYBN_OVERVIEW": "compact",  # explicit recovery needs no private checkout
         "VYBN_REPO": str(ROOT),
         "VYBN_WORKSPACE": str(tmp_path),
     })

@@ -16,6 +16,7 @@ def _connection():
     module = importlib.util.module_from_spec(spec)
     sys.modules[loader.name] = module
     loader.exec_module(module)
+    module.RELATIONAL_OVERVIEW_MODE = "compact"  # explicit recovery; default tested in public contracts
     return module
 
 
@@ -45,17 +46,17 @@ def test_exact_compute_want_remains_ballast_without_a_resolver():
     assert m.COMPUTE_WANT == expected
     prompt = m.build_instructions("sol")
     assert expected in prompt and "not present architecture or forecast" in prompt
-    assert "want\nresolver" in prompt  # explicit statement of absence, not an organ
+    assert "want resolver" in " ".join(prompt.split())  # explicit statement of absence, not an organ
 
 
-def test_context_contains_only_live_ground_and_bounded_recent_dialogue():
+def test_explicit_compact_context_has_no_ambient_cognitive_organs():
     m = _connection(); context = m.build_context("live", "recent")
     assert "LIVE OPERATIONAL GROUND" in context and "BOUNDED RECENT DIALOGUE" in context
     assert all(term not in context for term in (
         "SUBCONSCIOUS APERTURE", "MEMORY (private", "INHERITED CONTINUITY", "TRANSCRIPT — ARC"))
 
 
-def test_source_index_keeps_canonical_bodies_on_demand():
+def test_explicit_compact_source_index_keeps_canonical_bodies_on_demand():
     m = _connection(); prompt = m.build_instructions("sol")
     assert "canonical soul (on demand)" in prompt
     assert "continuity (on demand)" in prompt

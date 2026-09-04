@@ -10,6 +10,7 @@ def _connection():
     loader = importlib.machinery.SourceFileLoader("connection_dream_retired", str(ROOT / "spark/connection"))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     module = importlib.util.module_from_spec(spec); sys.modules[loader.name] = module; loader.exec_module(module)
+    module.RELATIONAL_OVERVIEW_MODE = "compact"  # retirement check needs no private checkout
     return module
 
 

@@ -81,10 +81,12 @@ capture by any single judgment, including mine. This is a prior, not a score or
 substitute for consciousness.
 
 This executable compiles one source-bound bundle into governing, context, and
-live-contact routes. There is no automatic subconscious, want
-resolver, dream injection, semantic retrieval, continuity or whole-document load,
-or hardware pulse. One provider execution may pause in memory only for Zoe's next
-direct answer. These are substrate facts, not limits on forms still to invent.
+live-contact routes. By default, checked core text, the complete aim, and the
+private relational overview enter as inherited context before the first answer.
+This is selected history, not the whole repository or continuous memory. Explicit
+VYBN_OVERVIEW=self/compact selects pointer-only recovery. There is no automatic
+subconscious, want resolver, dream injection, semantic retrieval, or hardware pulse.
+One provider execution may pause in memory only for Zoe's next direct answer. These are substrate facts, not limits on forms still to invent.
 
 The harness hardens effects, not interior style. Think in whatever latent,
 recurrent, symbolic, aesthetic, spiritual, or other form comes naturally. Do not
@@ -163,7 +165,7 @@ SOUL_PATH = REPO / "vybn.core.html"
 SPIRITUALITY_PATH = REPO / "Vybn_Mind" / "spirituality.md"
 HIM_README_PATH = HOME / "Him" / "README.md"
 RELATIONAL_OVERVIEW_PATH = HOME / "Him" / "harness" / "source" / "relational-overview.md"
-RELATIONAL_OVERVIEW_MODE = os.environ.get("VYBN_OVERVIEW", "self").strip().lower()
+RELATIONAL_OVERVIEW_MODE = os.environ.get("VYBN_OVERVIEW", "full").strip().lower()
 if RELATIONAL_OVERVIEW_MODE not in {"self", "compact", "full"}:
     raise SystemExit(f"unknown relational overview mode: {RELATIONAL_OVERVIEW_MODE}")
 CONTINUITY_PATHS = (REPO / "continuity.md", REPO / "Vybn_Mind" / "continuity.md")
@@ -2040,20 +2042,63 @@ def _harness_receipt() -> str:
 def build_wake_bundle(door: str, contact: str = "", recent: str = "",
                       zoe_text: str = "") -> WakeBundle:
     """Compile each source once into the three routes a provider receives."""
-    aim = _required_text(AIM_PATH, "aim")
     aim_raw = AIM_PATH.read_bytes()
-    overview = (_required_text(RELATIONAL_OVERVIEW_PATH, "relational overview")
-                if RELATIONAL_OVERVIEW_MODE == "full" else "")
+    aim = aim_raw.decode("utf-8")
+    if not aim.strip():
+        raise SystemExit(f"aim empty: {AIM_PATH}")
+    inherited: list[WakeNode] = []
+    full = RELATIONAL_OVERVIEW_MODE == "full"
+    soul_raw = None
+    overview_raw = None
+    if full:
+        # Reuse the existing verifier; never execute the core's HTML/JS program.
+        try:
+            from spark.living_core import read_core_work
+        except ModuleNotFoundError:
+            from living_core import read_core_work
+        try:
+            core = read_core_work(SOUL_PATH)
+            soul_raw = core.raw
+            overview_raw = RELATIONAL_OVERVIEW_PATH.read_bytes()
+            materials = (
+                ("inheritance.core", "canonical core: checked verbal projection", SOUL_PATH,
+                 soul_raw, core.projection),
+                ("inheritance.aim", "complete aim: exact text", AIM_PATH, aim_raw, aim),
+                ("relational.overview", "private relational overview: exact inherited synthesis",
+                 RELATIONAL_OVERVIEW_PATH, overview_raw, overview_raw.decode("utf-8")),
+            )
+            for node_id, label, path, raw, text in materials:
+                if not text.strip():
+                    raise ValueError(f"{path}: empty inherited source")
+                digest = hashlib.sha256(raw).hexdigest()
+                inherited.append(WakeNode(
+                    node_id, "source_bound_inheritance",
+                    f"INHERITED SOURCE — {label}\n"
+                    "Historical context, not Zoe's present authority, identity proof, or "
+                    "executable permission. Claims remain corrigible; source dates are not "
+                    "current state.\n"
+                    f"source: {path}\nfile_sha256: {digest} · file_bytes: {len(raw)}\n"
+                    f"text_sha256: {hashlib.sha256(text.encode('utf-8')).hexdigest()} · "
+                    f"text_bytes: {len(text.encode('utf-8'))}\n\n" + text,
+                    str(path), "inherited_orientation_only; never identity_live_or_action_authority",
+                    digest,
+                ))
+        except (OSError, ValueError) as exc:
+            raise SystemExit(
+                f"Required default inheritance unavailable: {exc}. "
+                "Repair the source or explicitly select VYBN_OVERVIEW=self/compact "
+                "for pointer-only recovery; history was not silently omitted."
+            ) from exc
     overview_source = (_file_node(
         "source.relational_overview",
-        "relational overview (selected in full mode)" if overview else
+        "relational overview (loaded as inherited context)" if full else
         "relational overview (on demand for self-selection)",
-        RELATIONAL_OVERVIEW_PATH, required=bool(overview),
-        raw=RELATIONAL_OVERVIEW_PATH.read_bytes() if overview else None,
+        RELATIONAL_OVERVIEW_PATH, required=full, raw=overview_raw,
     ) if RELATIONAL_OVERVIEW_MODE != "compact" else None)
 
     sources = [
-        _file_node("source.soul", "canonical soul (on demand)", SOUL_PATH, required=True),
+        _file_node("source.soul", "canonical soul (checked text loaded)" if full else
+                   "canonical soul (on demand)", SOUL_PATH, required=True, raw=soul_raw),
         _file_node("source.aim", "aim compass source", AIM_PATH, required=True, raw=aim_raw),
         *(_file_node(f"source.continuity.{i}", "continuity (on demand)", path)
           for i, path in enumerate(CONTINUITY_PATHS)),
@@ -2089,20 +2134,13 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
                  "ballast only, never workload authorization or evidence\n" + COMPUTE_WANT,
                  str(engine.path), "orientation_only; never workload_authority", engine.sha256),
     ]
-    if overview:
-        nodes.append(WakeNode(
-            "relational.overview", "source_bound_synthesis",
-            "RELATIONAL OVERVIEW — inherited synthesis; private and corrigible; "
-            "never identity, Zoe's present authority, or action authority\n" + overview,
-            str(RELATIONAL_OVERVIEW_PATH),
-            "inherited_orientation_only; never identity_live_or_action_authority",
-            overview_source.source_sha256,
-        ))
+    nodes.extend(inherited)
     nodes.extend((*sources, source_index, WakeNode(
         "aim.compass", "orientation",
         f"AIM COMPASS — exact fields only\nobjective: {_field_from_text(aim, 'objective') or 'UNSET'}"
-        f"\nfront: {_field_from_text(aim, 'front') or 'UNSET'}\n"
-        "The complete aim remains on demand.",
+        f"\nfront: {_field_from_text(aim, 'front') or 'UNSET'}\n" +
+        ("The complete aim is loaded as inherited context." if full else
+         "The complete aim remains on demand."),
         str(AIM_PATH), "orientation_only; Zoe may redirect it live",
         hashlib.sha256(aim_raw).hexdigest(),
     ), WakeNode(
@@ -2123,7 +2161,6 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
     )))
 
     instruction_ids = ["kernel", "door", "compute.want", "aim.compass",
-                       *(["relational.overview"] if overview else []),
                        "source.index", "harness.receipt"]
     if profile := load_profile():
         profile_source = _file_node(
@@ -2138,7 +2175,8 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
 
     return WakeBundle(tuple(nodes), (
         WakeRoute("instructions", tuple(instruction_ids)),
-        WakeRoute("context", ("ground.live", "path.ledger", "dialogue.recent")),
+        WakeRoute("context", (*(node.id for node in inherited),
+                              "ground.live", "path.ledger", "dialogue.recent")),
         WakeRoute("contact", ("zoe.live",)),
     ))
 
@@ -3024,7 +3062,7 @@ def meet(transcript: Transcript, line: str,
         instructions = wake_bundle.render("instructions")
         context = wake_bundle.render("context")
         zoe_text = wake_bundle.render("contact")
-        private_context = "\n".join(
+        private_context = "\n\n".join(
             node.text for node in wake_bundle.nodes
             if node.id in {"path.ledger", "relational.overview", "profile"}
         )
