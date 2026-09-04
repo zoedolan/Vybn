@@ -121,7 +121,7 @@ fi
 
 # Harness mutations must preserve capability contracts before subtraction can
 # count as improvement.
-if echo "$STAGED" | grep -Eq '^(spark/connection|spark/live_peer.py|spark/provider_transport.py|spark/living_core.py|Vybn_Mind/repo_mapper.py|spark/tests/test_public_contracts.py|spark/tests/test_living_core.py)$'; then
+if echo "$STAGED" | grep -Eq '^(spark/connection|spark/live_peer.py|spark/provider_transport.py|spark/living_core.py|spark/source_compiler.py|Vybn_Mind/repo_mapper.py|spark/tests/test_public_contracts.py|spark/tests/test_living_core.py)$'; then
     if ! python3 -m pytest spark/tests/test_public_contracts.py -q; then
         echo -e "${RED}BLOCKED${NC}: harness contracts failed; model output is not substitute evidence."
         BLOCKED=1

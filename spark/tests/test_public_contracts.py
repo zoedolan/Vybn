@@ -724,6 +724,7 @@ def test_meet_exposes_provider_model_in_panel_and_transcript(monkeypatch, tmp_pa
         path = tmp_path / "turn.jsonl"
         origin = "tty"
         writes = []
+        def recent(self): return ""
         def write(self, role, text, **extra): self.writes.append((role, text, extra))
 
     transcript = Transcript()
@@ -1015,42 +1016,11 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
 
 
-def test_relational_overview_self_selection_is_default_and_content_stays_on_demand(
-        monkeypatch, tmp_path):
+def test_full_checked_inheritance_is_the_production_default(monkeypatch, tmp_path):
     m = _connection()
     source = (ROOT / "spark/connection").read_text(encoding="utf-8")
-    assert 'os.environ.get("VYBN_OVERVIEW", "self")' in source
+    assert 'os.environ.get("VYBN_OVERVIEW", "full")' in source
 
-    overview = tmp_path / "relational-overview.md"
-    body = "# Private overview\n\nSELF-SELECTION-MUST-NOT-AUTOLOAD\n"
-    overview.write_text(body)
-    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
-    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
-
-    graph = m.build_wake_bundle("sol", contact="ground", recent="history")
-    routes = {route.id: route.nodes for route in graph.routes}
-    nodes = {node.id: node for node in graph.nodes}
-    instructions = graph.render("instructions")
-
-    assert routes["instructions"] == (
-        "kernel", "door", "compute.want", "aim.compass", "source.index", "harness.receipt")
-    assert "relational.selection" not in nodes and "relational.overview" not in nodes
-    assert "SELF-SELECTION-MUST-NOT-AUTOLOAD" not in instructions
-    assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
-        overview.read_bytes()).hexdigest()
-    assert "on demand for self-selection" in nodes["source.relational_overview"].text
-    assert str(overview) in instructions
-
-    missing = tmp_path / "missing.md"
-    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", missing)
-    unavailable = m.build_wake_bundle("sol")
-    unavailable_nodes = {node.id: node for node in unavailable.nodes}
-    assert "unavailable" in unavailable_nodes["source.relational_overview"].text
-    assert str(missing) in unavailable.render("instructions")
-
-
-def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch, tmp_path):
-    m = _connection()
     overview = tmp_path / "relational-overview.md"
     body = "# My present understanding of us\n\nFULL-OVERVIEW-SENTINEL\n" + "x" * 24000
     overview.write_text(body)
@@ -1061,19 +1031,51 @@ def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch
     second = m.build_wake_bundle("sol", contact="other ground", recent="other history")
     routes = {route.id: route.nodes for route in first.routes}
     nodes = {node.id: node for node in first.nodes}
+    inheritance = nodes["inheritance"].text
 
     assert routes["instructions"] == (
-        "kernel", "door", "compute.want", "aim.compass", "relational.overview",
+        "kernel", "door", "compute.want", "aim.compass", "inheritance",
         "source.index", "harness.receipt")
-    assert nodes["relational.overview"].text.endswith(body.strip())
-    assert nodes["relational.overview"].authority == (
+    assert "[canonical-core]" in inheritance
+    assert "checked verbal projection; no HTML program executed" in inheritance
+    assert (ROOT / "aim.md").read_text() in inheritance
+    assert body in inheritance
+    assert "FULL-OVERVIEW-SENTINEL" in first.render("instructions")
+    assert nodes["inheritance"].authority == (
         "inherited_orientation_only; never identity_live_or_action_authority")
     assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
         overview.read_bytes()).hexdigest()
-    assert "FULL-OVERVIEW-SENTINEL" in first.render("instructions")
     assert first.render("instructions") == second.render("instructions")
     assert first.structure_digest() == second.structure_digest()
-    assert len(first.render("instructions")) > 30000
+    assert len(first.render("instructions")) > 70000
+
+
+def test_explicit_compact_mode_keeps_large_inheritance_on_demand(monkeypatch, tmp_path):
+    m = _connection()
+    overview = tmp_path / "relational-overview.md"
+    overview.write_text("# Private overview\n\nON-DEMAND-SENTINEL\n")
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
+
+    graph = m.build_wake_bundle("sol", contact="ground", recent="history")
+    routes = {route.id: route.nodes for route in graph.routes}
+    nodes = {node.id: node for node in graph.nodes}
+    instructions = graph.render("instructions")
+
+    assert routes["instructions"] == (
+        "kernel", "door", "compute.want", "aim.compass", "source.index", "harness.receipt")
+    assert not nodes["inheritance"].text
+    assert "ON-DEMAND-SENTINEL" not in instructions
+    assert "on demand for self-selection" in nodes["source.relational_overview"].text
+    assert str(overview) in instructions
+
+    missing = tmp_path / "missing.md"
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", missing)
+    unavailable = m.build_wake_bundle("sol")
+    assert "unavailable" in {
+        node.id: node for node in unavailable.nodes
+    }["source.relational_overview"].text
+
 
 def _transform_test_paths(m, monkeypatch, tmp_path):
     root = tmp_path / "transforms"
@@ -1313,6 +1315,45 @@ def test_compact_wake_preserves_one_answering_membrane_and_only_bounded_residue(
     assert removed.startswith("TOOL RESULT — reconstitute_problem\n[EVIDENCE")
     assert "unknown tool" in removed
 
+def test_clear_profile_is_in_memory_and_toolless(monkeypatch, tmp_path):
+    m = _connection()
+    relation = tmp_path / "relation.md"
+    relation.write_text("# Us\n\nCLEAR-RELATION-SENTINEL\n")
+    monkeypatch.setattr(m, "PROFILE", "clear")
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", relation)
+
+    graph = m.build_wake_bundle("sol", contact="must not enter", recent="prior", zoe_text="live")
+    routes = {route.id: route.nodes for route in graph.routes}
+    prompt = graph.render("instructions")
+    context = graph.render("context")
+    assert routes["instructions"][:2] == ("kernel", "profile.boundary")
+    assert "CLEAR PROFILE — dialogue only" in prompt
+    assert "CLEAR-RELATION-SENTINEL" in prompt and "[canonical-core]" in prompt
+    assert "no tools or workspace access" in prompt
+    assert "must not enter" not in context and "PATH-BOUND INTENTION" not in context
+    assert "IN-PROCESS RECENT DIALOGUE" in context and "prior" in context
+
+    memory = m.MemoryTranscript()
+    memory.write("zoe", "first")
+    memory.write("vybn", "second")
+    assert "first" in memory.recent() and "second" in memory.recent()
+    assert not memory.path.exists()
+    memory.clear()
+    assert memory.recent() == ""
+
+    monkeypatch.setattr(
+        m, "execute_tool",
+        lambda call: (_ for _ in ()).throw(AssertionError("tool crossed clear boundary")),
+    )
+    call = m.ToolCall("1", "bash", {"command": "true"}, None)
+    dialect = ScriptDialect([("", [call]), ("still answering", [])])
+    outcome = m.attract(
+        dialect, "instructions", "zoe", allow_continuation=False, allow_tools=False)
+    assert outcome.text == "still answering"
+    assert dialect.tools == [False, False]
+    assert "dialogue-only profile exposes no tools" in dialect.answers[0][1]
+
+
 def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
     m = _connection(); prompt = m.build_instructions("sol")
     assert "Zoe's present words are live contact" in prompt
@@ -1385,7 +1426,8 @@ def test_production_meeting_has_no_ambient_cognitive_organs():
                     "Transcript.inherited", "load_repo_state", "load_ground"):
         assert retired not in meet
     assert "127.0.0.1:8100" not in source and "127.0.0.1:8101" not in source
-    assert "Transcript.recent()" in meet and "wake_contact()" in meet
+    assert "transcript.recent()" in meet and "wake_contact()" in meet
+    assert 'PROFILE == "clear"' in meet
     assert "build_wake_bundle(" in meet and "inbox_images_for(door_name)" in meet
     assert 'wake_bundle.render("instructions")' in meet
 

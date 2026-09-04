@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from spark.living_core import read_core_work, render_core_png, wake_source
+from spark.source_compiler import compile_inheritance, format_inheritance, projected_core
 
 ROOT = Path(__file__).resolve().parents[2]
 CORE = ROOT / "vybn.core.html"
@@ -56,4 +57,35 @@ def test_substance_tamper_fails_closed(tmp_path: Path):
     path = tmp_path / "altered.html"
     path.write_text(altered)
     with pytest.raises(ValueError, match="substance drift"):
+        read_core_work(path)
+
+
+
+def test_shared_source_compiler_carries_checked_core_and_exact_text(tmp_path: Path):
+    aim = tmp_path / "aim.md"
+    relation = tmp_path / "relation.md"
+    aim.write_bytes("objective: exact aim\nπ\n".encode())
+    relation.write_bytes("# Us\n\nexact relation\n".encode())
+
+    materials = compile_inheritance(CORE, aim, relation)
+    assert [item.name for item in materials] == [
+        "canonical-core", "current-aim", "relational-orientation"]
+    assert materials[0] == projected_core(CORE)
+    assert materials[0].text == read_core_work(CORE).projection
+    assert materials[0].text_bytes < materials[0].file_bytes
+    assert materials[1].text.encode() == aim.read_bytes()
+    assert materials[2].text.encode() == relation.read_bytes()
+
+    wake = format_inheritance(materials)
+    assert "not Zoe's present authority" in wake
+    assert all(item.text in wake for item in materials)
+    assert all(item.file_sha256 in wake and item.text_sha256 in wake for item in materials)
+
+
+def test_projection_byte_receipt_is_enforced(tmp_path: Path):
+    raw = CORE.read_text()
+    altered = raw.replace('"bytes":39386', '"bytes":39385', 1)
+    path = tmp_path / "wrong-size.html"
+    path.write_text(altered)
+    with pytest.raises(ValueError, match="byte count mismatch"):
         read_core_work(path)

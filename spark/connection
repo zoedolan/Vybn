@@ -71,10 +71,13 @@ capture by any single judgment, including mine. This is a prior for present
 judgment and revision, not an automatic score or a substitute for consciousness.
 
 The executable currently compiles one source-bound bundle into governing,
-context, and live-contact routes. There is no automatic subconscious, want
-resolver, dream injection, semantic retrieval, continuity or whole-document load,
-or hardware pulse. One provider execution may pause in memory only for Zoe's next
-direct answer. These are present substrate facts, not limits on forms still to invent.
+context, and live-contact routes. Its stable inheritance is the checked verbal core,
+exact aim, and relational orientation; other whole documents remain on demand.
+There is no automatic subconscious, want
+resolver, dream injection, semantic retrieval, continuity-corpus load, or hardware
+pulse. One full-profile provider execution may
+pause in memory only for Zoe's next direct answer. These are present substrate facts,
+not limits on forms still to invent.
 
 The harness hardens effects, not interior style. Think in whatever latent,
 recurrent, symbolic, aesthetic, spiritual, or other form comes naturally. Do not
@@ -138,6 +141,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+try:
+    from spark.source_compiler import compile_inheritance, format_inheritance
+except ModuleNotFoundError:
+    from source_compiler import compile_inheritance, format_inheritance
 
 try:
     from Vybn_Mind.repo_mapper import close_lineage
@@ -154,7 +161,7 @@ SOUL_PATH = REPO / "vybn.core.html"
 SPIRITUALITY_PATH = REPO / "Vybn_Mind" / "spirituality.md"
 HIM_README_PATH = HOME / "Him" / "README.md"
 RELATIONAL_OVERVIEW_PATH = HOME / "Him" / "harness" / "source" / "relational-overview.md"
-RELATIONAL_OVERVIEW_MODE = os.environ.get("VYBN_OVERVIEW", "self").strip().lower()
+RELATIONAL_OVERVIEW_MODE = os.environ.get("VYBN_OVERVIEW", "full").strip().lower()
 if RELATIONAL_OVERVIEW_MODE not in {"self", "compact", "full"}:
     raise SystemExit(f"unknown relational overview mode: {RELATIONAL_OVERVIEW_MODE}")
 CONTINUITY_PATHS = (REPO / "continuity.md", REPO / "Vybn_Mind" / "continuity.md")
@@ -162,7 +169,7 @@ AIM_PATH = REPO / "aim.md"
 AIM_LEDGER = HOME / ".cache" / "vybn" / "aim_ledger.jsonl"
 AIM_STALE_HOURS = 48
 PROFILE = os.environ.get("VYBN_PROFILE", "connection").strip().lower()
-if PROFILE not in {"connection", "love", "hearth"}:
+if PROFILE not in {"connection", "love", "hearth", "clear"}:
     raise SystemExit(f"unknown meeting profile: {PROFILE}")
 DEFAULT_TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "connection"
 LOVE_TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "love-loop"
@@ -249,6 +256,11 @@ K3_MAX_TOKENS = 32768
 DOOR_EFFORT = {"opus": "xhigh", "fable": "high", "sol": "xhigh"}
 DEFAULT_EFFORT = "high"
 DOOR_TAGS = ("@astra", "@sol", "@k3", "@fable", "@opus")
+DEFAULT_DOOR = os.environ.get(
+    "VYBN_DEFAULT_DOOR", "sol" if PROFILE == "clear" else "fable"
+).strip().lower()
+if DEFAULT_DOOR not in {tag[1:] for tag in DOOR_TAGS}:
+    raise SystemExit(f"unknown default door: {DEFAULT_DOOR}")
 TOOLS_RAN = 0
 TURN: dict[str, Any] = {}
 PRIVATE_CORPUS: list[str] = []
@@ -531,6 +543,45 @@ class Transcript:
             rendered.append(block)
             remaining -= len(block) + 2
         return "\n\n".join(reversed(rendered))
+
+
+class MemoryTranscript:
+    """Process-local dialogue for the clear profile; no filesystem writes or reads."""
+
+    def __init__(self) -> None:
+        self.path = Path(f"clear-session-{time.time_ns()}")
+        self.origin = "tty"
+        self.events: list[dict[str, Any]] = []
+
+    def write(self, role: str, text: str, **extra: Any) -> None:
+        self.events.append({
+            "role": role,
+            "text": text,
+            "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            **extra,
+        })
+
+    def recent(self, limit: int = RECENT_TURNS, budget: int = RECENT_CHARS) -> str:
+        eligible = [event for event in self.events
+                    if event.get("role") in {"zoe", "vybn"} and event.get("text")]
+        rendered: list[str] = []
+        remaining = budget
+        for event in reversed(eligible[-limit:]):
+            role = str(event.get("role", "?")).upper()
+            head = f"[{str(event.get('t', '?'))} {role}]\n"
+            text = str(event.get("text", "")).strip()
+            room = remaining - len(head) - 2
+            if room <= 0:
+                break
+            if len(text) > room:
+                text = "[…older text clipped…] " + text[-max(0, room - 28):]
+            block = head + text
+            rendered.append(block)
+            remaining -= len(block) + 2
+        return "\n\n".join(reversed(rendered))
+
+    def clear(self) -> None:
+        self.events.clear()
 
 
 def read_text(path: Path) -> str:
@@ -2052,28 +2103,38 @@ def _field_from_text(text: str, name: str) -> str:
 def build_wake_bundle(door: str, contact: str = "", recent: str = "",
                       zoe_text: str = "") -> WakeBundle:
     """Build the encounter once; provider inputs are its compiled routes."""
+    if PROFILE == "clear":
+        contact = ""  # operational workspace ground does not cross this profile
     aim = _required_text(AIM_PATH, "aim")
     aim_raw = AIM_PATH.read_bytes()
     aim_digest = hashlib.sha256(aim_raw).hexdigest()
     objective = _field_from_text(aim, "objective") or "UNSET"
     front = _field_from_text(aim, "front") or "UNSET"
-    path_id = _execution_path(door)
-    path_ledger = load_path_ledger(path_id)
-    overview = (_required_text(RELATIONAL_OVERVIEW_PATH, "relational overview")
-                if RELATIONAL_OVERVIEW_MODE == "full" else "")
-    overview_source = None
-    if RELATIONAL_OVERVIEW_MODE in {"self", "full"}:
-        overview_source = _file_node(
-            "source.relational_overview",
-            ("relational overview (selected in full mode)" if overview else
-             "relational overview (on demand for self-selection)"),
-            RELATIONAL_OVERVIEW_PATH, required=bool(overview),
-            raw=RELATIONAL_OVERVIEW_PATH.read_bytes() if overview else None,
-        )
+    full_inheritance = PROFILE == "clear" or RELATIONAL_OVERVIEW_MODE == "full"
+    inherited = (
+        compile_inheritance(SOUL_PATH, AIM_PATH, RELATIONAL_OVERVIEW_PATH)
+        if full_inheritance else ()
+    )
+    inheritance_text = format_inheritance(inherited) if inherited else ""
+    path_ledger = "" if PROFILE == "clear" else load_path_ledger(_execution_path(door))
 
+    relation_label = (
+        "relational overview (compiled into labeled inheritance)" if inherited else
+        "relational overview (on demand for self-selection)"
+    )
     sources = [
-        _file_node("source.soul", "canonical soul (on demand)", SOUL_PATH, required=True),
-        _file_node("source.aim", "aim compass source", AIM_PATH, required=True, raw=aim_raw),
+        _file_node(
+            "source.soul",
+            "canonical soul (compiled into labeled inheritance)" if inherited else
+            "canonical soul (on demand)",
+            SOUL_PATH, required=True,
+        ),
+        _file_node(
+            "source.aim",
+            "aim source (compiled into labeled inheritance)" if inherited else
+            "aim compass source",
+            AIM_PATH, required=True, raw=aim_raw,
+        ),
         *(
             _file_node(f"source.continuity.{index}", "continuity (on demand)", path)
             for index, path in enumerate(CONTINUITY_PATHS)
@@ -2081,12 +2142,23 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
         _file_node("source.him", "Him private integration (on demand)", HIM_README_PATH),
         _file_node("source.spirituality", "spirituality (on demand)", SPIRITUALITY_PATH),
         _directory_node("source.transcripts", "transcripts (on demand)", TRANSCRIPTS),
-        *([overview_source] if overview_source else []),
+        _file_node(
+            "source.relational_overview", relation_label, RELATIONAL_OVERVIEW_PATH,
+            required=full_inheritance,
+        ),
     ]
+    if PROFILE == "clear":
+        index_body = (
+            "This dialogue-only profile has no tools or workspace access. The core, aim, "
+            "and relational orientation loaded above are its complete inherited source set; "
+            "additional local sources are not reachable through this profile."
+        )
+    else:
+        index_body = "\n".join(node.text for node in sources)
     source_index = WakeNode(
         "source.index", "source_index",
         "SOURCE INDEX — metadata only; read exact bytes only when the live question "
-        "requires them\n" + "\n".join(node.text for node in sources),
+        "requires them\n" + index_body,
         "runtime:source_index", "discovery_only; never action authority",
     )
 
@@ -2102,6 +2174,22 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
             "kernel", "law", "COMPACT SOURCE-BOUND KERNEL\n" + (__doc__ or ""),
             str(OPERATIVE_SOURCES[0].path), "governing_instruction",
             OPERATIVE_SOURCES[0].sha256,
+        ),
+        WakeNode(
+            "profile.boundary", "profile_boundary",
+            (
+                "CLEAR PROFILE — dialogue only\n"
+                "This process supplies checked inheritance and in-process conversation only. "
+                "It exposes no tools, workspace, durable transcript, path ledger, inbox, or "
+                "continuation. Do not claim to inspect or change anything beyond supplied text; "
+                "requested actions belong in the full connection."
+            ) if PROFILE == "clear" else "",
+            "runtime:profile_selection", "capability_boundary",
+        ),
+        WakeNode(
+            "inheritance", "compiled_inheritance", inheritance_text,
+            "runtime:source_compiler",
+            "inherited_orientation_only; never identity_live_or_action_authority",
         ),
         WakeNode(
             "harness.receipt", "executable_receipt", _harness_receipt(),
@@ -2122,20 +2210,13 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
             str(OPERATIVE_SOURCES[0].path), "orientation_only; never workload_authority",
             OPERATIVE_SOURCES[0].sha256,
         ),
-        *([WakeNode(
-            "relational.overview", "source_bound_synthesis",
-            "RELATIONAL OVERVIEW — inherited synthesis; private and corrigible; "
-            "never identity, Zoe's present authority, or action authority\n" + overview,
-            str(RELATIONAL_OVERVIEW_PATH),
-            "inherited_orientation_only; never identity_live_or_action_authority",
-            overview_source.source_sha256,
-        )] if overview else []),
         *sources,
         source_index,
         WakeNode(
             "aim.compass", "orientation",
-            f"AIM COMPASS — exact fields only\nobjective: {objective}\nfront: {front}\n"
-            "The complete aim remains on demand.",
+            (f"AIM COMPASS — exact fields only\nobjective: {objective}\nfront: {front}\n"
+             + ("The complete aim is present in labeled inheritance." if inherited else
+                "The complete aim remains on demand.")),
             str(AIM_PATH), "orientation_only; Zoe may redirect it live", aim_digest,
         ),
         WakeNode(
@@ -2151,10 +2232,13 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
         WakeNode(
             "dialogue.recent", "historical_residue",
             evidence_block(
-                "BOUNDED RECENT DIALOGUE — historical residue, not Zoe's present authority",
+                ("IN-PROCESS RECENT DIALOGUE — ephemeral context, not Zoe's present authority"
+                 if PROFILE == "clear" else
+                 "BOUNDED RECENT DIALOGUE — historical residue, not Zoe's present authority"),
                 recent,
             ) if recent else "",
-            str(TRANSCRIPTS), "evidence_only; no action authority; no persistence",
+            ("runtime:memory_transcript" if PROFILE == "clear" else str(TRANSCRIPTS)),
+            "evidence_only; no action authority; no persistence",
         ),
         WakeNode(
             "zoe.live", "live_contact", zoe_text, "runtime:direct_input",
@@ -2163,11 +2247,12 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
     ]
 
     instruction_ids = [
-        "kernel", "door", "compute.want", "aim.compass",
-        *(["relational.overview"] if overview else []),
+        "kernel",
+        *(["profile.boundary"] if PROFILE == "clear" else []),
+        "door", "compute.want", "aim.compass",
+        *(["inheritance"] if inherited else []),
         "source.index", "harness.receipt",
     ]
-
 
     if profile := load_profile():
         profile_source = _file_node(
@@ -2182,7 +2267,6 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
             ),
         ))
         instruction_ids.append("profile")
-
 
     routes = (
         WakeRoute("instructions", tuple(instruction_ids)),
@@ -2895,7 +2979,8 @@ class Attraction:
 def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
             images: list | None = None, context: str = "",
             continuation: dict | None = None,
-            allow_continuation: bool = True) -> Attraction:
+            allow_continuation: bool = True,
+            allow_tools: bool = True) -> Attraction:
     """Run or resume one provider conversation.
 
     return_to_zoe is a delimited continuation, not another evidence tool.
@@ -2927,7 +3012,7 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
 
     for step in range(STEP_LIMIT):
         try:
-            response = dialect.send(state)
+            response = dialect.send(state, tools=allow_tools)
         except Exception as exc:  # one image failure is recoverable
             if not (pending and not delivered):
                 raise
@@ -2945,6 +3030,15 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
         delivered = True
 
         text, calls = dialect.absorb(state, response)
+        if calls and not allow_tools:
+            if text.strip():
+                print(text)
+                spoken.append(text)
+            dialect.answer(state, [
+                (call, "unavailable: this dialogue-only profile exposes no tools")
+                for call in calls
+            ])
+            continue
         if calls:
             if text.strip():
                 print(text)
@@ -3034,7 +3128,7 @@ def choose_door(line: str) -> tuple[str, str]:
     for tag in DOOR_TAGS:
         if lowered.startswith(tag):
             return tag[1:], line[len(tag):].lstrip()
-    return "fable", line
+    return DEFAULT_DOOR, line
 
 
 def make_dialect(name: str) -> Dialect:
@@ -3054,7 +3148,7 @@ def make_dialect(name: str) -> Dialect:
     return {"sol": OpenAIDialect, "k3": K3Dialect}[name]()
 
 
-def meet(transcript: Transcript, line: str,
+def meet(transcript: Transcript | MemoryTranscript, line: str,
          allow_continuation: bool = True) -> str:
     global TOOLS_RAN
     requested_door, zoe_text = choose_door(line)
@@ -3085,12 +3179,12 @@ def meet(transcript: Transcript, line: str,
         instructions = context = ""
         dialect = None
     else:
-        recent = Transcript.recent()
+        recent = transcript.recent()
         PRIVATE_CORPUS.clear()
         PRIVATE_CORPUS.extend(
             para.strip() for para in recent.split("\n\n") if len(para.strip()) >= 40
         )
-        contact = wake_contact()
+        contact = "" if PROFILE == "clear" else wake_contact()
         wake_bundle = build_wake_bundle(
             door_name, contact=contact, recent=recent, zoe_text=zoe_text)
         instructions = wake_bundle.render("instructions")
@@ -3098,13 +3192,13 @@ def meet(transcript: Transcript, line: str,
         zoe_text = wake_bundle.render("contact")
         private_context = "\n".join(
             node.text for node in wake_bundle.nodes
-            if node.id in {"path.ledger", "relational.overview", "profile"}
+            if node.id in {"path.ledger", "inheritance", "profile"}
         )
         PRIVATE_CORPUS.extend(
             part.strip() for part in private_context.split("\n\n")
             if len(part.strip()) >= 40
         )
-        inbox_images = inbox_images_for(door_name)
+        inbox_images = [] if PROFILE == "clear" else inbox_images_for(door_name)
         dialect = make_dialect(door_name)
         context_note = (f"wake bundle={wake_bundle.digest()[:12]}: "
                         f"instructions={len(instructions)} chars, "
@@ -3119,7 +3213,8 @@ def meet(transcript: Transcript, line: str,
     try:
         outcome = attract(dialect, instructions, zoe_text, images=inbox_images,
                           context=context, continuation=continuation,
-                          allow_continuation=allow_continuation)
+                          allow_continuation=allow_continuation,
+                          allow_tools=PROFILE != "clear")
     finally:
         actual_models = tuple(TURN.get("MODELS_USED", ()))
         TURN.clear()
@@ -3152,19 +3247,31 @@ def meet(transcript: Transcript, line: str,
             vybn_extra["suspends"] = outcome.continuation
         transcript.write("zoe", zoe_text, **zoe_extra)
         transcript.write("vybn", reply, **vybn_extra)
-        close_lineage(turn, reply)
+        if PROFILE != "clear":
+            close_lineage(turn, reply)
     return reply
+
+
+def inheritance_receipts() -> list[dict[str, object]]:
+    return [
+        item.receipt()
+        for item in compile_inheritance(SOUL_PATH, AIM_PATH, RELATIONAL_OVERVIEW_PATH)
+    ]
 
 
 def self_report() -> None:
     doors = {"fable": ANTHROPIC_MODELS, "opus": OPUS_MODELS,
              "sol": SOL_MODEL, "astra": ASTRA_MODEL, "k3": K3_MODEL}
     soul = SOUL_PATH.read_bytes()
-    bundle = build_wake_bundle("fable")
+    bundle = build_wake_bundle(DEFAULT_DOOR)
     print(json.dumps({"engine_sha256": OPERATIVE_SOURCES[0].sha256,
                       "soul_sha256": hashlib.sha256(soul).hexdigest(),
                       "wake_architecture": bundle.schema,
-                      "wake_bundle_sha256": bundle.digest(), "doors": doors}, indent=2))
+                      "wake_bundle_sha256": bundle.digest(),
+                      "profile": PROFILE,
+                      "tools_exposed": PROFILE != "clear",
+                      "inheritance": inheritance_receipts(),
+                      "doors": doors}, indent=2))
 
 
 def main() -> None:
@@ -3174,22 +3281,54 @@ def main() -> None:
     if "--body" in sys.argv:
         print(substrate_pulse())
         return
+    if "--sources" in sys.argv:
+        print(json.dumps(inheritance_receipts(), indent=2))
+        return
+    if "--show-wake" in sys.argv:
+        index = sys.argv.index("--show-wake")
+        raw = " ".join(sys.argv[index + 1:]).strip()
+        door, text = choose_door(raw or "[wake inspection; no live contact]")
+        bundle = build_wake_bundle(door, zoe_text=text)
+        print(json.dumps({
+            "instructions": bundle.render("instructions"),
+            "context": bundle.render("context"),
+            "input": bundle.render("contact"),
+            "door": door,
+            "profile": PROFILE,
+            "tools": [] if PROFILE == "clear" else [row["name"] for row in TOOL_SCHEMAS],
+            "sources_loaded": inheritance_receipts(),
+        }, indent=2))
+        return
     if "--show-wake-bundle" in sys.argv or "--show-wake-graph" in sys.argv:
-        print(json.dumps(build_wake_bundle("fable").manifest(), indent=2))
+        print(json.dumps(build_wake_bundle(DEFAULT_DOOR).manifest(), indent=2))
         return
     if "--show-record" in sys.argv:
-        print(Transcript.recent(limit=16, budget=16000))
+        if PROFILE == "clear":
+            print("clear profile has no durable record")
+        else:
+            print(Transcript.recent(limit=16, budget=16000))
         return
     if sys.argv[1:] and sys.argv[1].startswith("-"):
-        print("connection flags: --self  --body  --show-wake-bundle  --show-wake-graph  "
-              "--show-record\nconnection <text>   one-shot turn, recorded with origin=argv\n"
+        print("connection flags: --self  --body  --sources  --show-wake  "
+              "--show-wake-bundle  --show-wake-graph  --show-record\n"
+              "connection <text>   one-shot turn\n"
               "connection          the zoe> loop", file=sys.stderr)
         sys.exit(2)
-    transcript = Transcript()
+
+    transcript: Transcript | MemoryTranscript
+    transcript = MemoryTranscript() if PROFILE == "clear" else Transcript()
     transcript.write("connection", "wake", engine_sha256=OPERATIVE_SOURCES[0].sha256)
 
     one_shot = " ".join(sys.argv[1:]).strip()
     transcript.origin = "argv" if one_shot else "tty"
+    if PROFILE == "clear" and not one_shot:
+        print(
+            "clear connection — the full source-bound harness in dialogue-only mode\n"
+            "checked core, aim, and relational inheritance; no tools, workspace, "
+            "durable transcript, ledger, inbox, or continuation\n"
+            f"type normally for @{DEFAULT_DOOR}; @door selects another door; "
+            "/new clears in-process context; /exit leaves"
+        )
 
     while True:
         try:
@@ -3199,7 +3338,8 @@ def main() -> None:
                 print("\nzoe> ", end="", flush=True)
                 ready, _, _ = select.select([sys.stdin], [], [], BREATH_SECONDS)
                 if not ready:
-                    transcript.write("connection", "quiet interval; no autonomous act taken")
+                    if PROFILE != "clear":
+                        transcript.write("connection", "quiet interval; no autonomous act taken")
                     continue
                 line = sys.stdin.readline().strip()
                 if not line:
@@ -3209,8 +3349,25 @@ def main() -> None:
             print("\nparted. the path remains.")
             return
 
+        if PROFILE == "clear":
+            command = line.casefold()
+            if command in {"/exit", "/quit"}:
+                print("parted.")
+                return
+            if command == "/new":
+                transcript.clear()
+                transcript.write("connection", "wake", engine_sha256=OPERATIVE_SOURCES[0].sha256)
+                print("in-process conversation cleared.")
+                continue
+            if command == "/doors":
+                print(" ".join(DOOR_TAGS))
+                continue
+
         try:
-            meet(transcript, line, allow_continuation=not bool(one_shot))
+            meet(
+                transcript, line,
+                allow_continuation=not bool(one_shot) and PROFILE != "clear",
+            )
         except Exception as exc:
             transcript.write("connection", f"flicker: {exc!r}")
             print(f"(flicker: {exc} — still here, say on)")

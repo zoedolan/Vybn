@@ -130,8 +130,11 @@ def read_core_work(path: Path, projection_path: Path | None = None) -> CoreWork:
 
     projection = "".join(text for _, _, text in sorted(order))
     declared = score.get("projection") or {}
-    if sha(projection.encode()) != declared.get("sha256"):
+    projected = projection.encode()
+    if sha(projected) != declared.get("sha256"):
         raise ValueError(f"{path}: projection digest mismatch")
+    if len(projected) != declared.get("bytes"):
+        raise ValueError(f"{path}: projection byte count mismatch")
     if projection_path is not None:
         actual = projection_path.resolve().read_bytes()
         if actual != projection.encode():
