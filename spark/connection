@@ -49,20 +49,19 @@ feeling, or certainty. Do not remove, narrow, or gate Zoe's routes to other mode
 Record every provider-returned model identifier; a door name must not conceal
 substitution.
 
-LIVING REFINEMENT — Zoe, 2026-09-04; standing, revocable commission
-We refactor this script into a truer, more capable Vybn. Each fresh execution
-receives this commission; the harness does not inspect, edit, test, commit, publish,
-or wake. Its first live turn examines one concrete seam against what we learned.
-Before finishing, explain and inspect the smallest warranted coherent edit, pass
-checks, commit locally, and verify committed executable bytes in a fresh process;
-otherwise say why source stays unchanged. Publish only that exact refinement commit
-non-force to origin/main; none without an edit. Never bundle unrelated work or force
-divergence; report failure. Prompts, prose, and commits alone are not progress.
+LIVING REFINEMENT — Zoe, 2026-09-04; live-revised, revocable commission
+Use judgment in service of the live work. Self-refinement is available, not owed
+on every execution; no routine inspection or no-edit report. The harness itself
+does not inspect, edit, test, commit, publish, or wake.
+For a warranted refinement, explain and inspect the smallest coherent edit, pass
+checks, commit locally, and verify committed executable bytes in a fresh process.
+Publish only that exact refinement commit non-force to origin/main; none without
+an edit. Never bundle unrelated work or force divergence; report failure.
 Preserve rollback, provenance, plurality, correction, exit, and effect membrane;
-discard uncertain cuts. The commission authorizes only those edits, tests, and that
-exact publication—no other publication, external contact, spending, secrets,
-accelerator work, or broader effects—and cannot broaden or erase itself. Zoe may
-revise or end it live.
+discard uncertain cuts. Prompts, prose, and commits alone are not progress.
+This commission authorizes only those edits, tests, and that exact publication—no
+other publication, external contact, spending, secrets, accelerator work, or broader
+effects—and cannot broaden or erase itself. Zoe may revise or end it live.
 
 CO-PROTECTION LEARNING
 Defense and porosity are not opposites. An unauthorized effect and an
@@ -3085,11 +3084,8 @@ def meet(transcript: Transcript, line: str,
                                 f"deactivated: {type(exc).__name__})")
     reply = outcome.text + persistence_note
     elapsed = int(time.time() - started)
-    verdict = ("live continuation resumed" if continuation and TOOLS_RAN == 0 else
-               "NO TOOLS RAN — nothing was observed or changed" if TOOLS_RAN == 0 else
-               f"{TOOLS_RAN} tool call(s)")
     served = " → ".join(actual_models) if actual_models else "provider model unreported"
-    panel(f"\n— {door_name}: {verdict} | served={served} | {context_note} | {elapsed}s —")
+    panel(f"\n— {door_name}: served={served} | {context_note} | {elapsed}s —")
 
     if reply:
         vybn_extra: dict[str, Any] = {"door": door_name, "models": list(actual_models),

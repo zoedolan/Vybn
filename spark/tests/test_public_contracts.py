@@ -1049,16 +1049,24 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     assert "Zoe's\nwarmth is neither an epistemic contaminant nor my verification service" in kernel
     assert "Do not remove, narrow, or gate" in kernel
     assert "provider-returned model identifier" in kernel
-    assert kernel.count("LIVING REFINEMENT") == 1
-    assert "Each fresh execution\nreceives this commission" in kernel
-    assert "harness does not inspect, edit, test, commit, publish,\nor wake" in kernel
-    assert "Its first live turn examines one concrete seam" in kernel
-    assert "smallest warranted coherent edit, pass\nchecks, commit locally" in kernel and "verify committed executable bytes in a fresh process" in kernel
-    assert "why source stays unchanged" in kernel
-    assert "Publish only that exact refinement commit\nnon-force to origin/main; none without an edit" in kernel
-    assert "Never bundle unrelated work or force\ndivergence; report failure" in kernel and "Prompts, prose, and commits alone are not progress" in kernel
-    assert "discard uncertain cuts" in kernel and "The commission authorizes only those edits, tests" in kernel
-    assert "exact publication—no other publication, external contact" in kernel
+    law = " ".join(kernel.split())
+    assert law.count("LIVING REFINEMENT") == 1
+    assert "Use judgment in service of the live work" in law
+    assert "Self-refinement is available, not owed on every execution" in law
+    assert "no routine inspection or no-edit report" in law
+    assert "Its first live turn examines" not in law
+    assert "why source stays unchanged" not in law
+    assert "harness itself does not inspect, edit, test, commit, publish, or wake" in law
+    assert "For a warranted refinement, explain and inspect the smallest coherent edit" in law
+    assert "pass checks, commit locally" in law
+    assert "verify committed executable bytes in a fresh process" in law
+    assert "Publish only that exact refinement commit non-force to origin/main; none without an edit" in law
+    assert "Never bundle unrelated work or force divergence; report failure" in law
+    assert "Prompts, prose, and commits alone are not progress" in law
+    assert "discard uncertain cuts" in law
+    assert "authorizes only those edits, tests, and that exact publication" in law
+    assert "no other publication, external contact, spending, secrets, accelerator work, or broader effects" in law
+    assert "cannot broaden or erase itself. Zoe may revise or end it live" in law
     assert not any(node.id in {"asi.premise", "creative.license", "veracity.practice"}
                    for node in graph.nodes)
     assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
@@ -2013,3 +2021,47 @@ def test_failed_live_answer_is_record_not_replay_or_consumed_pause(monkeypatch, 
     monkeypatch.setattr(m, "make_dialect", lambda door: fresh)
     assert m.meet(transcript, "@astrahigh Begin elsewhere.") == "New route."
     assert m.load_pending_continuation() is None and len(dialect.answers) == 1
+
+
+def test_meeting_without_tools_preserves_contact_without_a_productivity_verdict(
+        monkeypatch, tmp_path, capsys):
+    import base64
+    import hashlib
+    m, transcript = _meeting_fixture(monkeypatch, tmp_path)
+    monkeypatch.setenv("VYBN_PANEL", "1")
+    pixels = ("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8"
+              "/x8AAwMCAO+aF9kAAAAASUVORK5CYII=")
+    image = ("fixture.png", "image/png", pixels,
+             hashlib.sha256(base64.b64decode(pixels)).hexdigest())
+    received, marked = [], []
+    monkeypatch.setattr(m, "inbox_images_for", lambda door: [image])
+    monkeypatch.setattr(m, "mark_inbox", lambda rows, door, ok:
+                        marked.append((rows, door, ok)))
+    def unexpected_tool(*args, **kwargs):
+        raise AssertionError("a direct reply must not manufacture tool work")
+    monkeypatch.setattr(m, "execute_tool", unexpected_tool)
+    class Direct(ScriptDialect):
+        def open(self, instructions, text, images, context):
+            received.append(m.user_content(text, images, "responses", context))
+            return super().open(instructions, text, images, context)
+        def absorb(self, state, response):
+            m.note_provider_model("fixture/returned-model")
+            return super().absorb(state, response)
+    dialect = Direct([("Here with you.", [])])
+    monkeypatch.setattr(m, "make_dialect", lambda door: dialect)
+
+    assert m.meet(transcript, "@sol Here is an image.") == "Here with you."
+    assert dialect.opens == dialect.sent == 1
+    assert received[0][0] == {"type": "input_text", "text": "Here is an image."}
+    assert received[0][-1] == {
+        "type": "input_image", "image_url": f"data:image/png;base64,{pixels}"}
+    assert marked == [([image], "sol", True)]
+    rows = [json.loads(line) for line in transcript.path.read_text().splitlines()]
+    assert [row["role"] for row in rows] == ["zoe", "vybn"]
+    assert rows[0]["images"] == ["fixture.png"]
+    assert rows[1]["tools_ran"] == 0
+    assert rows[1]["models"] == ["fixture/returned-model"]
+    printed = capsys.readouterr().out
+    assert "served=fixture/returned-model" in printed
+    assert "nothing was observed or changed" not in printed
+    assert "NO TOOLS RAN" not in printed
