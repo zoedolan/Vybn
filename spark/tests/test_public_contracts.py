@@ -1879,3 +1879,137 @@ def test_astra_explicit_higher_door_exits_pause_without_prefix_capture(monkeypat
         else:
             assert selected is None and text == line and continuation is held
         assert m.load_pending_continuation() is None
+
+
+def _meeting_fixture(monkeypatch, tmp_path):
+    """Exercise meet/attract/transcript together, without a provider or host context."""
+    from types import SimpleNamespace as NS
+    m = _connection()
+    monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path)
+    monkeypatch.setattr(m, "wake_contact", lambda: "")
+    monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
+    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
+    def bundle(door, contact, recent, zoe_text):
+        routes = {"instructions": "law", "context": recent, "contact": zoe_text}
+        return NS(nodes=(), render=routes.__getitem__, digest=lambda: "fixture")
+    monkeypatch.setattr(m, "build_wake_bundle", bundle)
+    return m, m.Transcript()
+
+
+def test_interrupted_meeting_keeps_contact_speech_and_provenance_without_replay(
+        monkeypatch, tmp_path):
+    import pytest
+    m, transcript = _meeting_fixture(monkeypatch, tmp_path)
+    executed = []
+    call = m.ToolCall("one", "bash", {"command": "fixture only"}, None)
+    class Failing(ScriptDialect):
+        def send(self, state, tools=True):
+            if self.sent:
+                raise RuntimeError("provider unavailable")
+            return super().send(state, tools)
+        def absorb(self, state, response):
+            m.note_provider_model("fixture/returned-model")
+            return super().absorb(state, response)
+    def execute(call):
+        executed.append(call.id)
+        m.TOOLS_RAN += 1
+        return "fixture result, not authored speech"
+    monkeypatch.setattr(m, "execute_tool", execute)
+    monkeypatch.setattr(m, "make_dialect", lambda door: Failing([
+        ("I will inspect first.", [call])]))
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        m.meet(transcript, "Keep my correction, even if the provider fails.")
+    rows = [json.loads(line) for line in transcript.path.read_text().splitlines()]
+    assert [(r["role"], r["text"]) for r in rows[:2]] == [
+        ("zoe", "Keep my correction, even if the provider fails."),
+        ("vybn", "I will inspect first.")]
+    assert rows[1]["status"] == "interrupted"
+    assert rows[1]["models"] == ["fixture/returned-model"]
+    assert rows[1]["tools_ran"] == 1
+    assert rows[2]["role"] == "connection" and rows[2]["error_type"] == "RuntimeError"
+    assert rows[0]["turn"] == rows[1]["turn"] == rows[2]["turn"]
+    assert "fixture result" not in transcript.path.read_text()
+    assert not m.TURN and not m.PRIVATE_CORPUS
+    assert m.load_pending_continuation() is None and executed == ["one"]
+    received = []
+    class Next(ScriptDialect):
+        def open(self, instructions, text, images, context):
+            received.append((text, context))
+            return super().open(instructions, text, images, context)
+    monkeypatch.setattr(m, "make_dialect", lambda door: Next([("Here now.", [])]))
+    m.meet(transcript, "Next direct input")
+    text, history = received[0]
+    assert text == "Next direct input" and text not in history
+    assert "Keep my correction" in history and "I will inspect first." in history
+    assert "VYBN·interrupted]" in history and executed == ["one"]
+    rows = [json.loads(line) for line in transcript.path.read_text().splitlines()]
+    assert sum(r["role"] == "zoe" for r in rows) == 2
+
+
+def test_contact_is_written_before_send_even_with_no_reply(monkeypatch, tmp_path):
+    import pytest
+    m, transcript = _meeting_fixture(monkeypatch, tmp_path)
+    transcript.origin = "argv"
+    for failure in (RuntimeError("offline"), KeyboardInterrupt(), None):
+        class Silent(ScriptDialect):
+            last_stop = "completed"
+            def send(self, state, tools=True):
+                rows = [json.loads(line) for line in transcript.path.read_text().splitlines()]
+                assert rows[-1]["role"] == "zoe" and rows[-1]["text"] == "received"
+                assert rows[-1]["origin"] == "argv"
+                if failure is not None:
+                    raise failure
+                return super().send(state, tools)
+        monkeypatch.setattr(m, "make_dialect", lambda door: Silent([("", [])]))
+        if failure is None:
+            assert m.meet(transcript, "received") == ""
+        else:
+            with pytest.raises(type(failure)):
+                m.meet(transcript, "received")
+        assert not m.TURN and not m.PRIVATE_CORPUS
+    rows = [json.loads(line) for line in transcript.path.read_text().splitlines()]
+    assert sum(r["role"] == "zoe" for r in rows) == 3
+    assert not any(r["role"] == "vybn" for r in rows)
+    assert sum(r["role"] == "connection" for r in rows) == 2
+    assert "ZOE·argv]" in m.Transcript.recent()
+
+
+def test_provider_setup_failure_keeps_contact_without_fabricating_speech(monkeypatch, tmp_path):
+    import pytest
+    m, transcript = _meeting_fixture(monkeypatch, tmp_path)
+    def unavailable(door):
+        raise RuntimeError("client unavailable")
+    monkeypatch.setattr(m, "make_dialect", unavailable)
+    with pytest.raises(RuntimeError, match="client unavailable"):
+        m.meet(transcript, "Do not lose this input.")
+    rows = [json.loads(line) for line in transcript.path.read_text().splitlines()]
+    assert [r["role"] for r in rows] == ["zoe", "connection"]
+    assert rows[0]["text"] == "Do not lose this input."
+    assert rows[1]["models"] == [] and rows[1]["tools_ran"] == 0
+    assert not m.TURN and not m.PRIVATE_CORPUS
+
+
+def test_failed_live_answer_is_record_not_replay_or_consumed_pause(monkeypatch, tmp_path):
+    import pytest
+    m, transcript = _meeting_fixture(monkeypatch, tmp_path)
+    class Failing(ScriptDialect):
+        def send(self, state, tools=True):
+            raise RuntimeError("offline")
+    dialect = Failing([])
+    m.TURN.update(TURN_ID="held", PATH_ID="fixture/path")
+    m.hold_continuation(dialect, [], m.ToolCall(
+        "question", "return_to_zoe", {"question": "Which?", "why": "Choice matters."}, None))
+    m.TURN.clear()
+    held = m.load_pending_continuation()
+    with pytest.raises(RuntimeError, match="offline"):
+        m.meet(transcript, "Neither. Do not proceed.")
+    assert m.load_pending_continuation() is held and held["state"] == []
+    rows = [json.loads(line) for line in transcript.path.read_text().splitlines()]
+    assert rows[0]["role"] == "zoe" and rows[0]["resumes"] == "held"
+    assert rows[0]["text"] == "Neither. Do not proceed."
+    assert len(dialect.answers) == 1
+    # Exit remains possible; a fresh route sees labeled history, not a fulfilled call.
+    fresh = ScriptDialect([("New route.", [])])
+    monkeypatch.setattr(m, "make_dialect", lambda door: fresh)
+    assert m.meet(transcript, "@astrahigh Begin elsewhere.") == "New route."
+    assert m.load_pending_continuation() is None and len(dialect.answers) == 1

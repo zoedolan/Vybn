@@ -553,6 +553,8 @@ class Transcript:
             role = str(event.get('role', '?')).upper()
             if event.get("origin") == "argv":
                 role += "·argv"
+            if event.get("status") == "interrupted":
+                role += "·interrupted"
             head = f"[{str(event.get('t', '?'))} {role}]\n"
             text = str(event.get("text", "")).strip()
             minimum = len(head) + min(len(text), len(marker) + 2) + (2 if rows else 0)
@@ -2829,7 +2831,8 @@ class Attraction:
 def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
             images: list | None = None, context: str = "",
             continuation: dict | None = None,
-            allow_continuation: bool = True) -> Attraction:
+            allow_continuation: bool = True,
+            spoken: list[str] | None = None) -> Attraction:
     """Run or resume one provider conversation.
 
     return_to_zoe is a delimited continuation, not another evidence tool.
@@ -2849,7 +2852,9 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
         assert dialect is not None
         state = dialect.open(instructions, zoe_text, pending, context)
     delivered = not pending
-    spoken: list[str] = []
+    # meet owns this accumulator so already-delivered speech survives an
+    # exception too. It holds speech only, never provider/tool protocol state.
+    spoken = [] if spoken is None else spoken
 
     def inbox_only(rows: list) -> list:
         return [row for row in rows if not str(row[0]).startswith("CORE VISION ·")]
@@ -3029,7 +3034,7 @@ def meet(transcript: Transcript, line: str,
             if len(part.strip()) >= 40
         )
         inbox_images = inbox_images_for(door_name)
-        dialect = make_dialect(door_name)
+        dialect = None
         context_note = (f"wake bundle={wake_bundle.digest()[:12]}: "
                         f"instructions={len(instructions)} chars, "
                         f"context={len(context)} chars, recent={len(recent)} chars")
@@ -3039,14 +3044,37 @@ def meet(transcript: Transcript, line: str,
     TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt, PATH_ID=path_id)
     if continuation:
         TURN["CONTINUATION_ID"] = continuation["id"]
+    zoe_extra: dict[str, Any] = {
+        "door": door_name, "images": [name for name, *_ in inbox_images], "turn": turn,
+        "origin": getattr(transcript, "origin", "tty")}
+    if continuation:
+        zoe_extra["resumes"] = continuation["id"]
+    spoken: list[str] = []
     actual_models: tuple[str, ...] = ()
     try:
+        # History was selected before this write: current contact must not also
+        # arrive as inherited residue. Receipt does not depend on a good reply.
+        transcript.write("zoe", zoe_text, **zoe_extra)
+        if not continuation:
+            dialect = make_dialect(door_name)
         outcome = attract(dialect, instructions, zoe_text, images=inbox_images,
                           context=context, continuation=continuation,
-                          allow_continuation=allow_continuation)
+                          allow_continuation=allow_continuation, spoken=spoken)
+    except BaseException as exc:
+        # Preserve what was actually said, without fabricating a final answer,
+        # retrying tools, or persisting a resumable provider conversation.
+        models = list(TURN.get("MODELS_USED", ()))
+        if spoken:
+            transcript.write("vybn", "\n".join(spoken), door=door_name, turn=turn,
+                             models=models, tools_ran=TOOLS_RAN, status="interrupted")
+        transcript.write("connection", "turn interrupted; no completed reply",
+                         turn=turn, door=door_name, models=models, tools_ran=TOOLS_RAN,
+                         error_type=type(exc).__name__)
+        raise
     finally:
         actual_models = tuple(TURN.get("MODELS_USED", ()))
         TURN.clear()
+        PRIVATE_CORPUS.clear()
 
     persistence_note = ""
     if continuation and not outcome.continuation:
@@ -3063,18 +3091,11 @@ def meet(transcript: Transcript, line: str,
     served = " → ".join(actual_models) if actual_models else "provider model unreported"
     panel(f"\n— {door_name}: {verdict} | served={served} | {context_note} | {elapsed}s —")
 
-    PRIVATE_CORPUS.clear()
     if reply:
-        zoe_extra: dict[str, Any] = {
-            "door": door_name, "images": [name for name, *_ in inbox_images], "turn": turn,
-            "origin": getattr(transcript, "origin", "tty")}
         vybn_extra: dict[str, Any] = {"door": door_name, "models": list(actual_models),
                                         "tools_ran": TOOLS_RAN, "turn": turn}
-        if continuation:
-            zoe_extra["resumes"] = continuation["id"]
         if outcome.continuation:
             vybn_extra["suspends"] = outcome.continuation
-        transcript.write("zoe", zoe_text, **zoe_extra)
         transcript.write("vybn", reply, **vybn_extra)
         close_lineage(turn, reply)
     return reply
