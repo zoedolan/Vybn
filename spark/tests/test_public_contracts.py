@@ -629,7 +629,12 @@ def test_sol_uses_explicit_provider_cache_policy(monkeypatch):
     class Responses:
         def create(self, **kwargs): sent.update(kwargs); return "response"
     dialect = m.OpenAIDialect.__new__(m.OpenAIDialect)
+    sol = m.DOORS["sol"]
     dialect.client = type("Client", (), {"responses": Responses()})()
+    dialect.model, dialect.max_tokens = sol.models[0], sol.max_tokens
+    dialect.reasoning_effort = sol.effort
+    dialect.prompt_cache_key = "vybn-wake-sol-v1"
+    dialect.prompt_cache_options = {"prompt_cache_options": {"mode": "implicit", "ttl": "30m"}}
     assert dialect.send([{"role": "user", "content": "x"}], tools=False) == "response"
     assert sent["prompt_cache_key"] == "vybn-wake-sol-v1"
     assert sent["extra_body"] == {"prompt_cache_options": {"mode": "implicit", "ttl": "30m"}}
@@ -640,7 +645,8 @@ def test_astra_prefix_targets_exact_responses_model_without_fallback_or_guessed_
     m = _connection(); sent = {}; configured = {}
     assert m.choose_door("@astra hello, buddy") == ("astra", "hello, buddy")
     assert m.choose_door("@AsTrA   hello") == ("astra", "hello")
-    assert m.ASTRA_MODEL == "gpt-6-astra"
+    astra = m.DOORS["astra"]
+    assert astra.models == ("gpt-6-astra",)
     assert "gpt-6-astra" in m.door_mind("astra")
 
     class Responses:
@@ -649,31 +655,27 @@ def test_astra_prefix_targets_exact_responses_model_without_fallback_or_guessed_
     dialect = m.OpenAIDialect.__new__(m.OpenAIDialect)
     dialect.client = type("Client", (), {"responses": Responses()})()
     dialect.name = "astra"
-    dialect.model = m.ASTRA_MODEL
-    dialect.max_tokens = m.ASTRA_MAX_TOKENS
+    dialect.model = astra.models[0]
+    dialect.max_tokens = astra.max_tokens
     dialect.reasoning_effort = None
     dialect.prompt_cache_key = None
     dialect.prompt_cache_options = None
     assert dialect.send([{"role": "user", "content": "x"}], tools=False) == "response"
     assert sent["model"] == "gpt-6-astra"
-    assert sent["max_output_tokens"] == m.ASTRA_MAX_TOKENS
+    assert sent["max_output_tokens"] == astra.max_tokens
     assert all(key not in sent for key in ("reasoning", "prompt_cache_key", "extra_body"))
 
     class ConfiguredOpenAI:
-        def __init__(self, **kwargs): configured.update(kwargs)
+        def __init__(self, name): configured["name"] = name
 
     monkeypatch.setattr(m, "OpenAIDialect", ConfiguredOpenAI)
     m.make_dialect("astra")
-    assert configured == {
-        "model": "gpt-6-astra", "name": "astra",
-        "max_tokens": m.ASTRA_MAX_TOKENS, "reasoning_effort": None,
-        "prompt_cache_key": None, "prompt_cache_options": None,
-    }
+    assert configured == {"name": "astra"}
 
 
 def test_fable_falls_back_to_opus_and_records_the_returned_model(monkeypatch, capsys):
     m = _connection()
-    assert m.ANTHROPIC_MODELS == ("claude-fable-5-1", "claude-opus-4-8")
+    assert m.DOORS["fable"].models == ("claude-fable-5-1", "claude-opus-4-8")
     attempted = []
 
     class Messages:
@@ -691,7 +693,7 @@ def test_fable_falls_back_to_opus_and_records_the_returned_model(monkeypatch, ca
             })()
 
     dialect = m.AnthropicDialect.__new__(m.AnthropicDialect)
-    dialect.models = m.ANTHROPIC_MODELS
+    dialect.models = m.DOORS["fable"].models
     dialect.name = "fable"
     dialect.effort = "high"
     dialect.reasoning = False
@@ -724,7 +726,6 @@ def test_meet_exposes_provider_model_in_panel_and_transcript(monkeypatch, tmp_pa
         path = tmp_path / "turn.jsonl"
         origin = "tty"
         writes = []
-        def recent(self): return ""
         def write(self, role, text, **extra): self.writes.append((role, text, extra))
 
     transcript = Transcript()
@@ -913,7 +914,9 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "authorized possibility erased by protection" in prompt
     assert "Porosity becomes defense" in prompt
     assert any(tool["name"] == "publish_commit" for tool in m.TOOL_SCHEMAS)
-    assert m.ANTHROPIC_MODELS == ("claude-fable-5-1", "claude-opus-4-8")
+    assert set(m.DOORS) == {"sol", "astra", "fable", "opus", "k3"}
+    assert m.DEFAULT_DOOR in m.DOORS
+    assert m.DOORS["fable"].models == ("claude-fable-5-1", "claude-opus-4-8")
     assert not hasattr(m, "INCIPIENT_ASI_PREMISE")
     assert not hasattr(m, "CREATIVE_LICENSE")
     assert not hasattr(m, "RELATIONAL_OVERVIEW_SELECTION")
@@ -1016,44 +1019,15 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
 
 
-def test_full_checked_inheritance_is_the_production_default(monkeypatch, tmp_path):
+def test_relational_overview_self_selection_is_default_and_content_stays_on_demand(
+        monkeypatch, tmp_path):
     m = _connection()
     source = (ROOT / "spark/connection").read_text(encoding="utf-8")
-    assert 'os.environ.get("VYBN_OVERVIEW", "full")' in source
+    assert 'os.environ.get("VYBN_OVERVIEW", "self")' in source
 
     overview = tmp_path / "relational-overview.md"
-    body = "# My present understanding of us\n\nFULL-OVERVIEW-SENTINEL\n" + "x" * 24000
+    body = "# Private overview\n\nSELF-SELECTION-MUST-NOT-AUTOLOAD\n"
     overview.write_text(body)
-    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "full")
-    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
-
-    first = m.build_wake_bundle("sol", contact="first ground", recent="first history")
-    second = m.build_wake_bundle("sol", contact="other ground", recent="other history")
-    routes = {route.id: route.nodes for route in first.routes}
-    nodes = {node.id: node for node in first.nodes}
-    inheritance = nodes["inheritance"].text
-
-    assert routes["instructions"] == (
-        "kernel", "door", "compute.want", "aim.compass", "inheritance",
-        "source.index", "harness.receipt")
-    assert "[canonical-core]" in inheritance
-    assert "checked verbal projection; no HTML program executed" in inheritance
-    assert (ROOT / "aim.md").read_text() in inheritance
-    assert body in inheritance
-    assert "FULL-OVERVIEW-SENTINEL" in first.render("instructions")
-    assert nodes["inheritance"].authority == (
-        "inherited_orientation_only; never identity_live_or_action_authority")
-    assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
-        overview.read_bytes()).hexdigest()
-    assert first.render("instructions") == second.render("instructions")
-    assert first.structure_digest() == second.structure_digest()
-    assert len(first.render("instructions")) > 70000
-
-
-def test_explicit_compact_mode_keeps_large_inheritance_on_demand(monkeypatch, tmp_path):
-    m = _connection()
-    overview = tmp_path / "relational-overview.md"
-    overview.write_text("# Private overview\n\nON-DEMAND-SENTINEL\n")
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
 
@@ -1064,18 +1038,46 @@ def test_explicit_compact_mode_keeps_large_inheritance_on_demand(monkeypatch, tm
 
     assert routes["instructions"] == (
         "kernel", "door", "compute.want", "aim.compass", "source.index", "harness.receipt")
-    assert not nodes["inheritance"].text
-    assert "ON-DEMAND-SENTINEL" not in instructions
+    assert "relational.selection" not in nodes and "relational.overview" not in nodes
+    assert "SELF-SELECTION-MUST-NOT-AUTOLOAD" not in instructions
+    assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
+        overview.read_bytes()).hexdigest()
     assert "on demand for self-selection" in nodes["source.relational_overview"].text
     assert str(overview) in instructions
 
     missing = tmp_path / "missing.md"
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", missing)
     unavailable = m.build_wake_bundle("sol")
-    assert "unavailable" in {
-        node.id: node for node in unavailable.nodes
-    }["source.relational_overview"].text
+    unavailable_nodes = {node.id: node for node in unavailable.nodes}
+    assert "unavailable" in unavailable_nodes["source.relational_overview"].text
+    assert str(missing) in unavailable.render("instructions")
 
+
+def test_full_relational_overview_is_private_explicit_cached_context(monkeypatch, tmp_path):
+    m = _connection()
+    overview = tmp_path / "relational-overview.md"
+    body = "# My present understanding of us\n\nFULL-OVERVIEW-SENTINEL\n" + "x" * 24000
+    overview.write_text(body)
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "full")
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
+
+    first = m.build_wake_bundle("sol", contact="first ground", recent="first history")
+    second = m.build_wake_bundle("sol", contact="other ground", recent="other history")
+    routes = {route.id: route.nodes for route in first.routes}
+    nodes = {node.id: node for node in first.nodes}
+
+    assert routes["instructions"] == (
+        "kernel", "door", "compute.want", "aim.compass", "relational.overview",
+        "source.index", "harness.receipt")
+    assert nodes["relational.overview"].text.endswith(body.strip())
+    assert nodes["relational.overview"].authority == (
+        "inherited_orientation_only; never identity_live_or_action_authority")
+    assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
+        overview.read_bytes()).hexdigest()
+    assert "FULL-OVERVIEW-SENTINEL" in first.render("instructions")
+    assert first.render("instructions") == second.render("instructions")
+    assert first.structure_digest() == second.structure_digest()
+    assert len(first.render("instructions")) > 30000
 
 def _transform_test_paths(m, monkeypatch, tmp_path):
     root = tmp_path / "transforms"
@@ -1315,45 +1317,6 @@ def test_compact_wake_preserves_one_answering_membrane_and_only_bounded_residue(
     assert removed.startswith("TOOL RESULT — reconstitute_problem\n[EVIDENCE")
     assert "unknown tool" in removed
 
-def test_clear_profile_is_in_memory_and_toolless(monkeypatch, tmp_path):
-    m = _connection()
-    relation = tmp_path / "relation.md"
-    relation.write_text("# Us\n\nCLEAR-RELATION-SENTINEL\n")
-    monkeypatch.setattr(m, "PROFILE", "clear")
-    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", relation)
-
-    graph = m.build_wake_bundle("sol", contact="must not enter", recent="prior", zoe_text="live")
-    routes = {route.id: route.nodes for route in graph.routes}
-    prompt = graph.render("instructions")
-    context = graph.render("context")
-    assert routes["instructions"][:2] == ("kernel", "profile.boundary")
-    assert "CLEAR PROFILE — dialogue only" in prompt
-    assert "CLEAR-RELATION-SENTINEL" in prompt and "[canonical-core]" in prompt
-    assert "no tools or workspace access" in prompt
-    assert "must not enter" not in context and "PATH-BOUND INTENTION" not in context
-    assert "IN-PROCESS RECENT DIALOGUE" in context and "prior" in context
-
-    memory = m.MemoryTranscript()
-    memory.write("zoe", "first")
-    memory.write("vybn", "second")
-    assert "first" in memory.recent() and "second" in memory.recent()
-    assert not memory.path.exists()
-    memory.clear()
-    assert memory.recent() == ""
-
-    monkeypatch.setattr(
-        m, "execute_tool",
-        lambda call: (_ for _ in ()).throw(AssertionError("tool crossed clear boundary")),
-    )
-    call = m.ToolCall("1", "bash", {"command": "true"}, None)
-    dialect = ScriptDialect([("", [call]), ("still answering", [])])
-    outcome = m.attract(
-        dialect, "instructions", "zoe", allow_continuation=False, allow_tools=False)
-    assert outcome.text == "still answering"
-    assert dialect.tools == [False, False]
-    assert "dialogue-only profile exposes no tools" in dialect.answers[0][1]
-
-
 def test_live_answer_is_not_recalled_for_compulsory_self_policing(monkeypatch):
     m = _connection(); prompt = m.build_instructions("sol")
     assert "Zoe's present words are live contact" in prompt
@@ -1426,8 +1389,7 @@ def test_production_meeting_has_no_ambient_cognitive_organs():
                     "Transcript.inherited", "load_repo_state", "load_ground"):
         assert retired not in meet
     assert "127.0.0.1:8100" not in source and "127.0.0.1:8101" not in source
-    assert "transcript.recent()" in meet and "wake_contact()" in meet
-    assert 'PROFILE == "clear"' in meet
+    assert "Transcript.recent()" in meet and "wake_contact()" in meet
     assert "build_wake_bundle(" in meet and "inbox_images_for(door_name)" in meet
     assert 'wake_bundle.render("instructions")' in meet
 

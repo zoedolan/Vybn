@@ -55,11 +55,9 @@ def test_context_contains_only_live_ground_and_bounded_recent_dialogue():
         "SUBCONSCIOUS APERTURE", "MEMORY (private", "INHERITED CONTINUITY", "TRANSCRIPT — ARC"))
 
 
-def test_source_index_loads_foundational_inheritance_and_keeps_other_bodies_on_demand():
+def test_source_index_keeps_canonical_bodies_on_demand():
     m = _connection(); prompt = m.build_instructions("sol")
-    assert "canonical soul (compiled into labeled inheritance)" in prompt
-    assert "[canonical-core]" in prompt and "[current-aim]" in prompt
-    assert "[relational-orientation]" in prompt
+    assert "canonical soul (on demand)" in prompt
     assert "continuity (on demand)" in prompt
     assert "Him private integration (on demand)" in prompt
     assert "spirituality (on demand)" in prompt
