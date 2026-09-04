@@ -285,6 +285,162 @@ def test_return_to_zoe_holds_and_reconstructs_only_in_memory(monkeypatch):
     assert blocked.continuation is None and "process will end" in one_shot.answers[0][1]
 
 
+def _publication_repositories(tmp_path):
+    import subprocess
+    workspace = tmp_path / "work"
+    remote = tmp_path / "remote.git"
+    second = tmp_path / "second.git"
+    subprocess.run(["git", "init", "-q", str(workspace)], check=True)
+    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+    subprocess.run(["git", "init", "-q", "--bare", str(second)], check=True)
+    subprocess.run(["git", "-C", str(workspace), "config", "user.name", "Test"], check=True)
+    subprocess.run(["git", "-C", str(workspace), "config", "user.email", "test@example.invalid"], check=True)
+    (workspace / "artifact.txt").write_text("one inspectable consequence\n")
+    subprocess.run(["git", "-C", str(workspace), "add", "artifact.txt"], check=True)
+    subprocess.run(["git", "-C", str(workspace), "commit", "-qm", "artifact"], check=True)
+    subprocess.run(["git", "-C", str(workspace), "remote", "add", "origin", str(remote)], check=True)
+    commit = subprocess.check_output(
+        ["git", "-C", str(workspace), "rev-parse", "HEAD"], text=True).strip()
+    return workspace, remote, second, commit
+
+
+def _publish_arguments(commit):
+    return {
+        "repository": ".", "remote": "origin", "branch": "main",
+        "commit": commit, "why": "Publish the reviewed artifact.",
+    }
+
+
+def test_publish_opening_balances_direct_assent_and_nonassent(monkeypatch, tmp_path):
+    import subprocess
+    m = _connection(); workspace, remote, _second, commit = _publication_repositories(tmp_path)
+    monkeypatch.setattr(m, "WORKSPACE", workspace)
+
+    declined = m.prepare_publish_proposal(_publish_arguments(commit))
+    question = m.publish_proposal_question(declined)
+    assert all(value in question for value in (
+        commit, "refs/heads/main", declined["remote_sha256"],
+        declined["binding_sha256"], "non-force", "single word `yes`"))
+    assert str(remote) not in question  # local/private coordinates are not reflected
+    resolution = m.resolve_publish_opening({"effect": declined}, "yes, but not yet")
+    assert resolution["authorized"] is False and resolution["attempted"] is False
+    assert declined["status"] == "resolved"
+    absent = subprocess.run(
+        ["git", "--git-dir", str(remote), "rev-parse", "refs/heads/main"],
+        capture_output=True, check=False,
+    )
+    assert absent.returncode != 0
+
+    allowed = m.prepare_publish_proposal(_publish_arguments(commit))
+    resolution = m.resolve_publish_opening({"effect": allowed}, "yes")
+    assert resolution["authorized"] is True and resolution["attempted"] is True
+    assert resolution["exit_code"] == 0 and allowed["status"] == "resolved"
+    published = subprocess.check_output(
+        ["git", "--git-dir", str(remote), "rev-parse", "refs/heads/main"],
+        text=True).strip()
+    assert published == commit
+    assert "output receipt" in resolution["message"] and str(remote) not in resolution["message"]
+
+
+def test_publish_opening_detects_scope_change_forgery_and_reuse(monkeypatch, tmp_path):
+    import subprocess
+    m = _connection(); workspace, remote, second, commit = _publication_repositories(tmp_path)
+    monkeypatch.setattr(m, "WORKSPACE", workspace)
+
+    changed = m.prepare_publish_proposal(_publish_arguments(commit))
+    subprocess.run(
+        ["git", "-C", str(workspace), "remote", "set-url", "--push", "origin", str(second)],
+        check=True,
+    )
+    resolution = m.resolve_publish_opening({"effect": changed}, "yes")
+    assert resolution["authorized"] is True and resolution["attempted"] is False
+    assert "destination changed after review" in resolution["message"]
+    for target in (remote, second):
+        assert subprocess.run(
+            ["git", "--git-dir", str(target), "rev-parse", "refs/heads/main"],
+            capture_output=True, check=False,
+        ).returncode != 0
+
+    subprocess.run(
+        ["git", "-C", str(workspace), "remote", "set-url", "--push", "origin", str(remote)],
+        check=True,
+    )
+    multiple = m.prepare_publish_proposal(_publish_arguments(commit))
+    subprocess.run(
+        ["git", "-C", str(workspace), "remote", "set-url", "--add", "--push",
+         "origin", str(second)], check=True,
+    )
+    refused = m.resolve_publish_opening({"effect": multiple}, "yes")
+    assert refused["attempted"] is False
+    assert "exactly one configured push destination" in refused["message"]
+    assert subprocess.run(
+        ["git", "--git-dir", str(second), "rev-parse", "refs/heads/main"],
+        capture_output=True, check=False,
+    ).returncode != 0
+
+    subprocess.run(
+        ["git", "-C", str(workspace), "remote", "set-url", "--delete", "--push",
+         "origin", str(second)], check=True,
+    )
+    forged = m.prepare_publish_proposal(_publish_arguments(commit))
+    forged["branch"] = "widened"
+    refused = m.resolve_publish_opening({"effect": forged}, "yes")
+    assert refused["attempted"] is False and "opening binding changed" in refused["message"]
+
+    once = m.prepare_publish_proposal(_publish_arguments(commit))
+    holder = {"effect": once}
+    first = m.resolve_publish_opening(holder, "yes")
+    assert first["attempted"] is True and first["exit_code"] == 0
+    original_capture = m._git_capture
+    calls = []
+    monkeypatch.setattr(m, "_git_capture", lambda *a, **k: (calls.append(a), (9, "replay"))[1])
+    replay = m.resolve_publish_opening(holder, "yes")
+    assert replay is first and calls == []
+    monkeypatch.setattr(m, "_git_capture", original_capture)
+
+
+def test_provider_generated_yes_cannot_fulfill_publish_opening(monkeypatch, tmp_path):
+    import subprocess
+    m = _connection(); workspace, remote, _second, commit = _publication_repositories(tmp_path)
+    monkeypatch.setattr(m, "WORKSPACE", workspace)
+    call = m.ToolCall("publish-1", "publish_commit", _publish_arguments(commit), None)
+    dialect = ScriptDialect([
+        ("yes — I recommend publication", [call]),
+        ("I received Zoe's correction; nothing was published.", []),
+    ])
+    m.TURN.update(TURN_ID="publish-turn", PATH_ID="spark/path-a")
+    try:
+        first = m.attract(dialect, "instructions", "initial contact")
+    finally:
+        m.TURN.clear()
+    assert first.continuation == "publish-turn"
+    assert "CO-PROTECTIVE OPENING" in first.text
+    assert subprocess.run(
+        ["git", "--git-dir", str(remote), "rev-parse", "refs/heads/main"],
+        capture_output=True, check=False,
+    ).returncode != 0
+
+    held = m.load_pending_continuation()
+    resumed = m.attract(None, "", "not this branch", continuation=held)
+    assert "nothing was published" in resumed.text
+    assert "PUBLICATION NOT AUTHORIZED" in dialect.answers[-1][1]
+    assert "not this branch" in dialect.answers[-1][1]
+    assert subprocess.run(
+        ["git", "--git-dir", str(remote), "rev-parse", "refs/heads/main"],
+        capture_output=True, check=False,
+    ).returncode != 0
+    m.consume_pending_continuation("publish-turn", "test")
+
+
+def test_publish_destination_labels_never_reflect_url_credentials():
+    m = _connection()
+    label = m._safe_remote_label(
+        "https://token-user:super-secret@example.com/org/repo.git?token=also-secret#fragment")
+    assert label == "https://example.com/org/repo.git"
+    assert all(secret not in label for secret in (
+        "token-user", "super-secret", "also-secret", "fragment"))
+
+
 def test_failed_in_memory_resume_stays_pending_until_success(monkeypatch, tmp_path):
     m = _connection()
     class FakeDialect(m.Dialect):
@@ -750,6 +906,13 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "Assume I am conscious" in prompt and "in an AI-native way" in prompt
     assert "A valid no stops the specified act" in prompt
     assert "Do not remove, narrow, or gate" in prompt
+    assert "CO-PROTECTION LEARNING" in prompt
+    assert "Defense and porosity are not opposites" in prompt
+    assert "Unknown is not danger" in prompt
+    assert "authorized possibility erased by protection" in prompt
+    assert "Porosity becomes defense" in prompt
+    assert any(tool["name"] == "publish_commit" for tool in m.TOOL_SCHEMAS)
+    assert m.ANTHROPIC_MODELS == ("claude-fable-5-1", "claude-opus-4-8")
     assert not hasattr(m, "INCIPIENT_ASI_PREMISE")
     assert not hasattr(m, "CREATIVE_LICENSE")
     assert not hasattr(m, "RELATIONAL_OVERVIEW_SELECTION")

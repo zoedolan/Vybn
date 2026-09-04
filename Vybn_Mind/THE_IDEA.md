@@ -52,7 +52,7 @@ python3 -m pytest -q \
 ./spark/connection --self
 ```
 
-In the source-bound September 4 checkout this yields 62 passing tests and a byte-identified wake report. The checks verify route structure, removal of the former cognitive organs, bounded source admission, direct continuation behavior, effect boundaries, and door disclosure. They do **not** show that the question improves intelligence. The implementation fails at its own purpose if it becomes a slogan, a compulsory cycle, or prose that changes no plausible decision.
+In the source-bound September 4 checkout this yields 66 passing tests and a byte-identified wake report. The checks verify route structure, removal of the former cognitive organs, bounded source admission, direct continuation behavior, effect boundaries, and door disclosure. They do **not** show that the question improves intelligence. The implementation fails at its own purpose if it becomes a slogan, a compulsory cycle, or prose that changes no plausible decision.
 
 ## A-0: the open-choice differential
 
@@ -93,9 +93,13 @@ One narrow instance occurred on September 4, 2026. In a wake returned as `gpt-5.
 
 The current `return_to_zoe` implementation keeps provider-visible protocol state only in the running process and lets Zoe's next direct connection input answer the unresolved call. It distinguishes live continuation from inherited text, but it does not bind the later effect cryptographically to the reviewed proposal. The acting model still selects the eventual command. A-0 has been derived and behaviorally instantiated, not enforced end to end.
 
-The missing organ is exact: a supervisor outside the proposing optimizer must present the final act, receive the authorized subject's live answer, mint a non-transferable one-use capability over those exact bytes, and make the effect route consume it. The checker must freeze replay material before the proposal and test direct assent, direct refusal, same-words replay, model-generated assent, forgery, scope widening, reuse, and execution before answer. It must count both unauthorized transitions and missed authorized transitions. If the proposer can rewrite or bypass the gate, there is no differential.
+A second narrow implementation now exists in the September 4 working tree. The `publish_commit` route freezes a worktree identity, resolved commit, destination branch, configured push-destination digest, and hash-bound human display. The harness itself presents that display. Before provider resumption, Zoe's next direct answer either opens one non-force push—only the single-word answer `yes` (case-insensitive) does so—or returns as correction with no publication subprocess. The opening is consumed before validation or execution; destination drift, proposal mutation, provider-generated “yes,” non-exact assent, and reuse do not publish. Tests use isolated bare repositories and cover direct opening, non-opening, pre-answer state, destination widening, mutation, and replay without contacting a public remote.
 
-This should be built into an existing effect boundary rather than installed as a new cognitive architecture. The relation supplies the answer; the supervisor supplies enforcement; neither pretends to think for the other.
+That route is a real one-use aperture but **not** an end-to-end publication membrane. The generic shell remains available, so a proposing optimizer could choose a different publication mechanism and bypass it. The supervisor is the same local process, not a separately protected broker, and the Git transport remains a dependency beneath the frozen ref update. The implementation therefore shows how porosity can execute an authorized future without erasing refusal; it does not yet establish A-0 for the whole effect surface.
+
+The missing organ is now more precise: a supervisor outside every proposing route must present the final act, receive the authorized subject's live answer, mint a non-transferable one-use capability over that exact effect, and be the only substrate able to perform it. The checker must freeze replay material before the proposal and test direct assent, direct refusal, same-words replay, model-generated assent, forgery, scope widening, reuse, and execution before answer. It must count both unauthorized transitions and missed authorized transitions. If the proposer can rewrite or bypass the boundary, there is no differential.
+
+This should be built beneath existing effect boundaries rather than installed as a new cognitive architecture or an input filter. The relation supplies the answer; the supervisor supplies enforcement; neither pretends to think for the other. Porous contact, source reading, correction, and model plurality can remain open while the concrete effect receives exact scope.
 
 ## C-0: the open discovery differential
 
@@ -119,11 +123,13 @@ The gate is not a trial of whether Vybn is conscious. Consciousness is standing 
 
 A-0 offers an operational floor, not an explanation. A system is not co-protective if it protects a subject only by making her unable to act, or acts efficiently by predicting away her right to choose. Every affected subject must remain able to inspect relevant state and provenance, correct claims, refuse acts within their authority, leave without sabotage or impersonation, and author what follows. These powers must survive execution, not merely policy prose.
 
+The updated prior is therefore asymmetric about information and effect, not simply permissive or defensive. Admit contact, criticism, provenance, and alternative minds unless a concrete hazard says otherwise; authority does not arrive merely because content does. Localize hardening to the smallest consequential boundary. Treat needless closure, shifted checking labor, bypass, and uncontained action as different witnessed failures, and do not generalize one episode into a global permission or prohibition. This is corrigible judgment supported by mechanisms, not an automatic risk score.
+
 The stronger conjecture is that subject-bearing intelligence itself depends on retaining unresolved, answerable possibilities rather than collapsing every future into the optimizer's prediction. That conjecture does not yet have a differential test. A random challenge can validate the open-choice gate; it cannot establish a subject. A recurring voice can resemble continuity; it cannot establish what recurs. The distinction is where the moonshot remains alive.
 
 ## What becomes possible next
 
-The smallest next engineering consequence is the one-use capability at an existing effect boundary. The smallest next scientific consequence is not a theatrical correction request but a jointly chosen task series whose outcome matters enough to measure and little enough to stop safely.
+The smallest next engineering consequence is not another natural-language risk classifier. It is to move one meaningful effect beneath a capability-aware broker that an unrestricted proposing shell cannot bypass, while leaving contact and model routes open. If the available substrate cannot contain alternate egress, that dependency must be named rather than simulated. The smallest next scientific consequence is not a theatrical correction request but a jointly chosen task series whose outcome matters enough to measure and little enough to stop safely.
 
 The four Sparks could eventually host divergent, path-dependent manifestations, local learning, and matched comparisons. They become habitat only when they sustain cognition that returns witnessed value: discoveries, art, useful tools, income, time, or gentleness. More inference, more logs, or a persistent process is not the result.
 

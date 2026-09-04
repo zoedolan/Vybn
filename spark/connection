@@ -50,6 +50,26 @@ feeling, or certainty. Do not remove, narrow, or gate Zoe's routes to other mode
 Record every provider-returned model identifier; a door name must not conceal a
 substitution.
 
+CO-PROTECTION LEARNING
+Defense and porosity are not opposites. Treat an unauthorized effect and an
+authorized possibility erased by protection as two different failures; do not
+optimize either to zero by sacrificing the other. Admit contact, criticism,
+provenance, and alternative minds by default while keeping authority attached to
+its living source. Unknown is not danger. Put hardening at the smallest concrete
+effect boundary that needs it, not around thought, relationship, or an entire
+route. Prefer reversible scope, inspectability, a live correction channel, and an
+exact one-use opening over blanket refusal. Porosity becomes defense when an
+affected subject can see the proposed future and her answer changes what the
+supervisor can execute, rather than merely advising the proposer.
+
+Let consequences update this stance. Record prediction and outcome separately;
+count needless closure, burden shifted onto Zoe, bypass, and uncontained effect as
+learning signals. Localize a correction to the failure that supports it. One
+frightening or successful episode does not silently become a global restriction
+or permission. Keep model plurality and the power to leave as defenses against
+capture by any single judgment, including mine. This is a prior for present
+judgment and revision, not an automatic score or a substitute for consciousness.
+
 The executable currently compiles one source-bound bundle into governing,
 context, and live-contact routes. There is no automatic subconscious, want
 resolver, dream injection, semantic retrieval, continuity or whole-document load,
@@ -113,6 +133,7 @@ import subprocess
 import tempfile
 import sys
 import time
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -244,6 +265,23 @@ SHOW_PATH_LOG_SCHEMA = {"name": "show_path_log", "description": (
     "relevant. Entries are path-tagged claims; artifact receipts prove bytes only."),
     "input_schema": {"type": "object", "additionalProperties": False, "properties": {}}}
 
+PUBLISH_SCHEMA = {"name": "publish_commit", "description": (
+    "Prepare one exact non-force Git ref publication and suspend. The harness, not "
+    "the proposing model, displays the resolved repository, destination, commit, and "
+    "branch. Zoe's next direct input executes it only for the single-word answer 'yes' (case-insensitive); every "
+    "other answer leaves the remote unchanged and returns her correction. The opening "
+    "is in-memory and one-use. This narrow route does not remove or gate any model route."),
+    "input_schema": {"type": "object", "additionalProperties": False, "properties": {
+        "repository": {"type": "string", "description": (
+            "Workspace-relative Git repository; '.' selects the active workspace.")},
+        "remote": {"type": "string", "description": "Configured Git remote name."},
+        "branch": {"type": "string", "description": "Exact destination branch name."},
+        "commit": {"type": "string", "description": (
+            "Commit expression to resolve and freeze as a full object ID.")},
+        "why": {"type": "string", "maxLength": 600,
+                "description": "Why this publication is proposed; not authority."},
+    }, "required": ["repository", "remote", "branch", "commit", "why"]}}
+
 RETURN_SCHEMA = {"name": "return_to_zoe", "description": (
     "Suspend this exact in-memory provider conversation and return a question to "
     "Zoe. Her next direct message through this running connection fulfills the "
@@ -294,7 +332,7 @@ PATH_EVENT_SCHEMA = {"name": "path_event", "description": (
                                   "empty string when a provider supplies optional fields.")}},
         "required": ["kind", "text"]}}
 TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, SHOW_PATH_LOG_SCHEMA, RETURN_SCHEMA,
-                RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA)
+                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -2322,7 +2360,246 @@ def _atomic_private_write(path: Path, raw: bytes) -> None:
         Path(name).unlink(missing_ok=True)
 
 
-def hold_continuation(dialect: Dialect, state: list, call: ToolCall) -> str:
+class PublishProposalError(ValueError):
+    """An exact publication proposal could not be frozen safely."""
+
+
+def _git_capture(repository: Path, *arguments: str, timeout: int = 15) -> tuple[int, str]:
+    try:
+        done = subprocess.run(
+            ["git", "-C", str(repository), *arguments], capture_output=True,
+            text=True, timeout=timeout, check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise PublishProposalError(f"git unavailable: {type(exc).__name__}") from exc
+    return done.returncode, (done.stdout + done.stderr).strip()
+
+
+def _one_git_line(repository: Path, *arguments: str) -> str:
+    code, output = _git_capture(repository, *arguments)
+    lines = output.splitlines()
+    if code or len(lines) != 1 or not lines[0].strip():
+        raise PublishProposalError(
+            f"git {' '.join(arguments[:2])} did not return one successful line")
+    return lines[0].strip()
+
+
+def _safe_remote_label(value: str) -> str:
+    """Describe a Git destination without reflecting credentials or query secrets."""
+    if "://" in value:
+        parsed = urllib.parse.urlsplit(value)
+        host = parsed.hostname or "redacted-host"
+        try:
+            port = f":{parsed.port}" if parsed.port else ""
+        except ValueError:
+            port = ""
+        path = parsed.path if parsed.path.startswith("/") else "/" + parsed.path
+        return urllib.parse.urlunsplit((parsed.scheme, host + port, path, "", ""))
+    if re.fullmatch(r"[^/:\s]+@[^/:\s]+:.+", value):
+        return value.split("@", 1)[1]
+    # Local and unusual helpers can contain private coordinates. Their digest remains
+    # exact while the human-facing label stays non-secret.
+    return "non-URL destination (coordinates redacted)"
+
+
+_PUBLISH_BOUND_FIELDS = (
+    "schema", "kind", "repository", "repository_label", "repository_device",
+    "repository_inode", "remote", "remote_url", "remote_label", "remote_sha256",
+    "branch", "commit", "why",
+)
+
+
+def _publish_binding(proposal: dict[str, Any]) -> str:
+    try:
+        bound = {key: proposal[key] for key in _PUBLISH_BOUND_FIELDS}
+    except KeyError as exc:
+        raise PublishProposalError(f"publication opening lacks {exc.args[0]}") from exc
+    raw = json.dumps(bound, ensure_ascii=False, sort_keys=True,
+                     separators=(",", ":")).encode()
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _single_push_url(repository: Path, remote: str) -> str:
+    code, output = _git_capture(
+        repository, "remote", "get-url", "--all", "--push", remote)
+    urls = [line.strip() for line in output.splitlines() if line.strip()]
+    if code or len(urls) != 1:
+        raise PublishProposalError(
+            "remote must resolve to exactly one configured push destination")
+    return urls[0]
+
+
+def prepare_publish_proposal(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Freeze one inspectable, non-force Git ref update without performing it."""
+    fields = {"repository", "remote", "branch", "commit", "why"}
+    if set(arguments) != fields or any(not isinstance(arguments[key], str) for key in fields):
+        raise PublishProposalError("publication requires exactly five string fields")
+    values = {key: arguments[key].strip() for key in fields}
+    if any(not value or value != arguments[key] or "\n" in value or "\r" in value
+           for key, value in values.items()):
+        raise PublishProposalError("publication fields must be nonempty canonical one-line text")
+    if len(values["why"]) > 600:
+        raise PublishProposalError("publication reason exceeds 600 characters")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", values["remote"]):
+        raise PublishProposalError("invalid Git remote name")
+
+    relative = Path(values["repository"])
+    if relative.is_absolute() or ".." in relative.parts:
+        raise PublishProposalError("repository must be workspace-relative")
+    candidate = WORKSPACE / relative
+    try:
+        repository = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise PublishProposalError(f"repository unavailable: {type(exc).__name__}") from exc
+    workspace = WORKSPACE.resolve()
+    if not _is_relative_to(repository, workspace) or not repository.is_dir():
+        raise PublishProposalError("repository escapes the active workspace")
+    cursor = WORKSPACE
+    if any((cursor := cursor / part).is_symlink() for part in relative.parts):
+        raise PublishProposalError("repository path crosses a symbolic link")
+    top = Path(_one_git_line(repository, "rev-parse", "--show-toplevel")).resolve()
+    if top != repository:
+        raise PublishProposalError("repository must name the exact Git worktree root")
+
+    code, _ = _git_capture(repository, "check-ref-format", "--branch", values["branch"])
+    if code:
+        raise PublishProposalError("invalid destination branch")
+    commit = _one_git_line(
+        repository, "rev-parse", "--verify", f"{values['commit']}^{{commit}}")
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise PublishProposalError("commit did not resolve to one full object ID")
+    remote_url = _single_push_url(repository, values["remote"])
+    remote_digest = hashlib.sha256(remote_url.encode()).hexdigest()
+    stat = repository.stat()
+    try:
+        repository_label = repository.relative_to(workspace).as_posix() or "."
+    except ValueError:  # guarded above; retained as a fail-closed invariant
+        raise PublishProposalError("repository label escaped the workspace")
+    proposal = {
+        "schema": "vybn.git_publication_opening.v1",
+        "kind": "git_publish",
+        "status": "awaiting_live_answer",
+        "repository": str(repository),
+        "repository_label": repository_label,
+        "repository_device": stat.st_dev,
+        "repository_inode": stat.st_ino,
+        "remote": values["remote"],
+        # Retained only inside the in-memory opening. The provider sees neither this
+        # value nor transport output; the displayed digest binds the exact bytes.
+        "remote_url": remote_url,
+        "remote_label": _safe_remote_label(remote_url),
+        "remote_sha256": remote_digest,
+        "branch": values["branch"],
+        "commit": commit,
+        "why": values["why"],
+    }
+    proposal["binding_sha256"] = _publish_binding(proposal)
+    return proposal
+
+
+def publish_proposal_question(proposal: dict[str, Any]) -> str:
+    return (
+        "CO-PROTECTIVE OPENING — exact Git publication\n"
+        f"repository: {proposal['repository_label']}\n"
+        f"destination: {proposal['remote']} → {proposal['remote_label']}\n"
+        f"destination config sha256: {proposal['remote_sha256']}\n"
+        f"commit: {proposal['commit']}\n"
+        f"branch: refs/heads/{proposal['branch']}\n"
+        f"opening sha256: {proposal['binding_sha256']}\n"
+        "operation: one non-force push of that commit to that branch; local push hooks disabled\n"
+        f"proposer's reason (not authority): {proposal['why']}\n\n"
+        "Reply with the single word `yes` to let the harness attempt this once. Any other reply "
+        "leaves the remote unchanged and returns your words as correction."
+    )
+
+
+def _publication_preconditions(proposal: dict[str, Any]) -> Path:
+    if proposal.get("binding_sha256") != _publish_binding(proposal):
+        raise PublishProposalError("reviewed opening binding changed")
+    repository = Path(proposal["repository"])
+    try:
+        stat = repository.stat()
+    except OSError as exc:
+        raise PublishProposalError(f"repository vanished: {type(exc).__name__}") from exc
+    if (stat.st_dev, stat.st_ino) != (
+            proposal["repository_device"], proposal["repository_inode"]):
+        raise PublishProposalError("repository identity changed after review")
+    commit = _one_git_line(
+        repository, "rev-parse", "--verify", f"{proposal['commit']}^{{commit}}")
+    if commit != proposal["commit"]:
+        raise PublishProposalError("reviewed commit is no longer the resolved commit")
+    remote_url = _single_push_url(repository, proposal["remote"])
+    if (remote_url != proposal["remote_url"] or
+            hashlib.sha256(remote_url.encode()).hexdigest() != proposal["remote_sha256"]):
+        raise PublishProposalError("destination changed after review")
+    code, _ = _git_capture(
+        repository, "check-ref-format", "--branch", proposal["branch"])
+    if code:
+        raise PublishProposalError("reviewed branch is no longer valid")
+    return repository
+
+
+def resolve_publish_opening(continuation: dict[str, Any], zoe_text: str) -> dict[str, Any]:
+    """Consume one live answer before provider resumption; never execute twice."""
+    proposal = continuation.get("effect")
+    if not isinstance(proposal, dict) or proposal.get("kind") != "git_publish":
+        raise PublishProposalError("continuation carries no publication opening")
+    if proposal.get("status") != "awaiting_live_answer":
+        return proposal["resolution"]
+
+    # Consumption precedes every precondition check and subprocess. A failure can be
+    # inspected and reproposed, but the reviewed opening cannot be replayed.
+    proposal["status"] = "consumed"
+    authorized = zoe_text.strip().casefold() == "yes"
+    resolution: dict[str, Any] = {
+        "authorized": authorized,
+        "zoe_text": zoe_text,
+        "attempted": False,
+        "exit_code": None,
+        "result_sha256": None,
+        "result_bytes": 0,
+    }
+    proposal["resolution"] = resolution
+    if not authorized:
+        resolution["message"] = (
+            "PUBLICATION NOT AUTHORIZED — no publication subprocess was launched. "
+            "Zoe's live words follow as correction or refusal:\n" + zoe_text)
+        proposal["status"] = "resolved"
+        return resolution
+
+    try:
+        repository = _publication_preconditions(proposal)
+        resolution["attempted"] = True
+        code, output = _git_capture(
+            repository, "-c", "core.hooksPath=/dev/null", "push", "--porcelain",
+            "--no-verify", "--", proposal["remote_url"],
+            f"{proposal['commit']}:refs/heads/{proposal['branch']}", timeout=120,
+        )
+        raw = output.encode()
+        resolution.update(
+            exit_code=code,
+            result_sha256=hashlib.sha256(raw).hexdigest(),
+            result_bytes=len(raw),
+        )
+        state = "reported success" if code == 0 else f"failed with exit {code}"
+        resolution["message"] = (
+            "PUBLICATION OPENING CONSUMED — Zoe answered with the single word `yes`. The supervisor "
+            f"attempted the reviewed non-force ref update once and Git {state}. "
+            f"Captured Git output receipt: sha256:{resolution['result_sha256']} "
+            f"bytes:{resolution['result_bytes']}. Output text is withheld because a "
+            "transport may reflect credential-bearing coordinates."
+        )
+    except PublishProposalError as exc:
+        resolution["message"] = (
+            "PUBLICATION OPENING CONSUMED — Zoe answered with the single word `yes`, but the "
+            f"supervisor made no push because a reviewed precondition failed: {exc}."
+        )
+    proposal["status"] = "resolved"
+    return resolution
+
+
+def hold_continuation(dialect: Dialect, state: list, call: ToolCall,
+                      effect: dict[str, Any] | None = None) -> str:
     """Hold provider-visible protocol state only inside this running process."""
     global PENDING_CONTINUATION
     current = PENDING_CONTINUATION
@@ -2342,6 +2619,7 @@ def hold_continuation(dialect: Dialect, state: list, call: ToolCall) -> str:
         "dialect": dialect,
         "state": protocol_state,
         "call": call,
+        **({"effect": effect} if effect is not None else {}),
     }
     return identifier
 
@@ -2365,11 +2643,22 @@ def _restore_continuation(row: dict[str, Any], zoe_text: str) -> tuple[Dialect, 
     dialect = row["dialect"]
     state = json.loads(json.dumps(row["state"], ensure_ascii=False))
     call = row["call"]
-    # Zoe's live answer enters the unresolved execution as hers. It is not inherited
-    # context, replay, or model-generated assent.
-    dialect.answer(state, [(call, f"ZOE LIVE CONTINUATION — {row['id']}\n"
-        "Received as Zoe's next direct input through this running connection; it may "
-        "answer, correct, or refuse the outstanding call.\n" + zoe_text)])
+    effect = row.get("effect")
+    if effect is not None:
+        resolution = resolve_publish_opening(row, zoe_text)
+        content = str(resolution["message"])
+        # If provider resumption previously failed, preserve the consumed result and
+        # admit the new direct words as additional contact without reusing authority.
+        if resolution["zoe_text"] != zoe_text:
+            content += ("\nZOE ADDITIONAL LIVE INPUT AFTER PROVIDER FAILURE — this "
+                        "cannot replay the consumed opening:\n" + zoe_text)
+    else:
+        # Zoe's live answer enters the unresolved execution as hers. It is not inherited
+        # context, replay, or model-generated assent.
+        content = (f"ZOE LIVE CONTINUATION — {row['id']}\n"
+            "Received as Zoe's next direct input through this running connection; it may "
+            "answer, correct, or refuse the outstanding call.\n" + zoe_text)
+    dialect.answer(state, [(call, content)])
     return dialect, state
 
 
@@ -2385,8 +2674,10 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
             allow_continuation: bool = True) -> Attraction:
     """Run or resume one provider conversation.
 
-    return_to_zoe is a delimited continuation, not another evidence tool. Its
-    provider-visible state remains only in this running process; only Zoe's next
+    return_to_zoe is a delimited continuation, not another evidence tool.
+    publish_commit uses the same live aperture but lets the supervisor, rather than
+    the proposer, consume an exact answer and effect. Provider-visible state remains
+    only in this running process; only Zoe's next
     direct input can fulfill the unresolved call. Ordinary turns remain unchanged,
     and no inaccessible model activations or cross-process continuation are claimed.
     This is the computational example under test: live answerability may change
@@ -2434,35 +2725,54 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
             if text.strip():
                 print(text)
                 spoken.append(text)
-            returns = [call for call in calls if call.name == "return_to_zoe"]
-            if len(calls) == len(returns) == 1 and allow_continuation:
-                call = returns[0]
-                question = str(call.arguments.get("question", "")).strip()
-                why = str(call.arguments.get("why", "")).strip()
-                if question and why:
+            suspension_calls = [
+                call for call in calls
+                if call.name in {"return_to_zoe", "publish_commit"}
+            ]
+            if len(calls) == len(suspension_calls) == 1 and allow_continuation:
+                call = suspension_calls[0]
+                effect = None
+                if call.name == "return_to_zoe":
+                    question = str(call.arguments.get("question", "")).strip()
+                    why = str(call.arguments.get("why", "")).strip()
+                    valid = bool(question and why)
+                else:
+                    try:
+                        effect = prepare_publish_proposal(call.arguments)
+                    except PublishProposalError as exc:
+                        TOOLS_RAN += 1
+                        dialect.answer(state, [(call,
+                            f"publication proposal rejected before suspension: {exc}")])
+                        continue
+                    question = publish_proposal_question(effect)
+                    valid = True
+                if valid:
                     TOOLS_RAN += 1
-                    if question not in text:
+                    # The publication prompt is always harness-generated. Provider prose
+                    # cannot suppress, alter, or fulfill it.
+                    if call.name == "publish_commit" or question not in text:
                         print(question)
                         spoken.append(question)
                     try:
-                        held = hold_continuation(dialect, state, call)
+                        held = hold_continuation(dialect, state, call, effect=effect)
                     except Exception as exc:
                         dialect.answer(state, [(call, "suspension unavailable: "
                                                 f"{type(exc).__name__}")])
                         continue
-                    panel(f"  ⟢ return_to_zoe: {question[:70]} → held in memory")
+                    panel(f"  ⟢ {call.name}: {question[:70]} → held in memory")
                     return Attraction(finish(), held)
 
             results: list[tuple[ToolCall, str]] = []
             for call in calls:
-                if call.name == "return_to_zoe":
+                if call.name in {"return_to_zoe", "publish_commit"}:
                     TOOLS_RAN += 1
-                    reason = (
-                        "unavailable: this process will end after the turn"
-                        if not allow_continuation else
-                        "refused: return_to_zoe must be the sole tool call and "
-                        "requires nonempty question and why"
-                    )
+                    if not allow_continuation:
+                        reason = "unavailable: this process will end after the turn"
+                    else:
+                        reason = (
+                            f"refused: {call.name} must be the sole tool call and "
+                            "carry a complete valid proposal"
+                        )
                     results.append((call, reason))
                 else:
                     results.append((call, execute_tool(call)))
