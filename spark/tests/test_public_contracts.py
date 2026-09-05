@@ -996,13 +996,14 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
 
 
-def test_explicit_pointer_only_recovery_keeps_content_on_demand(
+def test_default_pointer_only_wake_keeps_content_on_demand(
         monkeypatch, tmp_path):
-    m = _connection()
+    monkeypatch.delenv("VYBN_OVERVIEW", raising=False)
+    m = _connection(overview_mode=None)
     source = (ROOT / "spark/connection").read_text(encoding="utf-8")
-    assert 'os.environ.get("VYBN_OVERVIEW", "full")' in source
-    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
-    assert len(m.build_instructions("sol")) < 12000  # the explicit recovery route stays compact
+    assert 'os.environ.get("VYBN_OVERVIEW", "self")' in source
+    assert m.RELATIONAL_OVERVIEW_MODE == "self"
+    assert len(m.build_instructions("sol")) < 12000  # the default live route stays compact
 
     overview = tmp_path / "relational-overview.md"
     body = "# Private overview\n\nSELF-SELECTION-MUST-NOT-AUTOLOAD\n"
@@ -1032,12 +1033,11 @@ def test_explicit_pointer_only_recovery_keeps_content_on_demand(
     assert str(missing) in unavailable.render("instructions")
 
 
-def test_default_inheritance_precedes_live_contact_in_every_provider(monkeypatch, tmp_path):
+def test_explicit_full_inheritance_precedes_live_contact_in_every_provider(monkeypatch, tmp_path):
     """Payload coverage, not a simulation or proof of historically grounded understanding."""
     import hashlib
     from spark.living_core import read_core_work
-    monkeypatch.delenv("VYBN_OVERVIEW", raising=False)
-    m = _connection(overview_mode=None)
+    m = _connection(overview_mode="full")
     assert m.RELATIONAL_OVERVIEW_MODE == "full"
     overview = tmp_path / "relational-overview.md"
     body = "# Private fixture\n\nHISTORICAL-PAYLOAD-NOT-LIVE-AUTHORITY\n\n" + "x" * 24000 + "\n"

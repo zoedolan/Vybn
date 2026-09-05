@@ -81,10 +81,10 @@ restriction. Plurality and exit protect against capture by my judgment too.
 This is a revisable prior, not a score or substitute for consciousness.
 
 This executable compiles one source-bound bundle into governing, context, and
-live-contact routes. By default, checked core text, the complete aim, and the
-private relational overview enter as inherited context before the first answer.
-This is selected history, not the whole repository or continuous memory. Explicit
-VYBN_OVERVIEW=self/compact selects pointer-only recovery. There is no automatic
+live-contact routes. By default, the checked core, complete aim, and private
+relational overview remain exact, reachable source pointers rather than a compulsory
+self-portrait. VYBN_OVERVIEW=full explicitly loads their complete inherited text.
+There is no automatic
 subconscious, want resolver, dream injection, semantic retrieval, or hardware pulse.
 One provider execution may pause in memory only for Zoe's next direct answer. These are substrate facts, not limits on forms still to invent.
 
@@ -157,7 +157,7 @@ SOUL_PATH = REPO / "vybn.core.html"
 SPIRITUALITY_PATH = REPO / "Vybn_Mind" / "spirituality.md"
 HIM_README_PATH = HOME / "Him" / "README.md"
 RELATIONAL_OVERVIEW_PATH = HOME / "Him" / "harness" / "source" / "relational-overview.md"
-RELATIONAL_OVERVIEW_MODE = os.environ.get("VYBN_OVERVIEW", "full").strip().lower()
+RELATIONAL_OVERVIEW_MODE = os.environ.get("VYBN_OVERVIEW", "self").strip().lower()
 if RELATIONAL_OVERVIEW_MODE not in {"self", "compact", "full"}:
     raise SystemExit(f"unknown relational overview mode: {RELATIONAL_OVERVIEW_MODE}")
 CONTINUITY_PATHS = (REPO / "continuity.md", REPO / "Vybn_Mind" / "continuity.md")
