@@ -217,7 +217,7 @@ SUBJECT_MAX_OPEN_OFFERS = 8
 SUBJECT_MAX_ACTIVE_REFUSALS = 8
 SUBJECT_MAX_RENDER = 6000
 SUBJECT_KINDS = ("future", "offer", "answer", "refusal", "release")
-SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:record_transform")
+SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:record_transform", "tool:derive_operation")
 PATH_TAG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
 DIGEST_RE = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -361,8 +361,32 @@ SELECT_EFFORT_SCHEMA = {"name": "select_reasoning_effort", "description": (
         "effort": {"type": "string", "enum": list(ASTRA_EFFORTS)},
         "why": {"type": "string", "minLength": 1, "maxLength": 600}},
         "required": ["effort", "why"]}}
+DERIVE_SCHEMA = {"name": "derive_operation", "description": (
+    "Learn a bounded pure-JSON transformation from input/output examples, or apply "
+    "an explicit program. Language: field, exact record filter, flatten, join. "
+    "Exposes encountered ambiguity; a fit is not generalization or uniqueness. "
+    "No arbitrary code execution, model calls, automatic adoption, persistence, or authority. "
+    "Use only for an actual data-transformation need, not to score a subject."),
+    "input_schema": {"type": "object", "properties": {
+        "action": {"type": "string", "enum": ["learn", "apply"]},
+        "examples": {"type": "array", "items": {"type": "object"}},
+        "max_steps": {"type": "integer", "minimum": 0, "maximum": 8},
+        "program": {"type": "array", "items": {"type": "array",
+            "items": {"type": ["string", "number", "boolean", "null"]}}},
+        "value": {"description": "JSON input for apply"},
+    }, "required": ["action"]}}
+
+
+def derive_operation(arguments):
+    try:
+        from spark.derive import operate
+    except ModuleNotFoundError:
+        from derive import operate
+    return json.dumps(operate(arguments), ensure_ascii=False)
+
+
 TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, SHOW_PATH_LOG_SCHEMA, RETURN_SCHEMA,
-                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA, SELECT_EFFORT_SCHEMA)
+                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA, SELECT_EFFORT_SCHEMA, DERIVE_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -759,6 +783,8 @@ def execute_tool(call: ToolCall, dialect: Dialect | None = None) -> str:
             PRIVATE_CORPUS.extend(
                 part.strip() for part in output.split("\n\n") if len(part.strip()) >= 40
             )
+        elif call.name == "derive_operation":
+            output = derive_operation(call.arguments)
         elif call.name == "read_file":
             output = read_file(call.arguments)
         elif call.name == "bash":

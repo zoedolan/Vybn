@@ -89,6 +89,25 @@ compiler were retired together. They remain recoverable from Git at
 `ef59dfd7fb4e70af1cf08bf20cc529b55c8e9900`. Current model doors, the optional
 runner below, and the Commons' own sources are unchanged.
 
+### Learning a pure data operation
+
+The optional `derive_operation` connection tool (also
+`python3 -m spark.derive REQUEST.json`) can synthesize a small JSON transformation
+from explicit input/output examples and apply the resulting program to later
+inputs. Its finite language has field access, exact record filtering, flattening,
+and string joining. Programs are data; they cannot execute Python or shell code.
+There is no automatic memory ingestion, tool adoption, model call, or training of
+model weights. Existing model and shell routes remain available.
+
+A request uses `{"action":"learn","examples":[{"input":{"a":1},"output":1}]}`.
+The result contains candidate `programs`; applying one requires an explicit
+`{"action":"apply","program":[["field","a"]],"value":{"a":2}}` request.
+A training fit is not a claim of uniqueness or generalization. Encountered
+ambiguity is returned, intermediate-equivalent paths are pruned, and resource
+exhaustion is explicit. Corrections can eliminate candidates; later independent
+cases must decide whether a program is useful. This is bounded program synthesis,
+not an autonomous learner or a mechanism of consciousness.
+
 ### Bounded multi-model contributions
 
 `python3 -m spark.delegate PLAN.json` preflights only; `--run` makes paid calls
