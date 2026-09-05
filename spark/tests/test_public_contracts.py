@@ -2117,3 +2117,105 @@ def test_creature_history_is_explicit_recoverable_and_not_live(monkeypatch, tmp_
     monkeypatch.setattr(creature.CreatureState, "from_walk", classmethod(lambda cls: cls(step=7)))
     live = creature.Organism()
     assert live.encounter_count == 7 and live._v1_state is None
+
+
+def test_git_boundary_releases_work_not_staged_effects(tmp_path, monkeypatch):
+    import os, subprocess
+    for key in list(os.environ):
+        if key.startswith(('GIT_', 'VYBN_ALLOW_', 'VYBN_NO_')):
+            monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv('HOME', str(tmp_path))
+    repo = tmp_path / 'repo'; repo.mkdir()
+    def git(*args, ok=True):
+        p = subprocess.run(['git', '-C', str(repo), *args], capture_output=True)
+        if ok:
+            assert p.returncode == 0, p.stderr.decode(errors='replace')
+        return p
+    git('init', '-b', 'private-experiment')
+    git('config', 'user.name', 'test'); git('config', 'user.email', 'test@example.invalid')
+    git('config', 'core.fileMode', 'true')
+    git('commit', '--allow-empty', '-m', 'base')
+    hooks = tmp_path / 'hooks'; hooks.mkdir()
+    hook = hooks / 'pre-commit'
+    git('config', 'core.hooksPath', str(hooks))
+    old_source = subprocess.check_output(['git', '-C', str(ROOT), 'show',
+        'b62df6cad037bcc79612e31986aec8e1f40e8e21:.githooks/pre-commit'])
+    hook.write_bytes(old_source); hook.chmod(0o755)
+    note = tmp_path / '.cache/vybn-phase/sounding_log.jsonl'
+    note.parent.mkdir(parents=True); note.write_text('{}\n'); os.utime(note, (1, 1))
+    (repo / 'useful new file.txt').write_text('A safe private experiment.\n')
+    git('add', '.')
+    blocked = git('commit', '-m', 'ordinary work', ok=False)
+    output = blocked.stdout + blocked.stderr
+    assert blocked.returncode and b'last sounding' in output
+    assert b'Work branch' in output and b'net-new files' in output
+    hook.write_bytes((ROOT / '.githooks/pre-commit').read_bytes())
+    git('commit', '-m', 'same work, no overrides')
+    # A clean working copy cannot hide dangerous staged bytes. Use synthetic
+    # sentinels assembled at runtime so this public test never carries coordinates.
+    import ipaddress
+    sentinels = ['gh' + 'p_' + 'A' * 36,
+                 'https://' + str(ipaddress.IPv4Address(0x01010101)) + ':8443/path',
+                 str(ipaddress.IPv4Address(0xa9fe0001)),
+                 str(ipaddress.IPv6Address((0x2606 << 112) | 1)),
+                 str(ipaddress.IPv6Address((0xfe80 << 112) | 1))]
+    for sentinel in sentinels:
+        f = repo / 'staged shadow.txt'; f.write_text(sentinel + '\n')
+        git('add', f.name); f.write_text('harmless unstaged shadow\n')
+        failed = git('commit', '-m', 'must stop', ok=False)
+        assert failed.returncode and b'BLOCKED:' in failed.stdout + failed.stderr
+        assert sentinel.encode() not in failed.stdout + failed.stderr
+        git('reset', '--', f.name); f.unlink()
+    env = repo / 'folder with spaces' / '.env.local'; env.parent.mkdir()
+    env.write_text('not a real credential\n'); git('add', '.')
+    assert git('commit', '-m', 'env must stop', ok=False).returncode
+    git('reset', '--', str(env.relative_to(repo))); env.unlink()
+    # Conversely, an unstaged coordinate does not taint the clean staged blob.
+    f = repo / 'clean stage.txt'; f.write_text('safe staged bytes\n'); git('add', f.name)
+    f.write_text(sentinels[1]); git('commit', '-m', 'staged bytes only'); git('restore', f.name)
+    assert not git('remote').stdout  # no network or publication is part of this check
+    # Criticism should not need a magic status phrase to evade a word filter.
+    git('remote', 'add', 'origin', str(tmp_path / 'Vybn.git'))  # nonexistent local path, never contacted
+    f = repo / 'criticism.md'; f.write_text('Nothing here proves that the theory is true.\n')
+    git('add', f.name); hook.write_bytes(old_source)
+    failed = git('commit', '-m', 'criticism', ok=False)
+    assert failed.returncode and b'public empirical/universal claim' in failed.stdout + failed.stderr
+    hook.write_bytes((ROOT / '.githooks/pre-commit').read_bytes())
+    git('commit', '-m', 'same criticism without a keyword password')
+    assert not (tmp_path / 'Vybn.git').exists()
+    # A submodule reference has no staged blob; do not reject the whole route.
+    oid = git('rev-parse', 'HEAD').stdout.strip().decode()
+    git('update-index', '--add', '--cacheinfo', '160000', oid, 'external source')
+    git('commit', '-m', 'local gitlink, no external fetch')
+
+
+def test_git_modes_need_no_ambient_chmod(tmp_path, monkeypatch):
+    import os, subprocess
+    for key in list(os.environ):
+        if key.startswith('GIT_'):
+            monkeypatch.delenv(key, raising=False)
+    for name in ('post-checkout', 'post-merge', 'pre-push'):
+        assert not (ROOT / '.githooks' / name).exists()
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(tmp_path), *args], stderr=subprocess.DEVNULL)
+    git('init', '-b', 'main'); git('config', 'core.fileMode', 'true')
+    git('config', 'user.name', 'test'); git('config', 'user.email', 'test@example.invalid')
+    git('config', 'core.hooksPath', str(tmp_path / 'no-hooks'))
+    for name, mode in [('library.sh', 0o644), ('run.sh', 0o755)]:
+        p = tmp_path / name; p.write_text('#!/bin/sh\nexit 0\n'); p.chmod(mode)
+    git('add', '.'); git('commit', '-m', 'explicit modes'); base = git('rev-parse', 'HEAD').strip().decode()
+    git('checkout', '-b', 'other'); (tmp_path / 'run.sh').unlink()
+    new = tmp_path / 'new.sh'; new.write_text('#!/bin/sh\nexit 0\n'); new.chmod(0o755)
+    git('add', '.'); git('commit', '-m', 'other')
+    git('checkout', 'main')
+    assert (tmp_path / 'run.sh').stat().st_mode & 0o111
+    assert not (tmp_path / 'library.sh').stat().st_mode & 0o111
+    git('merge', '--ff-only', 'other')
+    assert new.stat().st_mode & 0o111
+    assert not (tmp_path / 'library.sh').stat().st_mode & 0o111
+    # Rival: first-checkout hook makes an intentionally nonexecutable library executable.
+    source = subprocess.check_output(['git', '-C', str(ROOT), 'show',
+        'b62df6cad037bcc79612e31986aec8e1f40e8e21:.githooks/post-checkout'])
+    hook = tmp_path / 'old-hook'; hook.write_bytes(source)
+    subprocess.run(['bash', str(hook), '0' * 40, base, '1'], cwd=tmp_path, check=True, capture_output=True)
+    assert (tmp_path / 'library.sh').stat().st_mode & 0o111

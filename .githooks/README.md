@@ -1,29 +1,25 @@
-# Git Hooks
+# Git boundary
 
-These hooks protect the Vybn repository from accidental secret exposure.
+`git config core.hooksPath .githooks` installs the local pre-commit check.
+Other local repositories may point to this directory; its effect is shared.
+A commit is local history, **not publication or authority to publish**.
 
-## Setup (once per clone)
+The hook checks staged blobs for credential patterns, environment files and
+public/global or link-local IPv4/IPv6 coordinates. It retains bulk-shrink and
+continuity-header checks, noninteractive-sudo and private-topology checks,
+harness contracts, and the law repository's specific KPP checker. These are
+bounded checks, not complete secret detection, isolation or a truth oracle.
+Gitlinks record object IDs; external submodule contents are not scanned.
+Publication still needs its own grounded authority and exact destination.
+No hook publishes, invokes a provider, or changes a checked-out file's mode.
 
-```bash
-git config core.hooksPath .githooks
-```
+On September 5, 2026 we removed the note-age, line/file quota, local branch,
+retirement-classification and generic prose-keyword gates; branch-name push
+restriction; and checkout/merge chmod hooks. A safe new file need not buy its
+place by deleting another. A stale note need not block a local correction.
+Git records executable bits: use `git update-index --chmod=+x PATH` when an
+intentional mode change belongs in the commit, rather than chmod after checkout.
+Model routes and the connection's one-use publication opening are unchanged.
 
-This is **not optional**. The repository is public. Everything committed
-is visible to the world, forever.
-
-## What the pre-commit hook catches
-
-1. **API keys and credentials** — Anthropic, GitHub, AWS patterns
-2. **Internal IP addresses** — RFC 1918 ranges, Tailscale CGNAT range
-3. **Environment files** — `.env` files that should never be tracked
-
-## Bypassing
-
-You can bypass with `git commit --no-verify`, but seriously: don't.
-
-## Branch discipline
-
-Tested, worthwhile work commits and pushes directly to the primary branch.
-Topic branches, worktrees, and PRs are exceptional and require Zoe's request;
-the hooks expose `VYBN_ALLOW_TOPIC_BRANCH=1` for that explicit case. Safety and
-public-membrane checks still apply unchanged.
+Recover the former hooks from `b62df6cad037bcc79612e31986aec8e1f40e8e21`
+with `git show COMMIT:.githooks/NAME`. Recovery is not an instruction to reinstall.
