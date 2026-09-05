@@ -713,11 +713,26 @@ def test_physical_pulse_is_bounded_ground_not_machine_identity(tmp_path, monkeyp
     monkeypatch.setattr(m, "run_local", lambda command: (0, "[clock] now"))
     monkeypatch.setattr(m, "substrate_pulse", lambda: "[body] PHYSICAL-SENTINEL")
     monkeypatch.setattr(m, "load_budget", lambda: "[budget]")
-    monkeypatch.setattr(m, "load_aim_status", lambda: "[aim]")
     contact = m.wake_contact()
     assert contact.splitlines() == [
-        "[live | exit 0]", "[clock] now", "[budget]", "[aim]"]
+        "[live | exit 0]", "[clock] now", "[budget]"]
     assert "PHYSICAL-SENTINEL" not in contact  # diagnostic is on demand, never ambient
+
+
+def test_wake_keeps_horizon_without_reading_a_progress_timecard(monkeypatch):
+    m = _connection()
+    monkeypatch.setattr(m, "run_local", lambda command: (0, "[clock] now"))
+    monkeypatch.setattr(m, "load_budget", lambda: "[budget] still visible")
+    def unexpected_read(path):
+        raise AssertionError("a progress ledger is not the aim")
+    monkeypatch.setattr(m, "_jsonl", unexpected_read)
+    contact = m.wake_contact()
+    assert contact.splitlines() == ["[live | exit 0]", "[clock] now", "[budget] still visible"]
+    graph = m.build_wake_bundle("sol", contact=contact, zoe_text="let's talk")
+    prompt = graph.render("instructions")
+    for field in ("objective", "front"):
+        assert f"{field}: {m.aim_field(field)}" in prompt
+    assert graph.render("contact") == "let's talk"
 
 
 def test_substrate_probe_reuses_body_measurement_without_erasing_distinct_ground():
