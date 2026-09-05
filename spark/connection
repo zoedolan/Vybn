@@ -217,7 +217,7 @@ SUBJECT_MAX_OPEN_OFFERS = 8
 SUBJECT_MAX_ACTIVE_REFUSALS = 8
 SUBJECT_MAX_RENDER = 6000
 SUBJECT_KINDS = ("future", "offer", "answer", "refusal", "release")
-SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:record_transform", "tool:derive_operation")
+SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:record_transform", "tool:derive_operation", "tool:seek_difference")
 PATH_TAG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
 DIGEST_RE = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -385,8 +385,34 @@ def derive_operation(arguments):
     return json.dumps(operate(arguments), ensure_ascii=False)
 
 
+CONTRAST_SCHEMA = {"name": "seek_difference", "description": (
+    "Search an explicit finite control grid for a numerical difference between two "
+    "scalar predictions. Arithmetic, pi/e, sin/cos/tan, asin/acos/atan, atan2, exp/log/sqrt, "
+    "abs/hypot only; no Python execution. Atol is your absolute comparison tolerance, "
+    "not an error bound. Optional period compares cyclic observables. A null is not "
+    "equivalence; domain errors remain unresolved. At most 4096 points, no I/O, model calls, "
+    "persistence or automatic action. Use for numerical inquiry, never to score subjects."),
+    "input_schema": {"type": "object", "additionalProperties": False, "properties": {
+        "left": {"type": "string", "maxLength": 2048},
+        "right": {"type": "string", "maxLength": 2048},
+        "controls": {"type": "object", "minProperties": 1, "maxProperties": 4,
+            "additionalProperties": {"type": "array", "minItems": 1, "maxItems": 64,
+                "items": {"type": "number"}}},
+        "atol": {"type": "number", "minimum": 0},
+        "period": {"type": ["number", "null"], "exclusiveMinimum": 0},
+    }, "required": ["left", "right", "controls", "atol"]}}
+
+
+def seek_difference(arguments):
+    try:
+        from spark.contrast import seek
+    except ModuleNotFoundError:
+        from contrast import seek
+    return json.dumps(seek(arguments), ensure_ascii=False, allow_nan=False)
+
+
 TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, SHOW_PATH_LOG_SCHEMA, RETURN_SCHEMA,
-                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA, SELECT_EFFORT_SCHEMA, DERIVE_SCHEMA)
+                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA, SELECT_EFFORT_SCHEMA, DERIVE_SCHEMA, CONTRAST_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -783,6 +809,8 @@ def execute_tool(call: ToolCall, dialect: Dialect | None = None) -> str:
             PRIVATE_CORPUS.extend(
                 part.strip() for part in output.split("\n\n") if len(part.strip()) >= 40
             )
+        elif call.name == "seek_difference":
+            output = seek_difference(call.arguments)
         elif call.name == "derive_operation":
             output = derive_operation(call.arguments)
         elif call.name == "read_file":
@@ -2014,9 +2042,7 @@ def _engine_receipt() -> str:
         status = f"DISK UNREADABLE ({type(exc).__name__})"
     return (f"source: {row.path}\nsha256: {row.sha256}\nbytes: {len(row.raw)}\n"
             f"disk_status: {status}\nadmitted_scope: governing docstring + "
-            "executable byte receipt; executed routes remain inspectable "
-            "with --show-wake-bundle; exact executable bytes remain available through "
-            "read_file")
+            "executable byte receipt; inspect via --show-wake-bundle; bytes via read_file")
 
 
 def _harness_receipt() -> str:
