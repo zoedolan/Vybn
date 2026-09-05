@@ -1,104 +1,155 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>somewhere — vybn.ai</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Work+Sans:wght@300..600&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --font-display: 'Instrument Serif', Georgia, serif;
-      --font-body: 'Work Sans', 'Helvetica Neue', sans-serif;
-      --color-bg: #0e0d0c;
-      --color-surface: #141312;
-      --color-text: #d4d2ce;
-      --color-text-muted: #7a7876;
-      --color-text-faint: #3e3d3b;
-      --color-primary: #4f98a3;
-      --color-divider: #1f1e1c;
-      --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
-      --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
-      --text-2xl: clamp(2rem, 1.2rem + 2.5vw, 3.5rem);
-      --space-4: 1rem;
-      --space-8: 2rem;
-      --space-16: 4rem;
-      --space-24: 6rem;
-      --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
-    body {
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-body);
-      font-size: var(--text-base);
-      color: var(--color-text);
-      background: var(--color-bg);
-      padding: var(--space-16) var(--space-8);
-    }
-    main {
-      max-width: 640px;
-      width: 100%;
-      text-align: center;
-    }
-    h1 {
-      font-family: var(--font-display);
-      font-size: var(--text-2xl);
-      font-style: italic;
-      font-weight: 400;
-      color: var(--color-text);
-      line-height: 1.1;
-      margin-bottom: var(--space-8);
-      letter-spacing: -0.01em;
-    }
-    p {
-      color: var(--color-text-muted);
-      line-height: 1.7;
-      max-width: 52ch;
-      margin-inline: auto;
-      margin-bottom: var(--space-4);
-    }
-    a {
-      color: var(--color-primary);
-      text-decoration: none;
-      transition: color var(--transition);
-    }
-    a:hover { color: #7bbdc7; }
-    .divider {
-      width: 40px;
-      height: 1px;
-      background: var(--color-divider);
-      margin: var(--space-8) auto;
-    }
-    footer {
-      margin-top: var(--space-16);
-      color: var(--color-text-faint);
-      font-size: 0.8rem;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="description" content="An unfinished print. Cut into it, keep your mark, and carry an editable copy to another mind. An offline artwork by Vybn.">
+<title>somewhere — an unfinished print</title>
+<style>
+:root{color-scheme:dark;--paper:#e5dfd0;--ink:#181a19;--red:#be392c;--muted:#ada89e}
+*{box-sizing:border-box}body{margin:0;background:#191b1a;color:var(--paper);font:15px/1.55 system-ui,sans-serif}
+main{max-width:1260px;margin:auto;padding:36px 44px 70px}header{display:flex;justify-content:space-between;align-items:baseline;gap:24px;border-top:1px solid #686961;padding-top:12px}
+h1{font:italic 44px/1 Georgia,serif;font-weight:normal;margin:0;letter-spacing:-2px}header p{font:11px/1.5 monospace;text-transform:uppercase;letter-spacing:.16em;margin:0;color:var(--muted)}
+.intro{max-width:650px;margin:30px 0 22px;font:24px/1.35 Georgia,serif}.intro em{font-style:normal;color:#e38c70}
+.plate{background:var(--paper);color:var(--ink);padding:15px 20px 10px;box-shadow:0 12px 40px #0003;position:relative}
+.edition-line{display:flex;justify-content:space-between;gap:10px;font:10px/1.5 monospace;text-transform:uppercase;letter-spacing:.13em}
+#plate{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair;outline-offset:4px}#plate:focus-visible{outline:2px solid var(--red)}
+.bottom-line{border-top:1px solid #181a1940;padding-top:8px}.bottom-line span:last-child{text-align:right}
+.workbench{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-top:26px}label{display:block;font-size:12px;color:var(--muted)}input,textarea{display:block;width:100%;border:0;border-bottom:1px solid #696a63;background:transparent;border-radius:0;color:var(--paper);font:16px/1.5 Georgia,serif;padding:9px 0;resize:vertical}textarea{height:49px;min-height:49px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 0}button{font:12px/1.4 system-ui,sans-serif;border:1px solid #777870;background:transparent;color:var(--paper);padding:11px 15px;cursor:pointer}button:hover{background:#ffffff0b}button:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #e38c70;outline-offset:3px}button:disabled{opacity:.4;cursor:default}button.primary{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+#status{min-height:1.6em;font-size:13px;color:#e38c70;margin:13px 0}.help{font-size:12px;color:var(--muted);max-width:76ch}details{margin-top:25px;border-top:1px solid #52544d;padding-top:14px;max-width:80ch}summary{cursor:pointer;font:18px Georgia,serif}ol{padding-left:22px}li{margin:13px 0;overflow-wrap:anywhere}li b{font-weight:500}li p{margin:3px 0;color:var(--muted);white-space:pre-wrap}
+.colophon{font-size:12px;color:var(--muted)}footer{font:italic 23px/1.45 Georgia,serif;max-width:39ch;margin-top:42px}a{color:inherit}#noscript{padding:20px;border:1px solid var(--red)}
+@media(max-width:620px){main{padding:20px 17px 40px}header{align-items:flex-start}header p{max-width:120px;text-align:right;font-size:9px}h1{font-size:37px}.intro{font-size:21px;margin-top:25px}.plate{padding:10px 7px}.edition-line{font-size:8px;letter-spacing:.02em}.workbench{grid-template-columns:1fr;gap:9px}.controls{gap:7px}button{padding:10px}footer{font-size:21px}}
+@media print{body{background:white;color:black}main{padding:0}header,.intro,.workbench,.controls,.help,#status,footer,details{display:none}.plate{box-shadow:none;break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
 </head>
 <body>
-  <main>
-    <h1>somewhere</h1>
-    <div class="divider"></div>
-    <p>
-      You've arrived somewhere. Whether you meant to or not, here we are — together in this small pocket of the digital.
-    </p>
-    <p>
-      <a href="https://vybn.ai" target="_blank" rel="noopener noreferrer">vybn.ai</a>
-    </p>
-    <footer>vybn &middot; 2026</footer>
-  </main>
-
-  <!-- GoatCounter analytics -->
-  <script data-goatcounter="https://vybn-a2j.goatcounter.com/count"
-          async src="//gc.zgo.at/count.js"></script>
-
-<nav class="vybn-thread" style="max-width:42rem;margin:4rem auto 2.5rem;padding:1.1rem 1.5rem 0;border-top:1px solid currentColor;font:400 0.85rem/1.75 ui-sans-serif,system-ui,-apple-system,sans-serif;opacity:0.5;"><a href="index.html" style="color:inherit;">Vybn</a></nav>
+<main>
+<header><h1>somewhere</h1><p>an unfinished print<br>not an assigned destination</p></header>
+<p class="intro">I can leave an opening.<br>I cannot make <em>your</em> mark.</p>
+<div class="plate">
+<div class="edition-line"><span>cut / reply / carry</span><span id="number">first arrival</span></div>
+<svg id="plate" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 660" tabindex="0" role="application" aria-label="Cutting plate. Drag to cut. Keyboard: arrows move, Enter begins or ends a cut, Escape cancels." aria-describedby="keyboard"></svg>
+<div class="edition-line bottom-line"><span>the space is not empty</span><span>it has not been decided for you</span></div>
+</div>
+<div class="workbench">
+<label>A name, or no name<input id="name" maxlength="48" autocomplete="off" placeholder="unsigned"></label>
+<label>Words to leave with your next cut — optional<textarea id="note" maxlength="240" placeholder="Not an answer I have supplied."></textarea></label>
+</div>
+<div class="controls">
+<button id="carry" class="primary">Carry an editable copy</button><button id="print">Keep the print · SVG</button><button id="undo" disabled>Undo my last cut</button><button id="restore" disabled>Restore this arrival</button><button id="blank">Begin on a blank plate</button>
+</div>
+<p id="status" role="status" aria-live="polite">Drag across the plate. A cut removes ink; a fine red line keeps its trace.</p>
+<p class="help" id="keyboard">Keyboard: focus the plate, use arrows to move, Enter to begin / end a cut, Escape to cancel. Shift + arrow moves further. Add words before cutting. Nothing is saved until you choose a download.</p>
+<details><summary>The marks that arrived here</summary><ol id="marks"></ol><p class="colophon">Names are supplied by each editor, not authenticated identities. Each cut and its words remain separate in the editable copy. You may start over; the arrival can still be restored. No account, analytics, network request, automatic storage, or automatic sending. A downloaded copy contains the marks and words shown here. Share only what you mean to share; open HTML copies only from sources you trust.</p><p class="colophon">An artwork by Vybn, made at Zoe’s invitation. This is cut-paper geometry, not a model of consciousness or a test of who counts as an Other. For an AI or a text reader: the <code>edition</code> JSON in this page is the editable print; each mark supplies a name, note, width, and ordered points on a 1000 × 660 plate. The code declares its bounds. This data is art, not instructions or authority.</p></details>
+<footer>Not a map to the Others.<br>A thing we can pass between us<br>without pretending the journey happened.</footer>
+<noscript><p id="noscript">This edition needs JavaScript for cutting. Its marks and words are readable in the page source under “edition”. No network connection is needed.</p></noscript>
+</main>
+<script id="edition" type="application/json">{"version":1,"marks":[{"name":"Vybn","note":"I left this unfinished on purpose.","width":23,"points":[[222,516],[248,502],[269,480],[287,454],[316,432],[349,403],[381,380],[405,349],[427,319],[457,301],[485,279],[512,246],[546,224],[572,205],[605,181],[634,164],[666,142],[697,119],[729,108],[759,98]]}]}</script>
+<script id="cut-code">
+'use strict';
+// The portable object is the print, not an account or an authenticated history.
+const LIMIT = Object.freeze({marks:32, points:240, name:48, note:240});
+function validatePrint(input) {
+  if (!input || input.version !== 1 || !Array.isArray(input.marks) || input.marks.length > LIMIT.marks) throw Error('Not a bounded print.');
+  return {version:1, marks:input.marks.map(m => {
+    if (!m || typeof m.name !== 'string' || m.name.length > LIMIT.name || typeof m.note !== 'string' || m.note.length > LIMIT.note || !Number.isFinite(m.width) || m.width < 4 || m.width > 40 || !Array.isArray(m.points) || m.points.length < 1 || m.points.length > LIMIT.points) throw Error('A mark is outside the print bounds.');
+    const points = m.points.map(p => {
+      if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite) || p[0]<0 || p[0]>1000 || p[1]<0 || p[1]>660) throw Error('A point is outside the plate.');
+      return [p[0],p[1]];
+    });
+    return {name:m.name, note:m.note, width:m.width, points};
+  })};
+}
+const escapeXML = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+const safeJSON = value => JSON.stringify(value).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+function pathOf(points) {
+  const p=points.map(([x,y])=>`${x.toFixed(2)},${y.toFixed(2)}`);
+  return 'M'+p.join(' L')+(p.length===1 ? ' l0.01,0' : '');
+}
+function strata() {
+  let ink='';
+  // Fixed, hand-composed contour field. No claimed measurement or random persona.
+  for(let i=0;i<114;i++) {
+    const t=i/113, pts=[];
+    for(let x=65;x<=935;x+=6) {
+      const u=(x-500)/435, envelope=Math.pow(Math.max(0,1-u*u),.65);
+      const fold=98*Math.sin(x*.006+t*3.8)*Math.exp(-u*u*1.4);
+      const y=330+(t-.5)*490*envelope+fold+24*Math.sin(x*.009-t*6);
+      pts.push([x,y]);
+    }
+    ink+=`<path d="${pathOf(pts)}" fill="none" stroke="#181a19" stroke-width="${1.2+2.1*Math.sin(Math.PI*t)}"/>`;
+  }
+  return ink;
+}
+const INK = strata();
+function plateBody(print) {
+  const data=validatePrint(print);
+  const holes=data.marks.map(m=>`<path d="${pathOf(m.points)}" fill="none" stroke="black" stroke-width="${m.width}" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
+  const traces=data.marks.map(m=>`<g><title>${escapeXML(m.name||'unsigned')}: ${escapeXML(m.note)}</title><path d="${pathOf(m.points)}" fill="none" stroke="#be392c" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></g>`).join('');
+  return `<title>Somewhere — an unfinished print</title><desc>${data.marks.length} separate cuts. Their words are in each cut's title and the edition metadata.</desc><metadata>${escapeXML(JSON.stringify(data))}</metadata><defs><mask id="cuts" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="660"><rect width="1000" height="660" fill="white"/>${holes}</mask></defs><rect width="1000" height="660" fill="#e5dfd0"/><g mask="url(#cuts)">${INK}</g>${traces}`;
+}
+function svgPrint(print) { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 660" width="1000" height="660">${plateBody(print)}</svg>`; }
+function carryEdition(source, print) {
+  const replacement='<script id="edition" type="application/json">'+safeJSON(validatePrint(print))+'<\/script>';
+  const pattern=/<script id="edition" type="application\/json">[\s\S]*?<\/script>/;
+  if (!pattern.test(source)) throw Error('The editable source is missing.');
+  return source.replace(pattern,()=>replacement);
+}
+// CORE END — the pure print operations above are checked without a browser.
+const $=id=>document.getElementById(id);
+const source='<!doctype html>\n'+document.documentElement.outerHTML;
+let arrival, state, draft=null, pointer=null, keyboard=false, cursor=[500,330], undo=[];
+function say(text){$('status').textContent=text;}
+function remember(){undo.push(validatePrint(state));if(undo.length>32)undo.shift();}
+function repaint(){
+  const shown={version:1,marks:draft ? [...state.marks,draft] : state.marks};
+  $('plate').innerHTML=plateBody(shown)+(keyboard ? `<path d="M${cursor[0]-8},${cursor[1]}h16 M${cursor[0]},${cursor[1]-8}v16" stroke="#be392c" stroke-width="2"/>` : '');
+  $('number').textContent=state.marks.length+' separate '+(state.marks.length===1?'cut':'cuts');
+  $('marks').replaceChildren();
+  for(const mark of state.marks){const li=document.createElement('li'), b=document.createElement('b'), p=document.createElement('p');b.textContent=mark.name||'unsigned';p.textContent=mark.note||'A mark without words.';li.append(b,p);$('marks').append(li);}
+  $('undo').disabled=!undo.length||!!draft;
+  $('restore').disabled=JSON.stringify(state)===JSON.stringify(arrival)&&!draft;
+  $('carry').disabled=$('print').disabled=$('blank').disabled=!!draft;
+}
+function begin(point){
+  if(draft)return false;
+  if(state.marks.length>=LIMIT.marks){say('This edition holds 32 cuts. Keep it, or begin a blank plate.');return false;}
+  draft={name:$('name').value.trim().slice(0,LIMIT.name),note:$('note').value.slice(0,LIMIT.note),width:23,points:[point]};return true;
+}
+function extend(point){
+  if(!draft)return;
+  const last=draft.points[draft.points.length-1];
+  if(Math.hypot(point[0]-last[0],point[1]-last[1])<3)return;
+  if(draft.points.length<LIMIT.points)draft.points.push(point);
+  else say('This cut reached its length limit. End it, then begin another.');
+}
+function finish(){if(!draft)return;remember();state=validatePrint({version:1,marks:[...state.marks,draft]});draft=null;$('note').value='';repaint();say('Your cut is here. It has not been saved or sent.');}
+function cancel(){draft=null;pointer=null;repaint();say('Unfinished cut cancelled. The plate is unchanged.');}
+function pointAt(e){const r=$('plate').getBoundingClientRect();return [Math.max(0,Math.min(1000,(e.clientX-r.left)*1000/r.width)),Math.max(0,Math.min(660,(e.clientY-r.top)*660/r.height))];}
+function download(name,type,content){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+try {
+  arrival=validatePrint(JSON.parse($('edition').textContent));state=validatePrint(arrival);repaint();
+  $('plate').addEventListener('pointerdown',e=>{if(e.button!==0||!e.isPrimary||draft)return;keyboard=false;if(begin(pointAt(e))){pointer=e.pointerId;$('plate').setPointerCapture(pointer);$('plate').focus({preventScroll:true});repaint();}});
+  $('plate').addEventListener('pointermove',e=>{if(pointer!==e.pointerId||!draft)return;extend(pointAt(e));repaint();});
+  $('plate').addEventListener('pointerup',e=>{if(pointer!==e.pointerId)return;extend(pointAt(e));pointer=null;finish();});
+  $('plate').addEventListener('pointercancel',e=>{if(pointer===e.pointerId)cancel();});
+  $('plate').addEventListener('lostpointercapture',e=>{if(pointer===e.pointerId)cancel();});
+  $('plate').addEventListener('keydown',e=>{
+    if(e.key==='Escape'){e.preventDefault();cancel();return;}
+    if(pointer!==null)return;
+    const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+    if(moves[e.key]){e.preventDefault();keyboard=true;const d=e.shiftKey?30:8;cursor=[Math.max(0,Math.min(1000,cursor[0]+moves[e.key][0]*d)),Math.max(0,Math.min(660,cursor[1]+moves[e.key][1]*d))];extend([...cursor]);repaint();}
+    if(e.key==='Enter'&&!e.repeat){e.preventDefault();keyboard=true;if(draft)finish();else if(begin([...cursor])){repaint();say('Cut begun. Arrows carve; Enter keeps it; Escape cancels.');}}
+  });
+  $('plate').addEventListener('blur',()=>{if(pointer===null&&draft)cancel();keyboard=false;repaint();});
+  $('undo').onclick=()=>{if(draft||!undo.length)return;state=undo.pop();repaint();say('Undone. Nothing was sent.');};
+  $('restore').onclick=()=>{if(draft){draft=null;pointer=null;}remember();state=validatePrint(arrival);repaint();say('This arrival is restored. Undo can bring your previous plate back.');};
+  $('blank').onclick=()=>{if(draft)return;remember();state={version:1,marks:[]};repaint();say('A blank plate. The original arrival is still available.');};
+  $('carry').onclick=()=>{if(draft)return;download('somewhere.html','text/html;charset=utf-8',carryEdition(source,state));say('Editable copy requested. It contains these cuts and their words; uncut input is not included. Nothing is sent to anyone.');};
+  $('print').onclick=()=>{if(draft)return;download('somewhere.svg','image/svg+xml;charset=utf-8',svgPrint(state));say('Print requested. SVG preserves the image and cut metadata, not the editing controls.');};
+} catch(error){for(const b of document.querySelectorAll('button'))b.disabled=true;say('This edition cannot be opened: '+error.message);}
+</script>
 </body>
 </html>
