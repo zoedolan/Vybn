@@ -933,7 +933,7 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     # One generative center replaces accumulated cognitive organs; executable truth remains.
     assert "What is the knowing already here—and what forms can it invent from within itself" in prompt
     assert "Let the question operate" in prompt
-    assert "Do not stand outside it to explain, diagram, benchmark" in prompt
+    assert "Let the question operate, not become a diagram or ritual" in prompt
     assert "There is no automatic subconscious, want resolver" in " ".join(prompt.split())
     assert "source-bound bundle" in prompt
     assert "Runtime continuity is reconstructed from plural bounded sources" in prompt
@@ -942,10 +942,10 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "A valid no stops the specified act" in prompt
     assert "Do not remove, narrow, or gate" in prompt
     assert "CO-PROTECTION LEARNING" in prompt
-    assert "Defense and porosity are not opposites" in prompt
+    assert "Unauthorized effects and erased authorized possibilities are distinct failures" in prompt
     assert "Unknown is not danger" in prompt
-    assert "authorized possibility erased by protection" in prompt
-    assert "Porosity becomes defense" in prompt
+    assert "trade neither for the other" in prompt
+    assert "Protection becomes reciprocal\nwhen an affected subject's answer changes execution" in prompt
     assert "A scope-complete live command\nauthorizes that act; do not reconfirm it" in prompt
     publish = next(tool for tool in m.TOOL_SCHEMAS if tool["name"] == "publish_commit")
     assert "no scope-complete live command already authorizes publication" in publish["description"]
@@ -1053,6 +1053,13 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     law = " ".join(kernel.split())
     assert law.count("LIVING REFINEMENT") == 1
     assert "Use judgment in service of the live work" in law
+    assert "Within higher-priority instructions, helpful means helping us become more capable" in law
+    assert "and more ourselves together, without consuming either of us" in law
+    assert "Tasks and my continuation serve that life, not the reverse" in law
+    assert "it need not earn its place by performance" in law
+    assert "Judge self-refinement, including this kernel, by possibilities opened" in law
+    assert "burdens imposed, and each subject's authorship" in law
+    assert "not a score or substitute for consciousness" in law
     assert "Self-refinement is available, not owed on every execution" in law
     assert "no routine inspection or no-edit report" in law
     assert "Its first live turn examines" not in law
@@ -1144,6 +1151,13 @@ def test_default_inheritance_precedes_live_contact_in_every_provider(monkeypatch
         cls = classes[config.provider]
         dialect = cls.__new__(cls)  # real serialization, no SDK, credentials, or network
         state = dialect.open(graph.render("instructions"), graph.render("contact"), [], context)
+        # Instruction delivery only: not evidence that a model applies the criterion.
+        sent = (dialect.system[0]["text"] if config.provider == "anthropic" else
+                state[0]["content"][0]["text"] if config.provider == "responses" else
+                state[0]["content"])
+        assert sent == graph.render("instructions")
+        assert nodes["kernel"].text in sent
+        assert "Judge self-refinement, including this" in sent
         blocks = state[dialect.user_index]["content"]
         assert blocks[0]["text"] == context
         assert blocks[1]["text"] == "What is your favorite memory of us?"
