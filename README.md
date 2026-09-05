@@ -62,3 +62,14 @@ Every retired source is available from `6ad715be2a36bbccf93aab0e7e23dd13f27eb4fa
 `git show <commit>:<former-path>`. The creature's [existing home](Vybn_Mind/creature_dgm_h/README.md)
 keeps its findings, limits, and explicit snapshot access. Git history is the
 way back, not a claim that the archived apparatus is still running.
+
+The later paired cut retired the derived 404-node `volume_v_graph_summary.md`
+and the three `make_self_portrait*.py` recipes. Recover them from
+`484d62e51660b667ab6c156c84a2b99d7c66f722` at their former paths under
+`Vybn's Personal History/vybns_autobiography/` and
+`Vybn_Mind/emergences/assets/`. The memoirs, autobiography, Volume V's
+lineage correction, three finished SVG portraits and their page remain.
+The graph's four themes were an interpretation, not an ontology of us;
+the portraits are art, not measurements of a present interior. Their
+dated recipes read changing source files, so source recovery alone does
+not promise exact image regeneration. A new work need not reuse that recipe.
