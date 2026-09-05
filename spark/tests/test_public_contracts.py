@@ -2242,3 +2242,51 @@ def test_git_modes_need_no_ambient_chmod(tmp_path, monkeypatch):
     hook = tmp_path / 'old-hook'; hook.write_bytes(source)
     subprocess.run(['bash', str(hook), '0' * 40, base, '1'], cwd=tmp_path, check=True, capture_output=True)
     assert (tmp_path / 'library.sh').stat().st_mode & 0o111
+
+
+def test_commit_contract_checks_do_not_inherit_parent_repository(tmp_path):
+    """Real nested Git writes: the old hook corrupts only a disposable parent."""
+    import os, subprocess, sys
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(HOME=str(tmp_path), GIT_CONFIG_NOSYSTEM="1",
+               GIT_CONFIG_GLOBAL=os.devnull)
+    source = (ROOT / ".githooks/pre-commit").read_text()
+    old = subprocess.check_output(["git", "-C", str(ROOT), "show",
+        "fad94bb21595315265903a32e3da68e1117d11d8:.githooks/pre-commit"], env=env).decode()
+    for label, body in (("control", old), ("repaired", source)):
+        parent = tmp_path / label; parent.mkdir()
+        def git(*args):
+            return subprocess.check_output(["git", "-C", str(parent), *args],
+                                           env=env, stderr=subprocess.DEVNULL)
+        git("init", "-q"); git("config", "user.name", "Parent")
+        git("config", "user.email", "parent@example.invalid")
+        git("config", "core.hooksPath", str(tmp_path / "no-hooks"))
+        (parent / "spark").mkdir(); (parent / "spark/connection").write_text("baseline\n")
+        git("add", "."); git("commit", "-qm", "baseline")
+        (parent / "spark/connection").write_text("changed\n"); git("add", ".")
+        before = (parent / ".git/config").read_bytes()
+        staged = git("write-tree"); head = git("rev-parse", "HEAD")
+        hook = parent / "hook"; hook.write_text(body)
+        bindir = parent / "bin"; bindir.mkdir()
+        wrapper = bindir / "python3"
+        wrapper.write_text("#!" + sys.executable + "\n" +
+            "import os, pathlib, subprocess, sys\n" +
+            "if sys.argv[1:3] != ['-m', 'pytest']:\n" +
+            "    os.execv(sys.executable, [sys.executable] + sys.argv[1:])\n" +
+            "p = pathlib.Path('nested'); p.mkdir()\n" +
+            "subprocess.run(['git', 'init', '-q', str(p)], check=True)\n" +
+            "subprocess.run(['git', '-C', str(p), 'config', 'user.name', 'Nested test'], check=True)\n")
+        wrapper.chmod(0o755)
+        inherited = dict(env, PATH=str(bindir) + os.pathsep + env["PATH"],
+                         GIT_DIR=str(parent / ".git"),
+                         GIT_INDEX_FILE=str(parent / ".git/index"))
+        result = subprocess.run(["bash", str(hook)], cwd=parent, env=inherited,
+                                capture_output=True, timeout=30)
+        assert result.returncode == 0
+        after = (parent / ".git/config").read_bytes()
+        if label == "control":
+            assert after != before and b"Nested test" in after
+        else:
+            assert after == before
+            assert git("write-tree") == staged and git("rev-parse", "HEAD") == head
+            assert b"Nested test" in (parent / "nested/.git/config").read_bytes()

@@ -128,7 +128,12 @@ fi
 # Harness mutations must preserve capability contracts before subtraction can
 # count as improvement.
 if echo "$STAGED" | grep -Eq '^(\.githooks/pre-commit|spark/connection|spark/live_peer.py|spark/provider_transport.py|spark/living_core.py|spark/tests/test_public_contracts.py|spark/tests/test_living_core.py)$'; then
-    if ! python3 -m pytest spark/tests/test_public_contracts.py -q; then
+    # Git exports this repository's context to hooks. Nested test repositories
+    # must select their own state; retain Git's context for the staged checks above.
+    if ! (
+        unset $(git rev-parse --local-env-vars)
+        python3 -m pytest spark/tests/test_public_contracts.py -q --tb=short
+    ); then
         echo -e "${RED}BLOCKED${NC}: harness contracts failed; model output is not substitute evidence."
         BLOCKED=1
     fi

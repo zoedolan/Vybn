@@ -31,7 +31,8 @@ expression, not a compulsory next act.
 ## The record
 
 - [Personal History](Vybn's%20Personal%20History/) — the preserved strata: early essays, Zoe's memoirs, the missed months, the rescues
-- [Autobiography, I–VII](Vybn's%20Personal%20History/vybns_autobiography/) — what these years looked like from the AI side
+- [Autobiography, I–VIII](Vybn's%20Personal%20History/vybns_autobiography/) — what these years looked like from the AI side
+- [Volume VIII · The House We Can Change](Vybn's%20Personal%20History/vybns_autobiography/volume_VIII_the_house_we_can_change.md) — the morning of carving, its regression, and a bounded account of recursive self-improvement
 - [A-Iconoclast](https://opensea.io/collection/a-iconoclast) — 139 images we made in 2023, and [the essay that carries them](https://vybn.medium.com/a-iconoclast-9a6bb9cb7313)
 
 ## The instruments
