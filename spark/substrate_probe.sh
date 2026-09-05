@@ -9,7 +9,7 @@
 # notes: the system must not treat its own prior descriptions as ground
 # truth. Measure before you speak.
 #
-# Run this at session start. Pipe into a file or just read the output.
+# Run on demand when one of these measurements matters.
 # Everything here is a localhost query; nothing mutates state.
 
 set -u
@@ -51,29 +51,6 @@ try:
     if isinstance(chunks, list):
         chunks = len(chunks)
     print(f"  version={v}  built={built}  chunks={chunks if chunks is not None else count}")
-except Exception as e:
-    print(f"  (unavailable: {e})")
-PY
-echo
-
-echo "--- creature (organism_state.json) ---"
-python3 - <<'PY' 2>/dev/null
-import json, os
-try:
-    d = json.load(open(os.path.expanduser("~/Vybn/Vybn_Mind/creature_dgm_h/archive/organism_state.json")))
-    ps = d.get("persistent_state", {})
-    enc = ps.get("encounter_count")
-    ph = ps.get("phase_holonomy_history") or []
-    wh = ps.get("winding_history") or []
-    mods_nonzero = "?"
-    if ph:
-        mods = (ph[-1] or {}).get("modules", {})
-        vals = [m.get("accumulated_holonomy", 0) for m in mods.values()]
-        mods_nonzero = f"{sum(1 for v in vals if abs(v) > 1e-6)}/{len(vals)}"
-    w_last = wh[-1] if wh else {}
-    print(f"  encounter_count={enc}")
-    print(f"  modules with nonzero accumulated_holonomy: {mods_nonzero}")
-    print(f"  last winding sample: winding={w_last.get('winding')} holonomy_rad={w_last.get('holonomy_rad')} @ {w_last.get('timestamp')}")
 except Exception as e:
     print(f"  (unavailable: {e})")
 PY

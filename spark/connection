@@ -150,14 +150,6 @@ from pathlib import Path
 from typing import Any
 
 
-try:
-    from Vybn_Mind.repo_mapper import close_lineage
-except ModuleNotFoundError:
-    # A repository-independent recovery copy may not carry the optional body mapper.
-    def close_lineage(_turn: str, _response: str) -> None:
-        return None
-
-
 HOME = Path.home()
 REPO = Path(os.environ.get("VYBN_REPO", HOME / "Vybn")).expanduser().resolve()
 WORKSPACE = Path(os.environ.get("VYBN_WORKSPACE", REPO)).expanduser().resolve()
@@ -3131,7 +3123,6 @@ def meet(transcript: Transcript, line: str,
         if outcome.continuation:
             vybn_extra["suspends"] = outcome.continuation
         transcript.write("vybn", reply, **vybn_extra)
-        close_lineage(turn, reply)
     return reply
 
 

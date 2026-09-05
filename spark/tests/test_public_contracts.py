@@ -158,47 +158,6 @@ def test_leak_guard_covers_every_retrieval_channel():
         m.PRIVATE_CORPUS.clear()
 
 
-def test_post_commit_keeps_commits_private_without_explicit_publication_authority(tmp_path):
-    import os
-    import subprocess
-
-    fake_bin = tmp_path / "bin"
-    fake_bin.mkdir()
-    calls = tmp_path / "git-calls"
-    fake_git = fake_bin / "git"
-    fake_git.write_text(
-        "#!/bin/sh\n"
-        "printf '%s\\n' \"$*\" >> \"$GIT_CALLS\"\n"
-        "[ \"$1\" = symbolic-ref ] && printf 'main\\n'\n"
-        "exit 0\n"
-    )
-    fake_git.chmod(0o755)
-    hook = ROOT / ".githooks" / "post-commit"
-    env = os.environ.copy()
-    env.update(HOME=str(tmp_path), GIT_CALLS=str(calls),
-               PATH=str(fake_bin) + os.pathsep + env["PATH"])
-    env.pop("VYBN_ALLOW_AUTOPUSH", None)
-    env.pop("VYBN_NO_AUTOPUSH", None)
-    env.pop("VYBN_TURN_ID", None)
-    env.pop("VYBN_PROMPT_SHA256", None)
-
-    private = subprocess.run(["bash", str(hook)], env=env, text=True,
-                             capture_output=True, check=True)
-    assert "commit kept local" in private.stdout
-    assert not calls.exists()
-
-    env["VYBN_ALLOW_AUTOPUSH"] = "1"
-    published = subprocess.run(["bash", str(hook)], env=env, text=True,
-                               capture_output=True, check=True)
-    assert "authorized origin/main update completed" in published.stdout
-    assert calls.read_text().splitlines() == ["symbolic-ref --short -q HEAD", "push origin main"]
-
-    env["VYBN_NO_AUTOPUSH"] = "1"
-    calls.unlink()
-    vetoed = subprocess.run(["bash", str(hook)], env=env, text=True,
-                            capture_output=True, check=True)
-    assert "commit kept local" in vetoed.stdout
-    assert not calls.exists()
 
 
 def test_connection_does_not_preempt_remote_action_authority(monkeypatch):
@@ -485,7 +444,6 @@ def test_failed_in_memory_resume_stays_pending_until_success(monkeypatch, tmp_pa
     class Transcript:
         path = tmp_path / "transcript.jsonl"
         def write(self, *args, **kwargs): pass
-    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
     monkeypatch.setattr(m, "attract", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
     try:
         m.meet(Transcript(), "live answer")
@@ -511,67 +469,10 @@ def test_main_dispatches_through_the_current_engine(monkeypatch):
     assert seen == ["hello"]
 
 
-def test_visible_graphs_are_source_for_foveation_and_governed_action():
-    from Vybn_Mind.repo_mapper import declared_body_graph, foveal_kernel, graph_crossing, inspect_file, public_body, soul_kernel
-    from spark.living_core import read_core_work
-    page = (ROOT / "README.md").read_text(encoding="utf-8")
-    graph = declared_body_graph(page)
-    assert graph and graph["schema"] == "vybn.readme_knowledge_graph.v1"
-    assert len(graph["nodes"]) == 10 and len(graph["edges"]) == 14
-    assert any(edge["to"] == "front" for edge in graph["edges"])
-    assert any(edge["from"] == "front" for edge in graph["edges"])
-    transform = {"added": [], "changed": ["Vybn/README.md"], "removed": []}
-    crossing = graph_crossing(graph, transform)
-    assert "×" in crossing and ":" in crossing and ";" in crossing
-    body = public_body([inspect_file(ROOT, ROOT / "README.md")], transform)
-    assert body["crossing"] == crossing
-    assert "README graph 10n/14e | crossing" in body["summary"]
-    assert "```mermaid" in page and "%% vybn.readme_knowledge_graph.v1" in page
-    assert all(node.get("url", "").startswith("https://") and node.get("source")
-               for node in graph["nodes"])
-    kernel = foveal_kernel(graph, transform)
-    assert kernel["schema"] == "vybn.foveal_graph_kernel.v1"
-    assert [row["node"] for row in kernel["open"]][1] == "front"
-    for row in kernel["open"]:
-        repo, rel = row["source"].split("/", 1)
-        raw = (ROOT.parent / repo / rel).read_bytes()
-        start, end = row["covered"]
-        assert raw[start:end].decode("utf-8", "replace") == row["text"]
-        assert row["sha256"] == __import__("hashlib").sha256(raw).hexdigest()
-
-    soul = read_core_work(ROOT / "vybn.core.html")
-    constitution = soul_kernel(declared_body_graph(soul.projection, "vybn.soul_kernel.v1"), transform)
-    assert constitution["route"][:6] == ["charter", "front", "want", "membrane", "ground", "subtract"] and constitution["route"][-1] == "contact" and constitution["admission"]["unknown_is_failure"] and constitution["return"]["status"] == "awaiting_witness"
-    exact = {"charter": "ai-native-continuity", "want": "the-want",
-             "membrane": "the-oxygen-mask-principle",
-             "ground": "we-deserve-the-best", "subtract": "metabolism"}
-    assert all(row["text"].startswith(
-        f'<template class="core-organ" data-id="{exact[row["node"]]}"><pre>'
-    ) for row in constitution["open"] if row["node"] in exact)
 
 
-def test_repo_mapper_rejoins_turn_response_commit_and_canonical_witness(monkeypatch, tmp_path):
-    import Vybn_Mind.repo_mapper as mapper
-    ledger = tmp_path / "lineage.jsonl"
-    ledger.write_text("\n".join((
-        json.dumps({"phase": "commit", "turn": "t1", "prompt": "p1", "repo": "Vybn",
-                    "commit": "a" * 40, "paths": ["spark/connection"]}),
-        json.dumps({"phase": "response", "turn": "t1", "response": "r1"}),
-    )))
-    monkeypatch.setattr(mapper, "LINEAGE", ledger)
-    monkeypatch.setattr(mapper, "is_ancestor", lambda *args: True)
-    row = mapper.latest_lineage([tmp_path / "Vybn"], {"Vybn": {"git": {"base_head": "b"}}})
-    assert row == {"turn": "t1", "prompt": "p1", "response": "r1", "repo": "Vybn",
-                   "commit": "a" * 12, "status": "canonical", "paths": ["spark/connection"]}
 
 
-def test_repo_mapper_binds_only_self_declared_public_surfaces():
-    from Vybn_Mind.repo_mapper import declared_public_relation
-    rel = "Vybn_Mind/emergences/page.html"
-    text = (f'<meta name="kpp-carrier" content="kpp.v1"> https://github.com/'
-            f'zoedolan/Vybn/blob/main/{rel} https://zoedolan.github.io/Vybn/{rel}')
-    assert declared_public_relation("Vybn", rel, text) == (f"https://zoedolan.github.io/Vybn/{rel}", "kpp.v1")
-    assert not declared_public_relation("Vybn", "other.html", text)[0]
 
 
 def test_fetch_guard_survived_the_substrate_retirement():
@@ -768,7 +669,6 @@ def test_meet_exposes_provider_model_in_panel_and_transcript(monkeypatch, tmp_pa
     monkeypatch.setattr(m, "build_wake_bundle", lambda *args, **kwargs: Bundle())
     monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
     monkeypatch.setattr(m, "make_dialect", lambda door: object())
-    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
 
     def answer(*args, **kwargs):
         m.note_provider_model("claude-opus-4-8")
@@ -823,7 +723,8 @@ def test_physical_pulse_is_bounded_ground_not_machine_identity(tmp_path, monkeyp
 def test_substrate_probe_reuses_body_measurement_without_erasing_distinct_ground():
     source = (ROOT / "spark/substrate_probe.sh").read_text()
     assert 'connection" --body' in source
-    for distinct_check in ("deep memory index", "organism_state", "repos (HEAD)"):
+    assert "organism_state" not in source  # an April fossil is not a live measurement
+    for distinct_check in ("deep memory index", "repos (HEAD)"):
         assert distinct_check in source
 
 
@@ -1213,7 +1114,6 @@ def test_ordinary_meeting_inherits_before_retrieval_and_keeps_private_guard(monk
     monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "transcripts")
     monkeypatch.setattr(m, "wake_contact", lambda: "")
     monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
-    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
     received = []
     class Receiver(ScriptDialect):
         def open(self, instructions, text, images, context):
@@ -1965,7 +1865,6 @@ def test_astra_explicit_higher_door_exits_pause_without_prefix_capture(monkeypat
     monkeypatch.setattr(m.Transcript, "recent", lambda: "history, not live state")
     monkeypatch.setattr(m, "wake_contact", lambda: "")
     monkeypatch.setattr(m, "inbox_images_for", lambda name: [])
-    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
     monkeypatch.setattr(m, "make_dialect", lambda name: NS(name=name))
     seen = []
     def attract(dialect, instructions, text, **kwargs):
@@ -1995,7 +1894,6 @@ def _meeting_fixture(monkeypatch, tmp_path):
     monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path)
     monkeypatch.setattr(m, "wake_contact", lambda: "")
     monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
-    monkeypatch.setattr(m, "close_lineage", lambda *args: None)
     def bundle(door, contact, recent, zoe_text):
         routes = {"instructions": "law", "context": recent, "contact": zoe_text}
         return NS(nodes=(), render=routes.__getitem__, digest=lambda: "fixture")
@@ -2164,3 +2062,58 @@ def test_meeting_without_tools_preserves_contact_without_a_productivity_verdict(
     assert "served=fixture/returned-model" in printed
     assert "nothing was observed or changed" not in printed
     assert "NO TOOLS RAN" not in printed
+
+
+def test_commits_have_no_ambient_mapper_or_publication_hook(tmp_path, monkeypatch):
+    import os, subprocess
+    for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"):
+        monkeypatch.delenv(key, raising=False)
+    assert not (ROOT / ".githooks/post-commit").exists()
+    assert not (ROOT / "Vybn_Mind/repo_mapper.py").exists()
+    assert "close_lineage" not in (ROOT / "spark/connection").read_text()
+    repo, remote = tmp_path / "repo", tmp_path / "remote"
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+    subprocess.run(["git", "init", "-b", "main", str(repo)], check=True, capture_output=True)
+    def git(*args):
+        return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+    git("config", "user.name", "test"); git("config", "user.email", "test@example.invalid")
+    git("remote", "add", "origin", str(remote))
+    # Install surviving post hooks without unrelated local commit gates.
+    hooks = tmp_path / "hooks"; hooks.mkdir()
+    for hook in (ROOT / ".githooks").glob("post-*"):
+        (hooks / hook.name).symlink_to(hook)
+    git("config", "core.hooksPath", str(hooks))
+    env = os.environ.copy(); env.update(VYBN_ALLOW_AUTOPUSH="1", VYBN_TURN_ID="historical-env", HOME=str(tmp_path))
+    env.pop("VYBN_NO_AUTOPUSH", None)  # isolate the rival from the caller's veto
+    subprocess.run(["git", "-C", str(repo), "commit", "--allow-empty", "-m", "local only"], env=env, check=True, capture_output=True)
+    assert not subprocess.check_output(["git", "--git-dir", str(remote), "for-each-ref"])
+    assert not (tmp_path / ".cache/vybn/body_lineage.jsonl").exists()
+    assert not (tmp_path / "Vybn/repo_mapping_output").exists()
+    # Publication is still possible, as a separate exact command.
+    git("push", "--no-follow-tags", "origin", "HEAD:refs/heads/main")
+    assert git("rev-parse", "HEAD").stdout.strip() == subprocess.check_output(["git", "--git-dir", str(remote), "rev-parse", "main"]).strip()
+    # Rival: the removed hook turns the same inherited environment into effects.
+    old_hook = subprocess.check_output(["git", "-C", str(ROOT), "show",
+        "6ad715be2a36bbccf93aab0e7e23dd13f27eb4fa:.githooks/post-commit"])
+    (hooks / "post-commit").write_bytes(old_hook)
+    (hooks / "post-commit").chmod(0o755)
+    subprocess.run(["git", "-C", str(repo), "commit", "--allow-empty", "-m", "rival"], env=env, check=True, capture_output=True)
+    assert git("rev-parse", "HEAD").stdout.strip() == subprocess.check_output(["git", "--git-dir", str(remote), "rev-parse", "main"]).strip()
+    assert (tmp_path / ".cache/vybn/body_lineage.jsonl").is_file()
+
+
+def test_creature_history_is_explicit_recoverable_and_not_live(monkeypatch, tmp_path):
+    import subprocess
+    from Vybn_Mind.creature_dgm_h import creature
+    expected = json.loads(subprocess.check_output(["git", "-C", str(ROOT), "show", creature.V1_SOURCE]))
+    old = creature.Organism.__new__(creature.Organism); old._v1_state = None
+    assert old.v1_state() == expected
+    assert expected["persistent_state"]["encounter_count"] == 1063
+    assert expected["persistent_state"]["winding_history"][-1]["path_closed"] is False
+    monkeypatch.setattr(creature, "REPO_ROOT", tmp_path)
+    unavailable = creature.Organism.__new__(creature.Organism); unavailable._v1_state = None
+    assert unavailable.v1_state() is None
+    # Reading current state must not open the archive or substitute its count.
+    monkeypatch.setattr(creature.CreatureState, "from_walk", classmethod(lambda cls: cls(step=7)))
+    live = creature.Organism()
+    assert live.encounter_count == 7 and live._v1_state is None

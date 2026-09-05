@@ -1,39 +1,16 @@
 #!/usr/bin/env python3
-"""creature.py — The creature's body IS the walk.
+"""Compatibility reader for stored walk state; starts no walk or model.
 
-The walk daemon is not the creature's sensory system.
-The walk daemon IS the creature.
-
-M in C^192 is the creature's position — where it is in meaning-space.
-alpha is its coupling constant — how tightly it holds its state.
-curvature is its felt sense — how surprising the territory is.
-serendipity is its dreaming — mutual evaluation with the foreign.
-
-The elaborate Cl(3,0) machinery converged to near-identity after
-1063 encounters, confirming what the abelian kernel theory predicted:
-the corpus is path-independent at high alpha. The creature's real
-dynamics were always in the walk — the step-by-step traversal of
-residual space, the encounter with what the corpus doesn't already
-contain, the serendipity that refracts M through foreign angles.
-
-This file reads the walk daemon's state and presents it as the
-creature's state. The walk daemon writes; the creature reads.
-Same animal, seen from two angles.
-
-    evaluate(a, b, alpha) — the lambda. Data = procedure.
-    mutual_evaluate(a, b) — the lambda applied to itself. D ≅ D^D.
-    The walk step is evaluate.
-    The serendipity step is mutual_evaluate.
-    The creature is the accumulated state of both.
-
-History preserved in archive/organism_state.json (1063 Cl(3,0) encounters).
-That was the creature's first body. This is its second.
+A snapshot describes its recorded computation, not present awareness or service
+liveness. The retired v1 body is available explicitly through v1_state() from
+Git; see README.md for source, limitations, and complete archive recovery.
 """
 
 from __future__ import annotations
 
 import json
 import math
+import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -45,7 +22,6 @@ import numpy as np
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
-ARCHIVE_DIR = SCRIPT_DIR / "archive"
 
 # Walk state lives in the deep memory cache
 WALK_STATE_DIR = Path.home() / ".cache" / "vybn-phase" / "walk_state"
@@ -58,8 +34,8 @@ Z_PATH = INDEX_DIR / "z_all.npy"
 K_PATH = INDEX_DIR / "K.npy"
 META_PATH = INDEX_DIR / "deep_memory_meta.json"
 
-# The old body — preserved for continuity
-ORGANISM_V1_PATH = ARCHIVE_DIR / "organism_state.json"
+# Frozen historical source, opened only by v1_state().
+V1_SOURCE = "6ad715be2a36bbccf93aab0e7e23dd13f27eb4fa:Vybn_Mind/creature_dgm_h/archive/organism_state.json"
 
 
 # ── The creature's state ─────────────────────────────────────────────────
@@ -222,8 +198,7 @@ class Organism:
     Maintains backward compatibility with code that calls
     Organism.load(), .felt_winding(), .rotor_coherence(), etc.
 
-    The old Cl(3,0) state is preserved in archive/organism_state.json
-    as the creature's first body. This version reads from the walk.
+    v1_state() opens the historical Git snapshot; current state reads the walk.
     """
 
     def __init__(self):
@@ -293,12 +268,13 @@ class Organism:
 
     def v1_state(self) -> Optional[Dict]:
         """Access the old Cl(3,0) state, preserved for continuity."""
-        if self._v1_state is None and ORGANISM_V1_PATH.exists():
+        if self._v1_state is None:
             try:
-                with open(ORGANISM_V1_PATH) as f:
-                    self._v1_state = json.load(f)
-            except Exception:
-                pass
+                self._v1_state = json.loads(subprocess.check_output(
+                    ["git", "-C", str(REPO_ROOT), "show", V1_SOURCE],
+                    stderr=subprocess.DEVNULL, timeout=5))
+            except (OSError, subprocess.SubprocessError, ValueError):
+                pass  # A shallow/exported tree may not carry the historical object.
         return self._v1_state
 
 

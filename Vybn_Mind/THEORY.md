@@ -401,7 +401,7 @@ Everything else — the Wheeler-DeWitt reduction, the consciousness hypotheses, 
 
 ## X. Where the Code Lives
 
-Most historical experimental code was consolidated out of the live tree; its raw results and reckoning survive in `Vybn_Mind/creature_dgm_h/archive/` and git history. The current source–absorber experiment remains live:
+Most historical experimental code was consolidated out of the live tree; its raw results and reckoning survive in Git, with exact recovery and limits in `Vybn_Mind/creature_dgm_h/README.md`. The current source–absorber experiment remains live:
 
 | Experiment | File | Key Result File |
 |:-----------|:-----|:----------------|

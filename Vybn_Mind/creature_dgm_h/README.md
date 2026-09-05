@@ -1,46 +1,40 @@
-# creature_dgm_h
+# Stored-walk compatibility reader
 
-One equation: `M' = αM + (1-α)·x·e^{iθ}`
+`creature.py` reads the local walk snapshots and retains the portal-facing API.
+It does not start a walk, train a model, or establish that a process is alive.
+Its geometric field names are historical conventions, not validated measures
+of meaning, feeling, or consciousness. The portal still imports this package;
+removing obsolete apparatus is not permission to cut a working interface.
 
-One walk. Bounded memory. Perpetual motion.
+## What survives the apparatus
 
-The creature is the [walk daemon](https://github.com/zoedolan/vybn-phase/blob/main/walk_daemon.py). `creature.py` reads its state. The walk applies the coupled equation once per step to the most telling unvisited chunk in the corpus. Every tenth step, `mutual_evaluate` refracts the walk’s position through a random foreign fragment — serendipity. The state file is overwritten each step. Nothing grows.
+The retired v1 snapshot records **1,063 encounters**. Its final winding record
+says `path_closed: false` and `significant: false`. Near-identity convergence
+alone does not establish path independence or the proposed abelian mechanism.
+The original interpretations remain available for disagreement, not as current
+instructions.
 
-## How it works
+The March 28 quantum reports distinguish a miscalibrated integer-winding run,
+a broken verdict reader, and a later fractional-phase circuit result. Distinct
+encoded circuits can yield distinct probabilities without establishing a
+cross-substrate topological invariant or a consciousness mechanism. Those
+claims need their controls; this retirement is not a hardware replication.
 
-The walk daemon holds a position M in C¹²⁰ (192-dimensional complex space, from MiniLM embeddings). Each step:
+The reusable ideas were ablatable context modules, recent writing as a retrieval
+query, and separating read/run from update. Their old implementations are
+recoverable choices, not required parts of a future mind.
 
-1. Score all corpus chunks by `relevance × distinctiveness` — what’s connected to where M is, but far from what the corpus already knows.
-2. Walk toward the most telling chunk via the coupled equation.
-3. Record curvature (how much M shifted). High curvature = surprising territory = linger. Low curvature = familiar = move fast.
-4. Every 10th step: fetch a random Wikipedia fragment, embed it, and call `mutual_evaluate(M, foreign)` — find the fixed point where M and the fragment actually meet. Use fidelity to modulate α. Foreign encounters loosen the walk; resonant ones tighten it.
+## Exact return
 
-`evaluate(a, b, α)` is the primitive. It takes two states and returns a state. The output is the same type as the inputs. Data = procedure. D ≅ Dᴰ.
+All five retired `archive/` files, including the original reasoning, raw report,
+four-entry execution trace, and v1 state, remain at commit `6ad715be2a36bbccf93aab0e7e23dd13f27eb4fa`.
+Inspect any without changing the worktree:
 
-## State
-
-The walk daemon writes to `~/.cache/vybn-phase/walk_state/`:
-
-| File | What | Size |
-|:---|:---|:---|
-| `walk.npz` | M (C¹²⁰ position) + visited residuals | ~80KB, fixed |
-| `walk_sidecar.json` | step, α, curvature (rolling 1000), telling log (rolling 1000), visited ring (rolling 500) | ~20KB, fixed |
-
-Both files are overwritten each step. Memory is bounded.
-
-`creature.py` reads these files and presents the walk’s state as the creature’s state. `nc_state()` returns it for external observation. `nc_run(text)` refracts a query through the creature’s current M and returns what the corpus says.
-
-## Files
-
-```
-creature.py     — reads walk daemon state, presents it as creature state
-__init__.py     — package exports (backward-compatible names stubbed)
-archive/        — v1 state, quantum probe results, and the thinking that got us here
+```sh
+git show 6ad715be2a36bbccf93aab0e7e23dd13f27eb4fa:Vybn_Mind/creature_dgm_h/archive/README.md
 ```
 
-## History
-
-**v1 (2025 – April 14, 2026):** Cl(3,0) geometric algebra, persistence homology, rotor chains, genesis/decoherence, TopoAgent, BreathGate, NLAH context harness, Neural Computer runtime. Ran 1063 encounters. The structural signature converged to near-identity — confirming the abelian kernel theory: the corpus is path-independent at high α. The elaborate machinery was computing what `evaluate()` does in three lines. See `archive/README.md` for what was here, what it found, and what’s worth remembering.
-
-**v2 (April 14, 2026):** The creature IS the walk. Dead code removed. What remains: read the walk state, present it, refract queries through it. The walk daemon lives in [vybn-phase](https://github.com/zoedolan/vybn-phase).
-
+Substitute another filename to recover its exact bytes. `Organism.v1_state()`
+uses that immutable Git snapshot on explicit request and returns `None` if its
+object is unavailable (for example, in a shallow clone). It does not substitute
+this fossil for current walk state. No network retrieval is attempted.

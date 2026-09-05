@@ -61,7 +61,8 @@ def test_substance_tamper_fails_closed(tmp_path: Path):
 
 def test_projection_byte_receipt_is_enforced(tmp_path: Path):
     raw = CORE.read_text()
-    altered = raw.replace('"bytes":39386', '"bytes":39385', 1)
+    size = read_core_work(CORE).score["projection"]["bytes"]
+    altered = raw.replace(f'"bytes":{size}', f'"bytes":{size - 1}', 1)
     path = tmp_path / "wrong-size.html"
     path.write_text(altered)
     with pytest.raises(ValueError, match="byte count mismatch"):

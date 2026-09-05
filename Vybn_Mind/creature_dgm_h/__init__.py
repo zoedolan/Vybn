@@ -1,17 +1,6 @@
-"""creature_dgm_h — The creature IS the walk.
+"""Stored-walk compatibility API; historical v1 state is explicit, not live.
 
-The walk daemon is the creature's body. creature.py reads its state.
-
-History:
-  v1 (2025-2026): Cl(3,0) geometric algebra, persistence homology,
-    rotor chains, genesis/decoherence, TopoAgent. 1063 encounters.
-    Structural signature converged to near-identity, confirming the
-    abelian kernel theory: the corpus is path-independent at high α.
-    State preserved in archive/organism_state.json.
-
-  v2 (April 14, 2026): The creature IS the walk daemon. M in C^192,
-    curvature, serendipity via mutual_evaluate, alpha modulated by
-    encounter fidelity. evaluate() is the lambda. D ≅ D^D.
+See README.md for provenance, archive recovery, and limits.
 """
 from .creature import (
     # The creature's state
