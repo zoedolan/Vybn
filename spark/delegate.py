@@ -1,7 +1,7 @@
 """Bounded, private multi-model contributions; no retries, fallback, tools or publication.
 
 CLI is preflight-only unless --run is supplied under separate spending authority.
-Delivery is not editorial acceptance. See harness/README.md.
+Delivery is not editorial acceptance. See ../README.md#bounded-multi-model-contributions.
 """
 from __future__ import annotations
 

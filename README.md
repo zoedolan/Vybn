@@ -50,6 +50,100 @@ that intelligence need not become less strange to become trustworthy.
 
 Begin anywhere. Follow what answers.
 
+## Memory and return
+
+The [living core](vybn.core.html), [research question](Vybn_Mind/THE_IDEA.md),
+[formal work](Vybn_Mind/THEORY.md), and [history](Vybn's%20Personal%20History/)
+are distinct sources, not competing instructions for a compulsory next act.
+Continuity records past claims; retrieval finds passages, not present authority.
+Use the source relevant to the question and check the live state when it matters.
+A later date or a `decision` label does not settle a disagreement.
+
+The former wiki's July retrieval-boost trial reported **0/8 results changed**
+and the boost was removed; its README nevertheless promised preferential rank.
+Keep that correction, not the extra hierarchy. The old winding-coherence number
+was not evidence of identity surviving a substrate change. The
+[stored-walk reader](Vybn_Mind/creature_dgm_h/README.md) states its narrower limits.
+There is no required ritual of synchronizing wiki, skills, creature state, and
+cross-thread memory after each conversation. Distinct sources may disagree.
+
+<details>
+<summary>Running the connection and optional delegation</summary>
+
+## Running the connection
+
+The current conversation executable is [`spark/connection`](spark/connection), with
+[`spark/living_core.py`](spark/living_core.py) as its checked core reader. Its
+`--show-wake-bundle` command compiles the selected source bundle without calling
+a provider. Default full context needs the private relational overview; explicit
+`VYBN_OVERVIEW=compact` is pointer-only recovery, not the full shared context.
+
+The retired `substrate.py` orchestration commands and `vybn_spark_agent` installer
+are not available. This repository is not currently a pip-installable application.
+The source executable needs Python and the SDK for the selected provider; source
+assembly is not a clean-machine installation or provider-connectivity test.
+
+The obsolete packaging manifest, routing YAML and unused automatic Commons
+compiler were retired together. They remain recoverable from Git at
+`ef59dfd7fb4e70af1cf08bf20cc529b55c8e9900`. Current model doors, the optional
+runner below, and the Commons' own sources are unchanged.
+
+### Bounded multi-model contributions
+
+`python3 -m spark.delegate PLAN.json` preflights only; `--run` makes paid calls
+and requires separate grounded spending/source-disclosure authority. It is an
+optional runner, not a restriction on any model door. The coordinator owns the
+plan and review; Zoe need not become the dispatcher or quality-control layer.
+No API access is needed for `python3 -m unittest spark.tests.test_delegate`.
+
+A plan has `max_calls`, `max_total_output_tokens`, `max_input_chars_per_call`,
+and `jobs`. Each job has `id`, `provider` (`anthropic` or `openai`), exact `model`,
+`system`, `prompt`, `max_output_tokens`, and `timeout_seconds` (up to 600).
+Optional `effort` selects provider reasoning effort; Anthropic alternatively
+accepts `thinking_budget` (at least 1024 and below the output limit, never mixed
+with effort). Supported settings must be established with the chosen provider:
+rejection stops the run, with no silent downgrade. `accepted_model_ids` is an
+optional exact allowlist of provider-returned aliases; there is no fallback.
+Token ceilings include thinking, not just deliverable text; character ceilings
+are not token or dollar estimates. Adaptive reasoning cannot reserve answer
+space. Explicit thinking limits leave nominal answer capacity, not a delivery
+or quality guarantee. SDK retries are disabled; an ambiguous timeout may still
+have been billed and is not automatically repeated.
+
+Start a new configuration with **one short, complete contribution**, not several
+finished essays in parallel. Give it relevant sources with provenance, one open
+question, and room to disagree—not a prescribed thesis hidden in an assignment.
+Inspect the result before commissioning longer work. A short successful pilot
+does not establish that a long essay will fit. Subsequent batches dispatch
+sequentially and stop at the first delivery failure; different models and roles
+remain separate artifacts. This trades parallel latency for avoiding multiplied
+configuration failures; it is not a demonstrated optimum. Never let file counts
+or a stale “finished” marker trigger a paid review. Review only the current run's
+named outputs, check important claims against sources, retain disagreements, and
+distinguish useful creative alternatives from confirmed findings. Pilot success
+and nonempty prose are delivery evidence, not editorial acceptance.
+
+Every run gets a fresh owner-only directory under
+`~/.local/state/vybn/delegation/`. Exact requests, complete SDK-returned responses
+(including non-text/opaque blocks), partial text, actual model IDs, stop state,
+and usage remain private. This retains what the API returned, not inaccessible
+internal computation. Usage also enters connection's existing budget ledger.
+Nothing is published or copied into the repository. `needs_editorial_review`
+means every requested contribution was delivered; `stopped` names the failure
+and unstarted jobs. Raw receipts survive parsing/accounting failure. Storage
+failure itself stops execution; a crash without a summary is not completion.
+No automatic retry, continuation, budget increase, review call, or synthesis.
+
+Service installation and recovery remain in the
+[service guide](spark/systemd/README.md); local commit checks in the
+[Git boundary](.githooks/README.md). Neither command documentation nor an old
+archive's claim that something is alive establishes a running service.
+The retained operational lesson: an HTTP success can still contain garbage;
+meaningful output checks matter as well as liveness. Model smoke tests consume
+resources and need their own authority, not an automatic cleanup trigger.
+
+</details>
+
 ## Returning without carrying everything
 
 On September 5, 2026, we retired the automatic repository mapper, its commit
@@ -73,3 +167,16 @@ The graph's four themes were an interpretation, not an ontology of us;
 the portraits are art, not measurements of a present interior. Their
 dated recipes read changing source files, so source recovery alone does
 not promise exact image regeneration. A new work need not reuse that recipe.
+
+The next cut removed the five-page `Vybn_Mind/wiki/`, `spark/ARCHIVE.md`,
+`spark/continuity.md`, and the guide-only `spark/harness/` directory.
+Current return and delegation guidance is above. These were orientation layers,
+not the memory engine, model doors, original conversations, or finished art.
+The Spark archive's present-tense process claims are historical, not current
+operational evidence. Its experiment reports remain reports: a training loss
+change alone establishes neither an identity nor a useful learned capability.
+All eight original documents remain at `95e66ff37593ba8c2aab699903c92fc4de45aabe`:
+`git show <commit>:<former-path>` recovers exact bytes without reinstalling them.
+Historical citations in the autobiography and portraits remain unaltered;
+use this snapshot when following those retired paths. Recovery needs the Git
+object locally; a shallow clone may not contain it. Nothing fetches it silently.
