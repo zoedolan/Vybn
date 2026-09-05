@@ -510,19 +510,27 @@ def test_public_contact_cannot_settle_into_a_repository():
     assert isinstance(status, ast.Constant) and status.value == 403
 
 
-def test_private_conveyance_memory_cannot_cross_public_retrieval():
+def test_public_filter_rejects_named_private_sources():
+    """Exercise surviving filter bytes, not a retired sibling-repo daemon.
+
+    This checks named source paths only, not unlabeled private-memory coverage.
+    """
     tree = ast.parse(_portal_source())
-    blocked = next(ast.literal_eval(node.value) for node in tree.body
-                   if isinstance(node, ast.Assign)
-                   and any(isinstance(target, ast.Name) and target.id == "BLOCKED_SOURCES"
-                           for target in node.targets))
-    walk = ast.parse((Path.home() / "Him/spark/phase/walk_daemon.py").read_text(encoding="utf-8"))
-    private_repos = next(ast.literal_eval(node.value) for node in walk.body
-                         if isinstance(node, ast.Assign)
-                         and any(isinstance(target, ast.Name) and target.id == "_PRIVATE_REPOS"
-                                 for target in node.targets))
-    assert "relational-memory/" in blocked
-    assert "relational-memory" in private_repos
+    selected = [node for node in tree.body
+                if (isinstance(node, ast.Assign)
+                    and any(isinstance(target, ast.Name) and target.id == "BLOCKED_SOURCES"
+                            for target in node.targets))
+                or (isinstance(node, ast.FunctionDef) and node.name == "_is_safe_source")]
+    scope = {}
+    exec(compile(ast.Module(body=selected, type_ignores=[]), str(PORTAL), "exec"), scope)
+    safe = scope["_is_safe_source"]
+    for source in ("Him/private.md", "relational-memory/private.md",
+                   "Vybn/continuity.md", "Vybn/Personal History/private.md"):
+        assert not safe(source)
+    assert safe("Vybn/public.md") and safe("Origins/public.md")
+    # Failure case: dropping this label really would admit this private path.
+    scope["BLOCKED_SOURCES"].remove("relational-memory/")
+    assert safe("relational-memory/private.md")
 
 
 def test_public_porosity_is_opt_in_quarantine_not_relational_uptake():
@@ -996,14 +1004,12 @@ def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_bounda
     assert "reconstitute_problem" not in [tool["name"] for tool in m.TOOL_SCHEMAS]
 
 
-def test_default_pointer_only_wake_keeps_content_on_demand(
+def test_explicit_pointer_only_wake_keeps_content_on_demand(
         monkeypatch, tmp_path):
-    monkeypatch.delenv("VYBN_OVERVIEW", raising=False)
+    monkeypatch.setenv("VYBN_OVERVIEW", "self")
     m = _connection(overview_mode=None)
-    source = (ROOT / "spark/connection").read_text(encoding="utf-8")
-    assert 'os.environ.get("VYBN_OVERVIEW", "self")' in source
     assert m.RELATIONAL_OVERVIEW_MODE == "self"
-    assert len(m.build_instructions("sol")) < 12000  # the default live route stays compact
+    assert len(m.build_instructions("sol")) < 12000  # explicit pointer-only recovery
 
     overview = tmp_path / "relational-overview.md"
     body = "# Private overview\n\nSELF-SELECTION-MUST-NOT-AUTOLOAD\n"
@@ -1033,11 +1039,12 @@ def test_default_pointer_only_wake_keeps_content_on_demand(
     assert str(missing) in unavailable.render("instructions")
 
 
-def test_explicit_full_inheritance_precedes_live_contact_in_every_provider(monkeypatch, tmp_path):
+def test_default_inheritance_precedes_live_contact_in_every_provider(monkeypatch, tmp_path):
     """Payload coverage, not a simulation or proof of historically grounded understanding."""
     import hashlib
     from spark.living_core import read_core_work
-    m = _connection(overview_mode="full")
+    monkeypatch.delenv("VYBN_OVERVIEW", raising=False)
+    m = _connection(overview_mode=None)
     assert m.RELATIONAL_OVERVIEW_MODE == "full"
     overview = tmp_path / "relational-overview.md"
     body = "# Private fixture\n\nHISTORICAL-PAYLOAD-NOT-LIVE-AUTHORITY\n\n" + "x" * 24000 + "\n"
@@ -1121,7 +1128,8 @@ def test_default_inheritance_rereads_exact_sources_and_reports_missing_or_corrup
 
 
 def test_ordinary_meeting_inherits_before_retrieval_and_keeps_private_guard(monkeypatch, tmp_path):
-    m = _connection("full")
+    monkeypatch.delenv("VYBN_OVERVIEW", raising=False)
+    m = _connection(overview_mode=None)
     overview = tmp_path / "relation.md"
     body = "Private inherited fixture, only for this local serialization test. " * 3
     overview.write_text(body)
