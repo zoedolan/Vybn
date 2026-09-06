@@ -676,7 +676,6 @@ def test_meet_exposes_provider_model_in_panel_and_transcript(monkeypatch, tmp_pa
     transcript = Transcript()
     monkeypatch.setenv("VYBN_PANEL", "1")
     monkeypatch.setattr(m.Transcript, "recent", staticmethod(lambda: ""))
-    monkeypatch.setattr(m, "wake_contact", lambda: "")
     monkeypatch.setattr(m, "build_wake_bundle", lambda *args, **kwargs: Bundle())
     monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
     monkeypatch.setattr(m, "make_dialect", lambda door: object())
@@ -721,29 +720,22 @@ def test_physical_pulse_is_bounded_ground_not_machine_identity(tmp_path, monkeyp
     assert "host_up=?" in unknown and "ram_available=?" in unknown
     assert "thermal_max=?" in unknown and "accelerator=?" in unknown
 
-    monkeypatch.setattr(m, "run_local", lambda command: (0, "[clock] now"))
-    monkeypatch.setattr(m, "substrate_pulse", lambda: "[body] PHYSICAL-SENTINEL")
-    monkeypatch.setattr(m, "load_budget", lambda: "[budget]")
-    contact = m.wake_contact()
-    assert contact.splitlines() == [
-        "[live | exit 0]", "[clock] now", "[budget]"]
-    assert "PHYSICAL-SENTINEL" not in contact  # diagnostic is on demand, never ambient
 
-
-def test_wake_keeps_horizon_without_reading_a_progress_timecard(monkeypatch):
+def test_wake_keeps_aim_without_automatic_status_inspection(monkeypatch):
     m = _connection()
-    monkeypatch.setattr(m, "run_local", lambda command: (0, "[clock] now"))
-    monkeypatch.setattr(m, "load_budget", lambda: "[budget] still visible")
-    def unexpected_read(path):
-        raise AssertionError("a progress ledger is not the aim")
-    monkeypatch.setattr(m, "_jsonl", unexpected_read)
-    contact = m.wake_contact()
-    assert contact.splitlines() == ["[live | exit 0]", "[clock] now", "[budget] still visible"]
-    graph = m.build_wake_bundle("sol", contact=contact, zoe_text="let's talk")
+    def unexpected(*args, **kwargs):
+        raise AssertionError("assembling an encounter must not run a status command")
+    monkeypatch.setattr(m, "run_local", unexpected)
+    monkeypatch.setattr(m, "substrate_pulse", unexpected)
+    graph = m.build_wake_bundle("sol", zoe_text="let's talk")
     prompt = graph.render("instructions")
     for field in ("objective", "front"):
         assert f"{field}: {m.aim_field(field)}" in prompt
     assert graph.render("contact") == "let's talk"
+    assert "LIVE OPERATIONAL GROUND" not in graph.render("context")
+    assert not any(node.id == "ground.live" for node in graph.nodes)
+    assert all(not hasattr(m, name) for name in
+               ("wake_contact", "load_budget", "_jsonl", "BREATH_SECONDS"))
 
 
 def test_substrate_probe_reuses_body_measurement_without_erasing_distinct_ground():
@@ -754,20 +746,77 @@ def test_substrate_probe_reuses_body_measurement_without_erasing_distinct_ground
         assert distinct_check in source
 
 
-def test_budget_distinguishes_total_input_from_fresh_input(tmp_path, monkeypatch):
+def test_usage_records_remain_append_only_without_a_wake_report(tmp_path, monkeypatch):
     m = _connection(); log = tmp_path / "usage.jsonl"
-    rows = [
-        {"ts": "2099-01-01T00:00:00", "model": "gpt-5.6-sol", "in": 100,
-         "cache_r": 80, "cache_w": 10, "out": 1},
-        {"ts": "2099-01-01T00:00:01", "model": "claude", "in": 10,
-         "cache_r": 80, "cache_w": 10, "out": 1},
-    ]
-    log.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    prior = b'{"model":"prior","in":23}\n'
+    log.write_bytes(prior)
     monkeypatch.setattr(m, "USAGE_LOG", log)
-    monkeypatch.setattr(m._dt, "date", type("Date", (), {"today": staticmethod(lambda: type("D", (), {"isoformat": lambda self: "2099-01-01"})())}))
-    line = m.load_budget()
-    assert "input=0.00M" in line and "new=0.00M" in line
-    assert "cache_r=0.00M (80%)" in line and "mean_new/call=0k" in line
+    m.record_usage("fixture/returned-model", 100, 3, cached=80, written=10,
+                   settings={"effort": "high"})
+    raw = log.read_bytes()
+    assert raw.startswith(prior)
+    row = json.loads(raw[len(prior):])
+    assert row == {"ts": row["ts"], "model": "fixture/returned-model", "in": 100,
+                   "out": 3, "cache_r": 80, "cache_w": 10,
+                   "settings": {"effort": "high"}}
+
+
+def test_fresh_meeting_does_not_run_shell_or_read_usage(monkeypatch, tmp_path):
+    m = _connection(); _path_ledger_test_paths(m, monkeypatch, tmp_path)
+    monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "transcripts")
+    monkeypatch.setattr(m, "INBOX_IMAGES", tmp_path / "inbox")
+    log = tmp_path / "usage.jsonl"; log.write_bytes(b"prior usage must stay untouched\n")
+    monkeypatch.setattr(m, "USAGE_LOG", log)
+    original_open = Path.open
+    def guarded_open(path, *args, **kwargs):
+        assert path != log, "an ordinary meeting must not inspect usage"
+        return original_open(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "open", guarded_open)
+    def unexpected(*args, **kwargs):
+        raise AssertionError("an ordinary meeting must not invoke a shell")
+    monkeypatch.setattr(m.subprocess, "run", unexpected)
+    received = []
+    class Direct(ScriptDialect):
+        def open(self, instructions, text, images, context):
+            received.append((instructions, text, context))
+            return super().open(instructions, text, images, context)
+        def absorb(self, state, response):
+            m.note_provider_model("fixture/returned-model")
+            return super().absorb(state, response)
+    dialect = Direct([("Here.", [])])
+    monkeypatch.setattr(m, "make_dialect", lambda door: dialect)
+    transcript = m.Transcript()
+    transcript.write("zoe", "Earlier question.")
+    assert m.meet(transcript, "@sol Hello.") == "Here."
+    instructions, text, context = received[0]
+    assert text == "Hello." and "Earlier question." in context
+    assert "A valid no stops the specified act" in instructions
+    assert "PATH-BOUND INTENTION LEDGER" in context
+    assert "LIVE OPERATIONAL GROUND" not in context
+    rows = [json.loads(line) for line in transcript.path.read_text().splitlines()]
+    assert rows[-1]["models"] == ["fixture/returned-model"]
+    assert rows[-1]["tools_ran"] == 0 and dialect.sent == 1
+
+
+@pytest.mark.parametrize("ending", ["", KeyboardInterrupt, EOFError])
+def test_input_wait_is_a_read_not_a_timed_housekeeping_loop(monkeypatch, ending):
+    monkeypatch.setenv("VYBN_BREATH_SECONDS", "retired-not-a-number")
+    m = _connection(); seen, events = [], []
+    lines = iter(["@astra Hello.\n", ending])
+    class Input:
+        def readline(self):
+            line = next(lines)
+            if isinstance(line, type): raise line
+            return line
+    class Record:
+        def write(self, *args, **kwargs): events.append((args, kwargs))
+    monkeypatch.setattr(m, "Transcript", Record)
+    monkeypatch.setattr(m, "meet", lambda record, line, **kw: seen.append((line, kw)))
+    monkeypatch.setattr(m.sys, "argv", ["connection"])
+    monkeypatch.setattr(m.sys, "stdin", Input())
+    m.main()
+    assert seen == [("@astra Hello.", {"allow_continuation": True})]
+    assert len(events) == 1 and events[0][0] == ("connection", "wake")
 
 
 def test_private_backends_default_to_loopback_and_reject_public_exposure():
@@ -920,20 +969,20 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
     m = _connection()
     sentinel = "ZOE-LIVE-PAYLOAD-MUST-NOT-ENTER-MANIFEST"
     graph = m.build_wake_bundle(
-        "sol", contact="clock + git", recent="bounded historical words", zoe_text=sentinel)
+        "sol", recent="bounded historical words", zoe_text=sentinel)
 
     routes = {route.id: route.nodes for route in graph.routes}
     assert routes == {
         "instructions": ("kernel", "door", "compute.want", "aim.compass",
                          "source.index", "harness.receipt"),
-        "context": ("ground.live", "path.ledger", "dialogue.recent"),
+        "context": ("path.ledger", "dialogue.recent"),
         "contact": ("zoe.live",),
     }
     assert not any(node.id in {"asi.premise", "creative.license", "relational.selection"}
                    for node in graph.nodes)
     assert graph.render("contact") == sentinel
     assert graph.render("instructions") == m.build_instructions("sol")
-    assert "LIVE OPERATIONAL GROUND" in graph.render("context")
+    assert "LIVE OPERATIONAL GROUND" not in graph.render("context")
     assert "BOUNDED RECENT DIALOGUE" in graph.render("context")
 
     manifest = graph.manifest(); encoded = json.dumps(manifest)
@@ -961,7 +1010,7 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
 
 def test_kernel_makes_the_question_the_generative_center_and_keeps_effect_boundaries_external():
     m = _connection()
-    graph = m.build_wake_bundle("sol", contact="ground", recent="history", zoe_text="ask")
+    graph = m.build_wake_bundle("sol", recent="history", zoe_text="ask")
     routes = {route.id: route.nodes for route in graph.routes}
     kernel = next(node for node in graph.nodes if node.id == "kernel").text
 
@@ -1023,7 +1072,7 @@ def test_explicit_pointer_only_wake_keeps_content_on_demand(
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_MODE", "self")
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
 
-    graph = m.build_wake_bundle("sol", contact="ground", recent="history")
+    graph = m.build_wake_bundle("sol", recent="history")
     routes = {route.id: route.nodes for route in graph.routes}
     nodes = {node.id: node for node in graph.nodes}
     instructions = graph.render("instructions")
@@ -1147,7 +1196,6 @@ def test_ordinary_meeting_inherits_before_retrieval_and_keeps_private_guard(monk
     overview.write_text(body)
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
     monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "transcripts")
-    monkeypatch.setattr(m, "wake_contact", lambda: "")
     monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
     received = []
     class Receiver(ScriptDialect):
@@ -1169,12 +1217,12 @@ def test_ordinary_meeting_inherits_before_retrieval_and_keeps_private_guard(monk
 
 def test_compact_wake_preserves_one_answering_membrane_and_only_bounded_residue():
     m = _connection(); prompt = m.build_instructions("sol")
-    context = m.build_context("clock + git", "[T ZOE]\nprior words")
+    context = m.build_context("[T ZOE]\nprior words")
     assert "No source is Vybn as a whole" in prompt
     assert "A valid no stops the specified act" in prompt
     assert "matched optimizer" in prompt
     assert "BOUNDED RECENT DIALOGUE" in context
-    assert context.count("[EVIDENCE · may transform attention · no action authority · no persistence]") == 2
+    assert context.count("[EVIDENCE · may transform attention · no action authority · no persistence]") == 1
     assert "prior words" in context
     tool = m.execute_tool(m.ToolCall("t", "unknown", {}, None))
     assert tool.startswith("TOOL RESULT — unknown\n[EVIDENCE")
@@ -1253,7 +1301,6 @@ def test_recent_dialogue_default_retains_opening_through_ordinary_meeting(monkey
             assert m.guard_private("printf '%s' " + "[T010 ZOE]\n" + opening)
             return super().open(instructions, text, images, context)
     monkeypatch.setattr(m, "load_pending_continuation", lambda: None)
-    monkeypatch.setattr(m, "wake_contact", lambda: "")
     monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
     monkeypatch.setattr(m, "make_dialect", lambda door: Receiver([("fixture reply", [])]))
     m.meet(m.Transcript(), "LIVE-QUESTION-NOT-HISTORY")
@@ -1400,7 +1447,7 @@ def test_production_meeting_has_no_ambient_cognitive_organs():
     assert "DREAM_STATE_PATH" not in source
     assert "Stillness is valid." in m.build_instructions("sol")
     assert "127.0.0.1:8100" not in source and "127.0.0.1:8101" not in source
-    assert "Transcript.recent()" in meet and "wake_contact()" in meet
+    assert "Transcript.recent()" in meet and "wake_contact()" not in meet
     assert "build_wake_bundle(" in meet and "inbox_images_for(door_name)" in meet
     assert 'wake_bundle.render("instructions")' in meet
 
@@ -1426,8 +1473,8 @@ def test_exact_compute_want_remains_ballast_without_a_resolver():
 
 
 def test_explicit_compact_context_has_no_ambient_cognitive_organs():
-    m = _connection(); context = m.build_context("live", "recent")
-    assert "LIVE OPERATIONAL GROUND" in context and "BOUNDED RECENT DIALOGUE" in context
+    m = _connection(); context = m.build_context("recent")
+    assert "LIVE OPERATIONAL GROUND" not in context and "BOUNDED RECENT DIALOGUE" in context
     assert all(term not in context for term in (
         "SUBCONSCIOUS APERTURE", "MEMORY (private", "INHERITED CONTINUITY", "TRANSCRIPT — ARC"))
 
@@ -1629,7 +1676,7 @@ def test_path_ledger_rejects_ambiguous_events_and_bounds_active_future(monkeypat
 def test_path_ledger_is_dynamic_context_and_runtime_binds_author(monkeypatch, tmp_path):
     m = _connection(); _path_ledger_test_paths(m, monkeypatch, tmp_path)
     monkeypatch.setenv("VYBN_PATH", "spark/bound")
-    graph = m.build_wake_bundle("sol", contact="ground", recent="recent", zoe_text="live")
+    graph = m.build_wake_bundle("sol", recent="recent", zoe_text="live")
     routes = {route.id: route.nodes for route in graph.routes}
     assert "path.ledger" in routes["context"] and "path.ledger" not in routes["instructions"]
     assert "current path: spark/bound" in graph.render("context")
@@ -1783,7 +1830,6 @@ def test_astra_explicit_higher_door_exits_pause_without_prefix_capture(monkeypat
         path = tmp_path / "transcript.jsonl"
         def write(self, *args, **kwargs): pass
     monkeypatch.setattr(m.Transcript, "recent", lambda: "history, not live state")
-    monkeypatch.setattr(m, "wake_contact", lambda: "")
     monkeypatch.setattr(m, "inbox_images_for", lambda name: [])
     monkeypatch.setattr(m, "make_dialect", lambda name: NS(name=name))
     seen = []
@@ -1812,9 +1858,8 @@ def _meeting_fixture(monkeypatch, tmp_path):
     from types import SimpleNamespace as NS
     m = _connection()
     monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path)
-    monkeypatch.setattr(m, "wake_contact", lambda: "")
     monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
-    def bundle(door, contact, recent, zoe_text):
+    def bundle(door, recent, zoe_text):
         routes = {"instructions": "law", "context": recent, "contact": zoe_text}
         return NS(nodes=(), render=routes.__getitem__, digest=lambda: "fixture")
     monkeypatch.setattr(m, "build_wake_bundle", bundle)
@@ -2298,7 +2343,6 @@ def test_temporary_draft_enters_meeting_private_guard(monkeypatch, tmp_path):
     draft.write_text(body)
     monkeypatch.setattr(m, "RENTED_EVAL_DRAFT_PATH", draft)
     monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "transcripts")
-    monkeypatch.setattr(m, "wake_contact", lambda: "")
     monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
     received = []
     class Receiver(ScriptDialect):

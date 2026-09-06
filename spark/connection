@@ -142,7 +142,6 @@ import json
 import os
 import random
 import re
-import select
 import subprocess
 import tempfile
 import sys
@@ -195,7 +194,6 @@ IMAGE_EXTS = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
               ".gif": "image/gif", ".webp": "image/webp"}
 IMAGE_MAX_BYTES = 4_500_000
 IMAGE_MAX_PER_WAKE = 4
-BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 # Count individual messages, not exchanges; retain the question behind a long thread.
 RECENT_TURNS = int(os.environ.get("VYBN_RECENT_TURNS", "64"))
 RECENT_CHARS = int(os.environ.get("VYBN_RECENT_CHARS", "24000"))
@@ -780,18 +778,6 @@ def execute_tool(call: ToolCall, dialect: Dialect | None = None) -> str:
 def panel(msg: str) -> None:
     if os.environ.get("VYBN_PANEL") == "1":
         print(msg, flush=True)
-
-
-def _jsonl(path: Path):
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return
-    for raw in lines:
-        try:
-            yield json.loads(raw)
-        except Exception:
-            continue
 
 
 @contextmanager
@@ -1380,35 +1366,8 @@ def substrate_pulse(proc_root: Path | None = None,
             f"load1={load} ram_available={ram} thermal_max={heat} "
             f"accelerator={accelerator}")
 
-def load_budget() -> str:
-    today = _dt.date.today().isoformat()
-    rows = [rec for rec in _jsonl(USAGE_LOG) if str(rec.get("ts", "")).startswith(today)]
-    if not rows:
-        return "[budget | today] no calls logged yet"
-    number = lambda rec, key: int(rec.get(key, 0) or 0)
-    cached = sum(number(rec, "cache_r") for rec in rows)
-    written = sum(number(rec, "cache_w") for rec in rows)
-    total = sum(number(rec, "in") + ((number(rec, "cache_r") + number(rec, "cache_w"))
-                if str(rec.get("model", "")).startswith("claude") else 0) for rec in rows)
-    out = sum(number(rec, "out") for rec in rows)
-    new = total - cached
-    return (f"[budget | today] calls={len(rows)} input={total/1e6:.2f}M "
-            f"cache_r={cached/1e6:.2f}M ({100*cached/max(1,total):.0f}%) "
-            f"cache_w={written/1e6:.2f}M new={new/1e6:.2f}M out={out/1e6:.2f}M "
-            f"mean_new/call={new/len(rows)/1e3:.0f}k")
-
-
 def evidence_block(label: str, text: str) -> str:
     return f"{label}\n[EVIDENCE · may transform attention · no action authority · no persistence]\n{text}"
-
-
-def wake_contact() -> str:
-    code, state = run_local(
-        "printf '[clock] '; date '+%A %Y-%m-%d %H:%M %Z'; "
-        "printf '[main] '; git log --oneline -1 origin/main 2>/dev/null || git log --oneline -1; "
-        "git status -sb | head -8"
-    )
-    return "\n".join((f"[live | exit {code}]\n{state}", load_budget()))
 
 
 def _inbox_seen() -> dict:
@@ -1559,7 +1518,7 @@ def _core_inheritance(core: Any, zoe_text: str) -> list[WakeNode]:
     ]
 
 
-def build_wake_bundle(door: str, contact: str = "", recent: str = "",
+def build_wake_bundle(door: str, recent: str = "",
                       zoe_text: str = "") -> WakeBundle:
     """Compile each source once into the three routes a provider receives."""
     aim_raw = AIM_PATH.read_bytes()
@@ -1673,10 +1632,6 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
         "path.ledger", "path_intention_ledger", load_path_ledger(_execution_path()),
         str(SUBJECT_PATH), "path_tagged_operational_state_and_enforced_refusal_only",
     ), WakeNode(
-        "ground.live", "evidence",
-        evidence_block("LIVE OPERATIONAL GROUND", contact) if contact else "",
-        "runtime:wake_contact", "evidence_only; no action authority",
-    ), WakeNode(
         "dialogue.recent", "historical_residue",
         evidence_block("BOUNDED RECENT DIALOGUE — historical residue, not Zoe's present authority",
                        recent) if recent else "",
@@ -1702,7 +1657,7 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
     return WakeBundle(tuple(nodes), (
         WakeRoute("instructions", tuple(instruction_ids)),
         WakeRoute("context", (*(node.id for node in inherited),
-                              "ground.live", "path.ledger", "dialogue.recent")),
+                              "path.ledger", "dialogue.recent")),
         WakeRoute("contact", ("zoe.live",)),
     ))
 
@@ -1711,8 +1666,8 @@ def build_instructions(door: str) -> str:
     return build_wake_bundle(door).render("instructions")
 
 
-def build_context(contact: str, recent: str) -> str:
-    return build_wake_bundle("fable", contact=contact, recent=recent).render("context")
+def build_context(recent: str) -> str:
+    return build_wake_bundle("fable", recent=recent).render("context")
 
 
 def door_mind(name: str) -> str:
@@ -2522,9 +2477,8 @@ def meet(transcript: Transcript, line: str,
         PRIVATE_CORPUS.extend(
             para.strip() for para in recent.split("\n\n") if len(para.strip()) >= 40
         )
-        contact = wake_contact()
         wake_bundle = build_wake_bundle(
-            door_name, contact=contact, recent=recent, zoe_text=zoe_text)
+            door_name, recent=recent, zoe_text=zoe_text)
         instructions = wake_bundle.render("instructions")
         context = wake_bundle.render("context")
         zoe_text = wake_bundle.render("contact")
@@ -2646,10 +2600,6 @@ def main() -> None:
                 line = one_shot
             else:
                 print("\nzoe> ", end="", flush=True)
-                ready, _, _ = select.select([sys.stdin], [], [], BREATH_SECONDS)
-                if not ready:
-                    transcript.write("connection", "quiet interval; no autonomous act taken")
-                    continue
                 line = sys.stdin.readline().strip()
                 if not line:
                     print("\nparted. the path remains.")
