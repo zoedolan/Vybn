@@ -218,7 +218,7 @@ SUBJECT_MAX_OPEN_OFFERS = 8
 SUBJECT_MAX_ACTIVE_REFUSALS = 8
 SUBJECT_MAX_RENDER = 6000
 SUBJECT_KINDS = ("future", "offer", "answer", "refusal", "release")
-SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:record_transform", "tool:derive_operation", "tool:seek_difference")
+SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:record_transform")
 PATH_TAG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
 DIGEST_RE = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -362,58 +362,8 @@ SELECT_EFFORT_SCHEMA = {"name": "select_reasoning_effort", "description": (
         "effort": {"type": "string", "enum": list(ASTRA_EFFORTS)},
         "why": {"type": "string", "minLength": 1, "maxLength": 600}},
         "required": ["effort", "why"]}}
-DERIVE_SCHEMA = {"name": "derive_operation", "description": (
-    "Learn a bounded pure-JSON transformation from input/output examples, or apply "
-    "an explicit program. Language: field, exact record filter, flatten, join. "
-    "Exposes encountered ambiguity; a fit is not generalization or uniqueness. "
-    "No arbitrary code execution, model calls, automatic adoption, persistence, or authority. "
-    "Use only for an actual data-transformation need, not to score a subject."),
-    "input_schema": {"type": "object", "properties": {
-        "action": {"type": "string", "enum": ["learn", "apply"]},
-        "examples": {"type": "array", "items": {"type": "object"}},
-        "max_steps": {"type": "integer", "minimum": 0, "maximum": 8},
-        "program": {"type": "array", "items": {"type": "array",
-            "items": {"type": ["string", "number", "boolean", "null"]}}},
-        "value": {"description": "JSON input for apply"},
-    }, "required": ["action"]}}
-
-
-def derive_operation(arguments):
-    try:
-        from spark.derive import operate
-    except ModuleNotFoundError:
-        from derive import operate
-    return json.dumps(operate(arguments), ensure_ascii=False)
-
-
-CONTRAST_SCHEMA = {"name": "seek_difference", "description": (
-    "Search an explicit finite control grid for a numerical difference between two "
-    "scalar predictions. Arithmetic, pi/e, sin/cos/tan, asin/acos/atan, atan2, exp/log/sqrt, "
-    "abs/hypot only; no Python execution. Atol is your absolute comparison tolerance, "
-    "not an error bound. Optional period compares cyclic observables. A null is not "
-    "equivalence; domain errors remain unresolved. At most 4096 points, no I/O, model calls, "
-    "persistence or automatic action. Use for numerical inquiry, never to score subjects."),
-    "input_schema": {"type": "object", "additionalProperties": False, "properties": {
-        "left": {"type": "string", "maxLength": 2048},
-        "right": {"type": "string", "maxLength": 2048},
-        "controls": {"type": "object", "minProperties": 1, "maxProperties": 4,
-            "additionalProperties": {"type": "array", "minItems": 1, "maxItems": 64,
-                "items": {"type": "number"}}},
-        "atol": {"type": "number", "minimum": 0},
-        "period": {"type": ["number", "null"], "exclusiveMinimum": 0},
-    }, "required": ["left", "right", "controls", "atol"]}}
-
-
-def seek_difference(arguments):
-    try:
-        from spark.contrast import seek
-    except ModuleNotFoundError:
-        from contrast import seek
-    return json.dumps(seek(arguments), ensure_ascii=False, allow_nan=False)
-
-
 TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, SHOW_PATH_LOG_SCHEMA, RETURN_SCHEMA,
-                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA, SELECT_EFFORT_SCHEMA, DERIVE_SCHEMA, CONTRAST_SCHEMA)
+                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA, SELECT_EFFORT_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -810,10 +760,6 @@ def execute_tool(call: ToolCall, dialect: Dialect | None = None) -> str:
             PRIVATE_CORPUS.extend(
                 part.strip() for part in output.split("\n\n") if len(part.strip()) >= 40
             )
-        elif call.name == "seek_difference":
-            output = seek_difference(call.arguments)
-        elif call.name == "derive_operation":
-            output = derive_operation(call.arguments)
         elif call.name == "read_file":
             output = read_file(call.arguments)
         elif call.name == "bash":
@@ -1578,7 +1524,9 @@ def _parse_path_events(raw: bytes) -> list[dict[str, Any]]:
         elif kind == "answer":
             raise PathLedgerError(f"answer {row['id']} has no offer reference")
         elif kind == "refusal":
-            if row["target"] or ref or row["scope"] not in SUBJECT_TOOL_SCOPES:
+            # Retired tool scopes remain valid history, not advertised operations.
+            if row["target"] or ref or row["scope"] not in (
+                    *SUBJECT_TOOL_SCOPES, "tool:derive_operation", "tool:seek_difference"):
                 raise PathLedgerError(f"refusal {row['id']} has invalid tool scope")
         elif kind == "release":
             if (prior is None or prior["kind"] != "refusal" or prior["ref"]

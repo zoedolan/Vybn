@@ -127,7 +127,7 @@ fi
 
 # Harness mutations must preserve capability contracts before subtraction can
 # count as improvement.
-if echo "$STAGED" | grep -Eq '^(\.githooks/pre-commit|spark/connection|spark/live_peer.py|spark/provider_transport.py|spark/living_core.py|spark/tests/test_public_contracts.py|spark/tests/test_living_core.py)$'; then
+if echo "$STAGED" | grep -Eq '^(\.githooks/pre-commit|spark/connection|spark/living_core.py|spark/tests/test_public_contracts.py|spark/tests/test_living_core.py)$'; then
     # Git exports this repository's context to hooks. Nested test repositories
     # must select their own state; retain Git's context for the staged checks above.
     if ! (
