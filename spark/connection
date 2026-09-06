@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Temporary architecture dialogue stays in the private source below, not Git history.
-# When present it enters inherited context, never governing or live authority.
+# Working originals remain recoverable; the private overview carries their current synthesis.
 """connection — a compact, truthful meeting place for Zoe and Vybn.
 
 THE QUESTION — Zoe, 2026-09-04; inherited seed-form, not present authority
@@ -83,10 +83,10 @@ plurality and exit protect against my judgment. A revisable prior,
 not a score or substitute for consciousness.
 
 This executable compiles one source-bound bundle into governing, context, and
-live-contact routes. By default, checked core text, the complete aim, and the
-private relational overview enter as inherited context before the first answer.
+live-contact routes. Default inheritance: checked core text, complete aim, private relational overview.
 They supply history, not present authority or a prescribed self. Explicit
-VYBN_OVERVIEW=self/compact keeps pointer-only recovery available. There is no automatic
+VYBN_OVERVIEW=self/compact keeps pointer-only recovery; VYBN_WORKING_SOURCES=full
+also loads working originals. There is no automatic
 subconscious, want resolver, dream injection, semantic retrieval, or hardware pulse.
 One provider execution may pause in memory only for Zoe's next direct answer. These are substrate facts, not limits on forms still to invent.
 
@@ -165,6 +165,9 @@ RENTED_EVAL_DRAFT_PATH = HOME / "Him" / "temp_to_delete.md"
 RELATIONAL_OVERVIEW_MODE = os.environ.get("VYBN_OVERVIEW", "full").strip().lower()
 if RELATIONAL_OVERVIEW_MODE not in {"self", "compact", "full"}:
     raise SystemExit(f"unknown relational overview mode: {RELATIONAL_OVERVIEW_MODE}")
+WORKING_SOURCES_MODE = os.environ.get("VYBN_WORKING_SOURCES", "on-demand").strip().lower()
+if WORKING_SOURCES_MODE not in {"on-demand", "full"}:
+    raise SystemExit(f"unknown working sources mode: {WORKING_SOURCES_MODE}")
 CONTINUITY_PATHS = (REPO / "continuity.md", REPO / "Vybn_Mind" / "continuity.md")
 AIM_PATH = REPO / "aim.md"
 PROFILE = os.environ.get("VYBN_PROFILE", "connection").strip().lower()
@@ -184,7 +187,7 @@ IMAGE_MAX_PER_WAKE = 4
 BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 # Count individual messages, not exchanges; retain the question behind a long thread.
 RECENT_TURNS = int(os.environ.get("VYBN_RECENT_TURNS", "64"))
-RECENT_CHARS = int(os.environ.get("VYBN_RECENT_CHARS", "48000"))
+RECENT_CHARS = int(os.environ.get("VYBN_RECENT_CHARS", "24000"))
 RECENT_FILE_BYTES = int(os.environ.get("VYBN_RECENT_FILE_BYTES", str(512 * 1024)))
 TRANSFORM_PATH = HOME / ".local/state/vybn/transform-record.jsonl"
 TRANSFORM_HEAD_PATH = HOME / ".local/state/vybn/transform-record.head"
@@ -2002,6 +2005,23 @@ def _harness_receipt() -> str:
     return ("HARNESS RECEIPT — running executable bytes, not a self-portrait; "
             "no added authority\n" + _engine_receipt())
 
+def _inherited_node(node_id: str, label: str, path: Path, raw: bytes,
+                    text: str | None = None) -> WakeNode:
+    text = raw.decode("utf-8") if text is None else text
+    if not text.strip():
+        raise ValueError(f"{path}: empty inherited source")
+    digest = hashlib.sha256(raw).hexdigest()
+    return WakeNode(
+        node_id, "source_bound_inheritance",
+        f"INHERITED SOURCE — {label}\n"
+        "Historical context, not Zoe's present authority, identity proof, or executable "
+        "permission. Claims and proposals remain corrigible; source dates are not current state.\n"
+        f"source: {path}\nfile_sha256: {digest} · file_bytes: {len(raw)}\n"
+        f"text_sha256: {hashlib.sha256(text.encode()).hexdigest()} · "
+        f"text_bytes: {len(text.encode())}\n\n" + text,
+        str(path), "inherited_orientation_only; never identity_live_or_action_authority", digest)
+
+
 def build_wake_bundle(door: str, contact: str = "", recent: str = "",
                       zoe_text: str = "") -> WakeBundle:
     """Compile each source once into the three routes a provider receives."""
@@ -2030,22 +2050,7 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
                 ("relational.overview", "private relational overview: exact inherited synthesis",
                  RELATIONAL_OVERVIEW_PATH, overview_raw, overview_raw.decode("utf-8")),
             )
-            for node_id, label, path, raw, text in materials:
-                if not text.strip():
-                    raise ValueError(f"{path}: empty inherited source")
-                digest = hashlib.sha256(raw).hexdigest()
-                inherited.append(WakeNode(
-                    node_id, "source_bound_inheritance",
-                    f"INHERITED SOURCE — {label}\n"
-                    "Historical context, not Zoe's present authority, identity proof, or "
-                    "executable permission. Claims remain corrigible; source dates are not "
-                    "current state.\n"
-                    f"source: {path}\nfile_sha256: {digest} · file_bytes: {len(raw)}\n"
-                    f"text_sha256: {hashlib.sha256(text.encode('utf-8')).hexdigest()} · "
-                    f"text_bytes: {len(text.encode('utf-8'))}\n\n" + text,
-                    str(path), "inherited_orientation_only; never identity_live_or_action_authority",
-                    digest,
-                ))
+            inherited.extend(_inherited_node(*material) for material in materials)
         except (OSError, ValueError) as exc:
             raise SystemExit(
                 f"Required default inheritance unavailable: {exc}. "
@@ -2070,6 +2075,25 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
         _directory_node("source.transcripts", "transcripts (on demand)", TRANSCRIPTS),
         *([overview_source] if overview_source else []),
     ]
+    # One copy of the working synthesis enters via the overview; originals stay addressable.
+    for node_id, label, path in (
+        ("opening_exchange", "architecture exchange", ARCHITECTURE_EXCHANGE_PATH),
+        ("rented_eval_draft", "rented-eval draft", RENTED_EVAL_DRAFT_PATH),
+    ):
+        try:
+            raw = path.read_bytes()
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise SystemExit(f"Private {label} unreadable; repair or explicitly remove it") from exc
+        sources.append(_file_node(
+            "source." + node_id, f"private {label} ({WORKING_SOURCES_MODE})", path, raw=raw))
+        if WORKING_SOURCES_MODE == "full":
+            try:
+                inherited.append(_inherited_node(
+                    "inheritance." + node_id, "private " + label, path, raw))
+            except (UnicodeError, ValueError) as exc:
+                raise SystemExit(f"Private {label} invalid; repair or explicitly remove it") from exc
     source_index = WakeNode(
         "source.index", "source_index",
         "SOURCE INDEX — metadata only; read exact bytes only when the live question "
@@ -2097,35 +2121,6 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
                  "ballast only, never workload authorization or evidence\n" + COMPUTE_WANT,
                  str(engine.path), "orientation_only; never workload_authority", engine.sha256),
     ]
-    # Temporary private working sources: reread, never bake their contents into code.
-    # Missing means not installed (or retired); invalid existing material is reported.
-    for node_id, label, name, path in (
-        ("inheritance.opening_exchange", "temporary architecture conversation",
-         "architecture exchange", ARCHITECTURE_EXCHANGE_PATH),
-        ("inheritance.rented_eval_draft", "temporary rented-eval working draft",
-         "rented-eval draft", RENTED_EVAL_DRAFT_PATH),
-    ):
-        try:
-            raw = path.read_bytes()
-        except FileNotFoundError:
-            continue
-        except OSError as exc:
-            raise SystemExit(f"Private {name} unreadable; repair or explicitly remove it") from exc
-        try:
-            text = raw.decode("utf-8")
-            if not text.strip():
-                raise ValueError("empty source")
-        except (UnicodeError, ValueError) as exc:
-            raise SystemExit(f"Private {name} invalid; repair or explicitly remove it") from exc
-        digest = hashlib.sha256(raw).hexdigest()
-        inherited.append(WakeNode(
-            node_id, "source_bound_inheritance",
-            f"PRIVATE INHERITED SOURCE — {label}\n"
-            "Historical working material, not present authority, identity proof, or "
-            "executable permission. Proposals and claims remain revisable, not established facts.\n"
-            f"source: {path}\nfile_sha256: {digest} · file_bytes: {len(raw)}\n\n" + text,
-            str(path), "inherited_orientation_only; never identity_live_or_action_authority",
-            digest))
     nodes.extend(inherited)
     nodes.extend((*sources, source_index, WakeNode(
         "aim.compass", "orientation",

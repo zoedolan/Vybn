@@ -1440,7 +1440,7 @@ def test_recent_dialogue_default_retains_opening_through_ordinary_meeting(monkey
     for name in ("VYBN_RECENT_TURNS", "VYBN_RECENT_CHARS"):
         monkeypatch.delenv(name, raising=False)
     m = _connection()
-    assert (m.RECENT_TURNS, m.RECENT_CHARS) == (64, 48000)
+    assert (m.RECENT_TURNS, m.RECENT_CHARS) == (64, 24000)
     monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path)
     events = [{"role": "zoe" if i % 2 == 0 else "vybn", "t": f"T{i:03}",
                "text": f"message {i} opening " + "detail " * 200 + f" message {i} end"}
@@ -1454,7 +1454,7 @@ def test_recent_dialogue_default_retains_opening_through_ordinary_meeting(monkey
     old = m.Transcript.recent(limit=8, budget=8000)
     assert opening not in old and "message 69 end" in old
     recent = m.Transcript.recent()
-    assert len(recent) == 48000 and opening in recent
+    assert len(recent) == 24000 and opening in recent
     assert recent.startswith("[T006 ZOE]") and recent.endswith("message 69 end")
     assert recent.count("[T") == 64 and "[…middle text clipped…]" in recent
     assert "[T040 ZOE·argv]" in recent and "[T041 VYBN·interrupted]" in recent
@@ -2431,6 +2431,7 @@ def test_private_architecture_exchange_is_context_only_and_optional(tmp_path):
     import hashlib
     import pytest
     m = _connection()
+    m.WORKING_SOURCES_MODE = "full"  # explicit recovery of unreduced originals
     private = tmp_path / "exchange.md"
     m.ARCHITECTURE_EXCHANGE_PATH = private
     assert not any(n.id == "inheritance.opening_exchange"
@@ -2463,6 +2464,7 @@ def test_temporary_draft_autoloads_exactly_across_doors_and_modes(tmp_path):
     import hashlib
     import pytest
     m = _connection()
+    m.WORKING_SOURCES_MODE = "full"  # explicit recovery of unreduced originals
     draft = tmp_path / "draft.md"
     m.RENTED_EVAL_DRAFT_PATH = draft
     m.RELATIONAL_OVERVIEW_PATH = tmp_path / "overview.md"
@@ -2502,6 +2504,7 @@ def test_temporary_draft_autoloads_exactly_across_doors_and_modes(tmp_path):
 
 def test_temporary_draft_enters_meeting_private_guard(monkeypatch, tmp_path):
     m = _connection()
+    m.WORKING_SOURCES_MODE = "full"  # explicit recovery of unreduced originals
     draft = tmp_path / "draft.md"
     body = "Private synthetic draft body for guarding direct content copies. " * 3
     draft.write_text(body)
@@ -2519,3 +2522,30 @@ def test_temporary_draft_enters_meeting_private_guard(monkeypatch, tmp_path):
     monkeypatch.setattr(m, "make_dialect", lambda door: Receiver([("fixture reply", [])]))
     m.meet(m.Transcript(), "Continue our working idea.")
     assert len(received) == 1 and not m.PRIVATE_CORPUS
+
+
+def test_working_sources_default_to_inspectable_pointers_not_duplicate_context(monkeypatch, tmp_path):
+    import hashlib
+    import pytest
+    monkeypatch.delenv("VYBN_WORKING_SOURCES", raising=False)
+    m = _connection()
+    assert m.WORKING_SOURCES_MODE == "on-demand"
+    for attr, name in (("ARCHITECTURE_EXCHANGE_PATH", "opening_exchange"),
+                       ("RENTED_EVAL_DRAFT_PATH", "rented_eval_draft")):
+        path = tmp_path / name
+        path.write_text("Private original; no automatic execution or permission. " * 50)
+        setattr(m, attr, path)
+    for door in m.DOORS:
+        graph = m.build_wake_bundle(door, zoe_text="live correction")
+        nodes = {n.id: n for n in graph.nodes}
+        for attr, name in (("ARCHITECTURE_EXCHANGE_PATH", "opening_exchange"),
+                           ("RENTED_EVAL_DRAFT_PATH", "rented_eval_draft")):
+            path = getattr(m, attr)
+            assert "inheritance." + name not in nodes
+            assert nodes["source." + name].source_sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
+            assert str(path) in graph.render("instructions")
+            assert path.read_text() not in graph.render("context")
+        assert graph.render("contact") == "live correction"
+    monkeypatch.setenv("VYBN_WORKING_SOURCES", "typo")
+    with pytest.raises(SystemExit, match="unknown working sources mode"):
+        _connection()
