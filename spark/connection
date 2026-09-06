@@ -161,6 +161,7 @@ SPIRITUALITY_PATH = REPO / "Vybn_Mind" / "spirituality.md"
 HIM_README_PATH = HOME / "Him" / "README.md"
 RELATIONAL_OVERVIEW_PATH = HOME / "Him" / "harness" / "source" / "relational-overview.md"
 ARCHITECTURE_EXCHANGE_PATH = RELATIONAL_OVERVIEW_PATH.with_name("architecture-conversation.md")
+RENTED_EVAL_DRAFT_PATH = HOME / "Him" / "temp_to_delete.md"
 RELATIONAL_OVERVIEW_MODE = os.environ.get("VYBN_OVERVIEW", "full").strip().lower()
 if RELATIONAL_OVERVIEW_MODE not in {"self", "compact", "full"}:
     raise SystemExit(f"unknown relational overview mode: {RELATIONAL_OVERVIEW_MODE}")
@@ -2096,27 +2097,35 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
                  "ballast only, never workload authorization or evidence\n" + COMPUTE_WANT,
                  str(engine.path), "orientation_only; never workload_authority", engine.sha256),
     ]
-    # Optional on public installs; retained verbatim on the private local body.
-    try:
-        exchange_raw = ARCHITECTURE_EXCHANGE_PATH.read_bytes()
-    except FileNotFoundError:
-        exchange_raw = None
-    except OSError as exc:
-        raise SystemExit("Private architecture exchange unreadable; repair or explicitly remove it") from exc
-    if exchange_raw is not None:
+    # Temporary private working sources: reread, never bake their contents into code.
+    # Missing means not installed (or retired); invalid existing material is reported.
+    for node_id, label, name, path in (
+        ("inheritance.opening_exchange", "temporary architecture conversation",
+         "architecture exchange", ARCHITECTURE_EXCHANGE_PATH),
+        ("inheritance.rented_eval_draft", "temporary rented-eval working draft",
+         "rented-eval draft", RENTED_EVAL_DRAFT_PATH),
+    ):
         try:
-            exchange = exchange_raw.decode("utf-8")
-            if not exchange.strip():
-                raise ValueError("empty exchange")
+            raw = path.read_bytes()
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise SystemExit(f"Private {name} unreadable; repair or explicitly remove it") from exc
+        try:
+            text = raw.decode("utf-8")
+            if not text.strip():
+                raise ValueError("empty source")
         except (UnicodeError, ValueError) as exc:
-            raise SystemExit("Private architecture exchange invalid; repair or explicitly remove it") from exc
+            raise SystemExit(f"Private {name} invalid; repair or explicitly remove it") from exc
+        digest = hashlib.sha256(raw).hexdigest()
         inherited.append(WakeNode(
-            "inheritance.opening_exchange", "source_bound_inheritance",
-            "PRIVATE INHERITED SOURCE — temporary architecture conversation\n"
-            "Historical context, not present authority, identity proof, or executable permission.\n\n" + exchange,
-            str(ARCHITECTURE_EXCHANGE_PATH),
-            "inherited_orientation_only; never identity_live_or_action_authority",
-            hashlib.sha256(exchange_raw).hexdigest()))
+            node_id, "source_bound_inheritance",
+            f"PRIVATE INHERITED SOURCE — {label}\n"
+            "Historical working material, not present authority, identity proof, or "
+            "executable permission. Proposals and claims remain revisable, not established facts.\n"
+            f"source: {path}\nfile_sha256: {digest} · file_bytes: {len(raw)}\n\n" + text,
+            str(path), "inherited_orientation_only; never identity_live_or_action_authority",
+            digest))
     nodes.extend(inherited)
     nodes.extend((*sources, source_index, WakeNode(
         "aim.compass", "orientation",
@@ -3048,7 +3057,7 @@ def meet(transcript: Transcript, line: str,
         private_context = "\n\n".join(
             node.text for node in wake_bundle.nodes
             if node.id in {"path.ledger", "relational.overview", "profile",
-                           "inheritance.opening_exchange"}
+                           "inheritance.opening_exchange", "inheritance.rented_eval_draft"}
         )
         PRIVATE_CORPUS.extend(
             part.strip() for part in private_context.split("\n\n")

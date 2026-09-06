@@ -123,6 +123,7 @@ def _connection(overview_mode="compact"):
     sys.modules["vybn_connection"] = module
     loader.exec_module(module)
     module.ARCHITECTURE_EXCHANGE_PATH = ROOT / "__absent_test_architecture_exchange__"
+    module.RENTED_EVAL_DRAFT_PATH = ROOT / "__absent_test_rented_eval_draft__"
     if overview_mode is not None:
         module.RELATIONAL_OVERVIEW_MODE = overview_mode  # explicit host-independent recovery
     return module
@@ -2443,3 +2444,65 @@ def test_private_architecture_exchange_is_context_only_and_optional(tmp_path):
     private.mkdir()
     with pytest.raises(SystemExit, match="exchange unreadable"):
         m.build_wake_bundle("astra")
+
+
+def test_temporary_draft_autoloads_exactly_across_doors_and_modes(tmp_path):
+    import hashlib
+    import pytest
+    m = _connection()
+    draft = tmp_path / "draft.md"
+    m.RENTED_EVAL_DRAFT_PATH = draft
+    m.RELATIONAL_OVERVIEW_PATH = tmp_path / "overview.md"
+    m.RELATIONAL_OVERVIEW_PATH.write_text("Independent inherited overview fixture.")
+    node_id = "inheritance.rented_eval_draft"
+    assert node_id not in {n.id for n in m.build_wake_bundle("astra").nodes}
+    raw = ("# Revisable private draft\r\n\r\n" + "λ: fictional working material.\n" * 1500).encode()
+    draft.write_bytes(raw)
+    for mode in ("full", "self", "compact"):
+        m.RELATIONAL_OVERVIEW_MODE = mode
+        for door in m.DOORS:
+            graph = m.build_wake_bundle(door, zoe_text="present words")
+            node = next(n for n in graph.nodes if n.id == node_id)
+            assert node.text.endswith(raw.decode())
+            assert node.source == str(draft)
+            assert node.source_sha256 == hashlib.sha256(raw).hexdigest()
+            assert node.authority == "inherited_orientation_only; never identity_live_or_action_authority"
+            assert graph.render("context").count(raw.decode()) == 1
+            assert raw.decode() not in graph.render("instructions")
+            assert raw.decode() not in json.dumps(graph.manifest())
+            assert graph.render("contact") == "present words"
+    before = graph.digest()
+    draft.write_text("A replacement working idea, not a frozen snapshot.")
+    graph = m.build_wake_bundle(door, zoe_text="present words")
+    assert draft.read_text() in graph.render("context")
+    assert raw.decode() not in graph.render("context") and graph.digest() != before
+    for bad in (b"", b" \n", b"\xff"):
+        draft.write_bytes(bad)
+        with pytest.raises(SystemExit, match="rented-eval draft invalid"):
+            m.build_wake_bundle("astra")
+    draft.unlink()
+    assert node_id not in {n.id for n in m.build_wake_bundle("astra").nodes}
+    draft.mkdir()
+    with pytest.raises(SystemExit, match="rented-eval draft unreadable"):
+        m.build_wake_bundle("astra")
+
+
+def test_temporary_draft_enters_meeting_private_guard(monkeypatch, tmp_path):
+    m = _connection()
+    draft = tmp_path / "draft.md"
+    body = "Private synthetic draft body for guarding direct content copies. " * 3
+    draft.write_text(body)
+    monkeypatch.setattr(m, "RENTED_EVAL_DRAFT_PATH", draft)
+    monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path / "transcripts")
+    monkeypatch.setattr(m, "wake_contact", lambda: "")
+    monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
+    received = []
+    class Receiver(ScriptDialect):
+        def open(self, instructions, text, images, context):
+            assert context.count(body) == 1 and body not in instructions
+            assert m.guard_private("printf '%s' " + body)
+            received.append(context)
+            return super().open(instructions, text, images, context)
+    monkeypatch.setattr(m, "make_dialect", lambda door: Receiver([("fixture reply", [])]))
+    m.meet(m.Transcript(), "Continue our working idea.")
+    assert len(received) == 1 and not m.PRIVATE_CORPUS
