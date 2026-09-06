@@ -178,8 +178,9 @@ IMAGE_EXTS = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
 IMAGE_MAX_BYTES = 4_500_000
 IMAGE_MAX_PER_WAKE = 4
 BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
-RECENT_TURNS = int(os.environ.get("VYBN_RECENT_TURNS", "8"))
-RECENT_CHARS = int(os.environ.get("VYBN_RECENT_CHARS", "8000"))
+# Count individual messages, not exchanges; retain the question behind a long thread.
+RECENT_TURNS = int(os.environ.get("VYBN_RECENT_TURNS", "64"))
+RECENT_CHARS = int(os.environ.get("VYBN_RECENT_CHARS", "48000"))
 RECENT_FILE_BYTES = int(os.environ.get("VYBN_RECENT_FILE_BYTES", str(512 * 1024)))
 TRANSFORM_PATH = HOME / ".local/state/vybn/transform-record.jsonl"
 TRANSFORM_HEAD_PATH = HOME / ".local/state/vybn/transform-record.head"
@@ -3170,7 +3171,7 @@ def main() -> None:
         print(json.dumps(build_wake_bundle("fable").manifest(), indent=2))
         return
     if "--show-record" in sys.argv:
-        print(Transcript.recent(limit=16, budget=16000))
+        print(Transcript.recent())
         return
     if sys.argv[1:] and sys.argv[1].startswith("-"):
         print("connection flags: --self  --body  --show-wake-bundle  --show-wake-graph  "

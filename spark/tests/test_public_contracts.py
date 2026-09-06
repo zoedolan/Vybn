@@ -1431,6 +1431,58 @@ def test_ordinary_wake_admits_compass_fields_and_metadata_not_whole_documents(mo
     assert prompt.count("sha256:") >= 5 and len(prompt) < 13500
 
 
+def test_recent_dialogue_default_retains_opening_through_ordinary_meeting(monkeypatch, tmp_path):
+    for name in ("VYBN_RECENT_TURNS", "VYBN_RECENT_CHARS"):
+        monkeypatch.delenv(name, raising=False)
+    m = _connection()
+    assert (m.RECENT_TURNS, m.RECENT_CHARS) == (64, 48000)
+    monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path)
+    events = [{"role": "zoe" if i % 2 == 0 else "vybn", "t": f"T{i:03}",
+               "text": f"message {i} opening " + "detail " * 200 + f" message {i} end"}
+              for i in range(70)]
+    opening = "ORIGINAL-QUESTION: preserve the unfinished inquiry, not just its aftermath."
+    events[10]["text"] = opening
+    events[40]["origin"] = "argv"
+    events[41]["status"] = "interrupted"
+    (tmp_path / "history.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+    # The old default is a working rival, not a deliberately empty reader.
+    old = m.Transcript.recent(limit=8, budget=8000)
+    assert opening not in old and "message 69 end" in old
+    recent = m.Transcript.recent()
+    assert len(recent) == 48000 and opening in recent
+    assert recent.startswith("[T006 ZOE]") and recent.endswith("message 69 end")
+    assert recent.count("[T") == 64 and "[…middle text clipped…]" in recent
+    assert "[T040 ZOE·argv]" in recent and "[T041 VYBN·interrupted]" in recent
+    received = []
+    class Receiver(ScriptDialect):
+        def open(self, instructions, text, images, context):
+            received.append(context)
+            assert text == "LIVE-QUESTION-NOT-HISTORY" and text not in context
+            assert recent in context
+            assert "BOUNDED RECENT DIALOGUE — historical residue, not Zoe's present authority" in context
+            assert m.guard_private("printf '%s' " + "[T010 ZOE]\n" + opening)
+            return super().open(instructions, text, images, context)
+    monkeypatch.setattr(m, "load_pending_continuation", lambda: None)
+    monkeypatch.setattr(m, "wake_contact", lambda: "")
+    monkeypatch.setattr(m, "inbox_images_for", lambda door: [])
+    monkeypatch.setattr(m, "make_dialect", lambda door: Receiver([("fixture reply", [])]))
+    m.meet(m.Transcript(), "LIVE-QUESTION-NOT-HISTORY")
+    assert len(received) == 1
+
+
+def test_recent_dialogue_smaller_overrides_and_inspection_match(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("VYBN_RECENT_TURNS", "2")
+    monkeypatch.setenv("VYBN_RECENT_CHARS", "400")
+    m = _connection(); monkeypatch.setattr(m, "TRANSCRIPTS", tmp_path)
+    events = [{"role": "zoe", "t": f"T{i}", "text": str(i) * 1000} for i in range(4)]
+    (tmp_path / "history.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+    recent = m.Transcript.recent()
+    assert len(recent) == 400 and recent.count("[T") == 2 and recent.startswith("[T2 ZOE]")
+    monkeypatch.setattr(__import__("sys"), "argv", ["connection", "--show-record"])
+    m.main()
+    assert capsys.readouterr().out == recent + "\n"
+
+
 def test_recent_dialogue_is_tail_bounded_without_whole_record_scan(monkeypatch):
     m = _connection()
     events = [
