@@ -149,7 +149,7 @@ import time
 import urllib.parse
 from collections import Counter, defaultdict
 from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -396,23 +396,6 @@ class WakeBundle:
             raise KeyError(f"unknown wake route: {route_id}")
         bindings = {node.id: node.text for node in self.nodes}
         return "\n\n".join(bindings[name] for name in route.nodes if bindings[name])
-
-    def derive(self, *nodes):
-        """Fork selected bindings locally, without mutating the parent or executing them.
-
-        Only inherited source payloads can vary; law, live contact, configuration
-        and operative refusals cannot be rebound here. This is an explicit
-        CPU operation, not an automatic memory writer or a provider continuation.
-        """
-        old = {node.id: node for node in self.nodes}
-        if len({node.id for node in nodes}) != len(nodes):
-            raise ValueError("duplicate derived binding")
-        for node in nodes:
-            prior = old[node.id]
-            if (prior.kind != "source_bound_inheritance"
-                    or (node.kind, node.authority) != (prior.kind, prior.authority)):
-                raise ValueError("derive accepts inherited source views only, preserving their authority and kind")
-        return replace(self, nodes=tuple(dict(old, **{n.id: n for n in nodes}).values()))
 
     def structure(self):
         fields = ("id", "kind", "source", "authority", "source_sha256")

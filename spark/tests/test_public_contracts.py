@@ -2540,7 +2540,7 @@ def test_common_envelope_rejects_resigned_malformed_events(monkeypatch, tmp_path
         parse(m._encoded(row))
 
 
-def test_local_source_views_branch_without_mutating_law_live_contact_or_parent(tmp_path):
+def test_source_views_need_no_dedicated_branching_api(tmp_path):
     from dataclasses import replace
     m = _connection()
     path = tmp_path / "source.txt"; raw = b"alpha\n\nbeta\n"; path.write_bytes(raw)
@@ -2548,8 +2548,10 @@ def test_local_source_views_branch_without_mutating_law_live_contact_or_parent(t
     fixed = tuple(m.WakeNode(k, k, "fixed", "test", k) for k in
                   ("law", "live_contact", "path_intention_ledger", "configuration"))
     base = m.WakeBundle((source, *fixed), (m.WakeRoute("context", ("reading",)),))
-    branches = [base.derive(m._inherited_node("reading", "selected exact passage", path, raw, text))
-                for text in ("alpha", "beta")]
+    assert not hasattr(base, "derive")
+    branches = [replace(base, nodes=(
+        m._inherited_node("reading", "selected exact passage", path, raw, text), *fixed))
+        for text in ("alpha", "beta")]
     assert "alpha\n\nbeta\n" in base.render("context")
     assert branches[0].render("context").endswith("alpha")
     assert branches[1].render("context").endswith("beta")
@@ -2557,15 +2559,7 @@ def test_local_source_views_branch_without_mutating_law_live_contact_or_parent(t
     assert {b.nodes[0].source_sha256 for b in (base, *branches)} == {source.source_sha256}
     assert "alpha" not in json.dumps(branches[0].manifest())
     assert path.read_bytes() == raw
-    for node in fixed:
-        with pytest.raises(ValueError):
-            base.derive(replace(node, text="replacement"))
-    with pytest.raises(ValueError):
-        base.derive(replace(source, authority="governing_instruction"))
-    with pytest.raises(ValueError):
-        base.derive(source, source)
-    with pytest.raises(KeyError):
-        base.derive(replace(source, id="absent"))
+    assert all(branch.nodes[1:] == fixed for branch in branches)
 
 
 @pytest.mark.parametrize("name,args", [
