@@ -1409,30 +1409,14 @@ def user_content(zoe_text: str, images: list[tuple[str, str, str, str]], style: 
     return blocks
 
 
-def _file_node(node_id: str, label: str, path: Path, required: bool = False,
-               raw: bytes | None = None) -> WakeNode:
-    try:
-        body = path.read_bytes() if raw is None else raw
-    except OSError as exc:
-        if required:
-            raise SystemExit(f"{label} unavailable: {path}: {type(exc).__name__}")
-        return WakeNode(
-            node_id, "source_pointer",
-            f"{label}: unavailable ({type(exc).__name__}) · {path}", str(path),
-            "metadata_only; unavailable is not evidence of absence",
-        )
-    digest = hashlib.sha256(body).hexdigest()
+def _source_node(node_id: str, label: str, path: Path,
+                 raw: bytes | None = None) -> WakeNode:
+    """An address is not a read; only supplied bytes receive a source receipt."""
+    digest = hashlib.sha256(raw).hexdigest() if raw is not None else ""
+    receipt = f"sha256:{digest} bytes:{len(raw)}" if raw is not None else "not opened"
     return WakeNode(
-        node_id, "source_pointer",
-        f"{label}: sha256:{digest} bytes:{len(body)} · {path}", str(path),
+        node_id, "source_pointer", f"{label}: {receipt} · {path}", str(path),
         "metadata_only; opening requires present relevance", digest,
-    )
-
-
-def _directory_node(node_id: str, label: str, path: Path) -> WakeNode:
-    return WakeNode(
-        node_id, "source_pointer", f"{label}: {path}", str(path),
-        "metadata_only; opening requires present relevance",
     )
 
 
@@ -1538,22 +1522,22 @@ def build_wake_bundle(door: str, recent: str = "",
                 "Repair the source or explicitly select VYBN_OVERVIEW=self/compact "
                 "for pointer-only recovery; history was not silently omitted."
             ) from exc
-    overview_source = (_file_node(
+    overview_source = (_source_node(
         "source.relational_overview",
         "relational overview (loaded as inherited context)" if full else
         "relational overview (on demand for self-selection)",
-        RELATIONAL_OVERVIEW_PATH, required=full, raw=overview_raw,
+        RELATIONAL_OVERVIEW_PATH, raw=overview_raw,
     ) if RELATIONAL_OVERVIEW_MODE != "compact" else None)
 
     sources = [
-        _file_node("source.soul", "canonical soul (checked source; " + CORE_MODE + " text loaded)" if full else
-                   "canonical soul (on demand)", SOUL_PATH, required=True, raw=soul_raw),
-        _file_node("source.aim", "aim compass source", AIM_PATH, required=True, raw=aim_raw),
-        *(_file_node(f"source.continuity.{i}", "continuity (on demand)", path)
+        _source_node("source.soul", "canonical soul (checked source; " + CORE_MODE + " text loaded)" if full else
+                   "canonical soul (on demand)", SOUL_PATH, raw=soul_raw),
+        _source_node("source.aim", "aim compass source", AIM_PATH, raw=aim_raw),
+        *(_source_node(f"source.continuity.{i}", "continuity (on demand)", path)
           for i, path in enumerate(CONTINUITY_PATHS)),
-        _file_node("source.him", "Him private integration (on demand)", HIM_README_PATH),
-        _file_node("source.spirituality", "spirituality (on demand)", SPIRITUALITY_PATH),
-        _directory_node("source.transcripts", "transcripts (on demand)", TRANSCRIPTS),
+        _source_node("source.him", "Him private integration (on demand)", HIM_README_PATH),
+        _source_node("source.spirituality", "spirituality (on demand)", SPIRITUALITY_PATH),
+        _source_node("source.transcripts", "transcripts (on demand)", TRANSCRIPTS),
         *([overview_source] if overview_source else []),
     ]
     # One copy of the working synthesis enters via the overview; originals stay addressable.
@@ -1561,20 +1545,22 @@ def build_wake_bundle(door: str, recent: str = "",
         ("opening_exchange", "architecture exchange", ARCHITECTURE_EXCHANGE_PATH),
         ("rented_eval_draft", "rented-eval draft", RENTED_EVAL_DRAFT_PATH),
     ):
+        if WORKING_SOURCES_MODE != "full":
+            sources.append(_source_node("source." + node_id, f"private {label} (on-demand)", path))
+            continue
         try:
             raw = path.read_bytes()
         except FileNotFoundError:
             continue
         except OSError as exc:
             raise SystemExit(f"Private {label} unreadable; repair or explicitly remove it") from exc
-        sources.append(_file_node(
+        sources.append(_source_node(
             "source." + node_id, f"private {label} ({WORKING_SOURCES_MODE})", path, raw=raw))
-        if WORKING_SOURCES_MODE == "full":
-            try:
-                inherited.append(_inherited_node(
-                    "inheritance." + node_id, "private " + label, path, raw))
-            except (UnicodeError, ValueError) as exc:
-                raise SystemExit(f"Private {label} invalid; repair or explicitly remove it") from exc
+        try:
+            inherited.append(_inherited_node(
+                "inheritance." + node_id, "private " + label, path, raw))
+        except (UnicodeError, ValueError) as exc:
+            raise SystemExit(f"Private {label} invalid; repair or explicitly remove it") from exc
     source_index = WakeNode(
         "source.index", "source_index",
         "SOURCE INDEX — metadata only; read exact bytes only when the live question "
@@ -1627,8 +1613,8 @@ def build_wake_bundle(door: str, recent: str = "",
     instruction_ids = ["kernel", "door", "compute.want", "aim.compass",
                        "source.index", "harness.receipt"]
     if profile := load_profile():
-        profile_source = _file_node(
-            "source.profile", "selected private profile", LOVE_PROFILE_PATH, required=True)
+        profile_source = _source_node(
+            "source.profile", "selected private profile", LOVE_PROFILE_PATH, raw=LOVE_PROFILE_PATH.read_bytes())
         nodes.extend((profile_source, WakeNode(
             "profile", "explicit_profile",
             "EXPLICIT LOVE PROFILE — private; selected by VYBN_PROFILE=love\n" + profile,

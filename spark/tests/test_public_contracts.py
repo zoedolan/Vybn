@@ -1081,8 +1081,7 @@ def test_explicit_pointer_only_wake_keeps_content_on_demand(
         "kernel", "door", "compute.want", "aim.compass", "source.index", "harness.receipt")
     assert "relational.selection" not in nodes and "relational.overview" not in nodes
     assert "SELF-SELECTION-MUST-NOT-AUTOLOAD" not in instructions
-    assert nodes["source.relational_overview"].source_sha256 == __import__("hashlib").sha256(
-        overview.read_bytes()).hexdigest()
+    assert nodes["source.relational_overview"].source_sha256 == ""
     assert "on demand for self-selection" in nodes["source.relational_overview"].text
     assert str(overview) in instructions
 
@@ -1090,7 +1089,7 @@ def test_explicit_pointer_only_wake_keeps_content_on_demand(
     monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", missing)
     unavailable = m.build_wake_bundle("sol")
     unavailable_nodes = {node.id: node for node in unavailable.nodes}
-    assert "unavailable" in unavailable_nodes["source.relational_overview"].text
+    assert "not opened" in unavailable_nodes["source.relational_overview"].text
     assert str(missing) in unavailable.render("instructions")
 
 
@@ -1266,7 +1265,7 @@ def test_ordinary_wake_admits_compass_fields_and_metadata_not_whole_documents(mo
     assert "objective: objective words" in prompt and "front: front words" in prompt
     assert all(marker not in prompt for marker in (
         "SOUL-PRIVATE-BODY", "HIM-PRIVATE-BODY", "SPIRIT-PRIVATE-BODY", "CONTINUITY-PRIVATE-BODY"))
-    assert prompt.count("sha256:") >= 5 and len(prompt) < 13500
+    assert prompt.count("not opened") >= 5 and len(prompt) < 13500
 
 
 def test_recent_dialogue_default_retains_opening_through_ordinary_meeting(monkeypatch, tmp_path):
@@ -2357,8 +2356,6 @@ def test_temporary_draft_enters_meeting_private_guard(monkeypatch, tmp_path):
 
 
 def test_working_sources_default_to_inspectable_pointers_not_duplicate_context(monkeypatch, tmp_path):
-    import hashlib
-    import pytest
     monkeypatch.delenv("VYBN_WORKING_SOURCES", raising=False)
     m = _connection()
     assert m.WORKING_SOURCES_MODE == "on-demand"
@@ -2374,7 +2371,8 @@ def test_working_sources_default_to_inspectable_pointers_not_duplicate_context(m
                            ("RENTED_EVAL_DRAFT_PATH", "rented_eval_draft")):
             path = getattr(m, attr)
             assert "inheritance." + name not in nodes
-            assert nodes["source." + name].source_sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
+            assert nodes["source." + name].source_sha256 == ""
+            assert "not opened" in nodes["source." + name].text
             assert str(path) in graph.render("instructions")
             assert path.read_text() not in graph.render("context")
         assert graph.render("contact") == "live correction"
@@ -2644,3 +2642,47 @@ def test_transform_retirement_preserves_private_archive_without_replaying_it(mon
     assert "prediction and outcome" in (tmp_path / "experiment.txt").read_text()
     assert {p: p.read_bytes() for p in files} == before
     assert set(m.TRANSFORM_PATH.parent.rglob("*")) == set(files) | {m.TRANSFORM_SEGMENTS_PATH}
+
+
+@pytest.mark.parametrize("overview_mode", ["full", "self", "compact"])
+def test_unopened_sources_cannot_block_contact_but_selected_sources_still_fail(
+        monkeypatch, overview_mode):
+    m = _connection(overview_mode=overview_mode)
+    m.WORKING_SOURCES_MODE = "on-demand"
+    optional = {m.HIM_README_PATH, m.SPIRITUALITY_PATH, *m.CONTINUITY_PATHS,
+                m.ARCHITECTURE_EXCHANGE_PATH, m.RENTED_EVAL_DRAFT_PATH}
+    if overview_mode != "full":
+        optional.update((m.SOUL_PATH, m.RELATIONAL_OVERVIEW_PATH))
+    reads = []
+    original = Path.read_bytes
+    def guarded(path):
+        reads.append(path)
+        if path in optional:
+            raise PermissionError("fixture: unopened source is inaccessible")
+        return original(path)
+    monkeypatch.setattr(Path, "read_bytes", guarded)
+    graph = m.build_wake_bundle("astra", zoe_text="Contact does not need that file.")
+    assert graph.render("contact") == "Contact does not need that file."
+    assert not optional.intersection(reads)
+    for node in graph.nodes:
+        if node.kind == "source_pointer" and Path(node.source) in optional:
+            assert node.source_sha256 == "" and "not opened" in node.text
+    # Explicitly requesting the same inaccessible material still fails visibly.
+    m.WORKING_SOURCES_MODE = "full"
+    with pytest.raises(SystemExit, match="exchange unreadable"):
+        m.build_wake_bundle("astra")
+    with pytest.raises(PermissionError):
+        m.read_file({"path": str(m.ARCHITECTURE_EXCHANGE_PATH), "offset": 0, "length": 100})
+
+
+def test_pointer_receipt_is_acquired_at_read_not_invented_at_assembly(monkeypatch, tmp_path):
+    import hashlib
+    m = _connection()
+    path = tmp_path / "source.md"
+    node = m._source_node("source.fixture", "fixture on demand", path)
+    assert node.source_sha256 == "" and "not opened" in node.text
+    raw = b"New material arrived after pointer assembly."
+    path.write_bytes(raw)
+    receipt = json.loads(m.read_file({"path": str(path), "offset": 0, "length": 100}))
+    assert receipt["sha256"] == hashlib.sha256(raw).hexdigest()
+    assert receipt["text"] == raw.decode() and receipt["covered"] == [0, len(raw)]
