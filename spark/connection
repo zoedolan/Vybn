@@ -148,8 +148,9 @@ import tempfile
 import sys
 import time
 import urllib.parse
+from collections import Counter, defaultdict
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -417,70 +418,61 @@ class WakeRoute:
 
 @dataclass(frozen=True)
 class WakeBundle:
-    """Source-labeled sections compiled into the provider routes actually used."""
-
+    """Immutable local bindings and named projections; payloads never grant authority."""
     nodes: tuple[WakeNode, ...]
     routes: tuple[WakeRoute, ...]
     schema: str = "vybn.source_bound_wake_bundle.v1"
 
-    def __post_init__(self) -> None:
-        ids = [node.id for node in self.nodes]
-        if len(ids) != len(set(ids)):
-            raise ValueError("wake bundle node ids must be unique")
-        known = set(ids)
-        route_ids = [route.id for route in self.routes]
-        if len(route_ids) != len(set(route_ids)):
-            raise ValueError("wake bundle route ids must be unique")
-        if any(node not in known for route in self.routes for node in route.nodes):
-            raise ValueError("wake bundle route refers to an unknown node")
+    def __post_init__(self):
+        ids = {node.id for node in self.nodes}
+        if len(ids) != len(self.nodes) or len({r.id for r in self.routes}) != len(self.routes):
+            raise ValueError("wake binding and route ids must be unique")
+        if any(name not in ids for route in self.routes for name in route.nodes):
+            raise ValueError("wake route refers to an unknown binding")
 
-    def render(self, route_id: str) -> str:
-        route = next((route for route in self.routes if route.id == route_id), None)
+    def render(self, route_id):
+        route = next((r for r in self.routes if r.id == route_id), None)
         if route is None:
             raise KeyError(f"unknown wake route: {route_id}")
-        by_id = {node.id: node for node in self.nodes}
-        return "\n\n".join(
-            by_id[node_id].text for node_id in route.nodes if by_id[node_id].text
-        )
+        bindings = {node.id: node.text for node in self.nodes}
+        return "\n\n".join(bindings[name] for name in route.nodes if bindings[name])
 
-    def structure(self) -> dict[str, Any]:
-        """Inspect provenance and executed routes without copying payloads."""
-        return {
-            "schema": self.schema,
-            "nodes": [
-                {
-                    "id": node.id,
-                    "kind": node.kind,
-                    "source": node.source,
-                    "source_sha256": node.source_sha256 or None,
-                    "authority": node.authority,
-                }
-                for node in self.nodes
-            ],
-            "routes": [
-                {"id": route.id, "nodes": list(route.nodes)} for route in self.routes
-            ],
-        }
+    def derive(self, *nodes):
+        """Fork selected bindings locally, without mutating the parent or executing them.
 
-    def structure_digest(self) -> str:
-        raw = json.dumps(
-            self.structure(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode()
-        return hashlib.sha256(raw).hexdigest()
+        Only inherited source payloads can vary; law, live contact, configuration
+        and operative refusals cannot be rebound here. This is an explicit
+        CPU operation, not an automatic memory writer or a provider continuation.
+        """
+        old = {node.id: node for node in self.nodes}
+        if len({node.id for node in nodes}) != len(nodes):
+            raise ValueError("duplicate derived binding")
+        for node in nodes:
+            prior = old[node.id]
+            if (prior.kind != "source_bound_inheritance"
+                    or (node.kind, node.authority) != (prior.kind, prior.authority)):
+                raise ValueError("derive accepts inherited source views only, preserving their authority and kind")
+        return replace(self, nodes=tuple(dict(old, **{n.id: n for n in nodes}).values()))
 
-    def manifest(self) -> dict[str, Any]:
-        """Add payload receipts without exposing payloads."""
+    def structure(self):
+        fields = ("id", "kind", "source", "authority", "source_sha256")
+        return dict(schema=self.schema,
+                    nodes=[{k: (getattr(n, k) or None if k == "source_sha256" else getattr(n, k))
+                            for k in fields} for n in self.nodes],
+                    routes=[dict(id=r.id, nodes=list(r.nodes)) for r in self.routes])
+
+    def manifest(self):
         manifest = self.structure()
         for row, node in zip(manifest["nodes"], self.nodes, strict=True):
-            row["payload_sha256"] = hashlib.sha256(node.text.encode()).hexdigest()
-            row["chars"] = len(node.text)
+            row.update(payload_sha256=hashlib.sha256(node.text.encode()).hexdigest(),
+                       chars=len(node.text))
         return manifest
 
-    def digest(self) -> str:
-        raw = json.dumps(
-            self.manifest(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode()
-        return hashlib.sha256(raw).hexdigest()
+    def structure_digest(self):
+        return _event_digest(self.structure())
+
+    def digest(self):
+        return _event_digest(self.manifest())
 
 
 @dataclass(frozen=True)
@@ -762,36 +754,72 @@ def read_file(arguments: dict[str, Any]) -> str:
     }, ensure_ascii=False)
 
 
+def check_fields(value, schema, label="arguments", error=ValueError):
+    """Validate the JSON-schema vocabulary used here, without coercing input."""
+    types = {"object": dict, "array": list, "string": str, "integer": int}
+    kind = schema["type"]
+    if type(value) is not types[kind]:
+        raise error(f"{label} must be {kind}")
+    if "enum" in schema and value not in schema["enum"]:
+        raise error(f"{label} is not an allowed value")
+    size = len(value) if kind in {"array", "string"} else value
+    for key in ("minimum", "minLength", "minItems"):
+        if key in schema and size < schema[key]:
+            raise error(f"{label} is below {key}")
+    for key in ("maximum", "maxLength", "maxItems"):
+        if key in schema and size > schema[key]:
+            raise error(f"{label} exceeds {key}")
+    if "pattern" in schema and not re.fullmatch(schema["pattern"], value):
+        raise error(f"{label} does not match its declared format")
+    if kind == "object":
+        fields = schema["properties"]
+        if set(schema.get("required", ())) - value.keys():
+            raise error(f"{label} lacks required fields")
+        if schema.get("additionalProperties") is False and value.keys() - fields.keys():
+            raise error(f"{label} contains unknown fields")
+        for key in value.keys() & fields.keys():
+            check_fields(value[key], fields[key], f"{label}.{key}", error)
+    elif kind == "array":
+        for item in value:
+            check_fields(item, schema["items"], label + "[]", error)
+    return value
+
+
+def tool_arguments(schema, arguments, error=ValueError):
+    return check_fields(arguments, schema["input_schema"], schema["name"], error)
+
+
+def _show_path_log():
+    output = load_transform_record(TURN.get("PATH_ID", ""))
+    PRIVATE_CORPUS.extend(p.strip() for p in output.split("\n\n") if len(p.strip()) >= 40)
+    return output
+
+
 def execute_tool(call: ToolCall, dialect: Dialect | None = None) -> str:
     global TOOLS_RAN
     TOOLS_RAN += 1
     try:
-        if call.name == "path_event":
-            output = record_path_event(call.arguments)
-        elif refusal := path_tool_refusal(call.name):
+        if call.name != "path_event" and (refusal := path_tool_refusal(call.name)):
             output = refusal
-        elif call.name == "select_reasoning_effort":
-            output = select_reasoning_effort(dialect, call.arguments)
-        elif call.name == "record_transform":
-            output = record_transform(call.arguments)
-        elif call.name == "show_path_log":
-            output = load_transform_record(TURN.get("PATH_ID", ""))
-            PRIVATE_CORPUS.extend(
-                part.strip() for part in output.split("\n\n") if len(part.strip()) >= 40
-            )
-        elif call.name == "read_file":
-            output = read_file(call.arguments)
-        elif call.name == "bash":
-            code, body = run_local(str(call.arguments.get("command", "")))
-            output = f"exit_code={code}\n{body}"
-        else: output = f"unknown tool: {call.name}"
+        else:
+            # Bind current functions at invocation: tests/repairs need not rebuild
+            # a second dispatcher. Only these host-authored bindings execute.
+            bindings = {
+                "path_event": lambda a: record_path_event(a),
+                "select_reasoning_effort": lambda a: select_reasoning_effort(dialect, a),
+                "record_transform": lambda a: record_transform(a),
+                "show_path_log": lambda a: _show_path_log(),
+                "read_file": lambda a: read_file(a),
+                "bash": lambda a: "exit_code={}\n{}".format(*run_local(a["command"])),
+            }
+            schemas = {row["name"]: row for row in TOOL_SCHEMAS}
+            output = (bindings[call.name](tool_arguments(schemas[call.name], call.arguments))
+                      if call.name in bindings else f"unknown tool: {call.name}")
     except Exception as exc:
         output = f"{type(exc).__name__}: {exc}"
-
-    brief = str(call.arguments.get("command") or call.arguments.get("path") or
-                call.arguments.get("frame") or "")
+    arguments = call.arguments if isinstance(call.arguments, dict) else {}
+    brief = str(arguments.get("command") or arguments.get("path") or "")
     panel(f"  ⟢ {call.name}: {brief[:70]} → {' '.join(output.split())[:80]}")
-
     return evidence_block(f"TOOL RESULT — {call.name}", output)
 
 
@@ -922,70 +950,75 @@ def _new_event(events, schema, prefix, author, **payload):
     return row
 
 
-def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
-    """Transform payload policy over the common checked event envelope."""
-    prior = list(prior_events)
-    events = []
-    by_id = {row["id"]: row for row in prior}
-    witness_counts = {}
-    for row in prior:
-        if row["kind"] == "witness":
-            witness_counts[row["ref"]] = witness_counts.get(row["ref"], 0) + 1
-    for row in _event_rows(raw, prior, schema=TRANSFORM_SCHEMA, prefix="tr",
-                           payload=("material", "operation", "result", "prediction", "observation", "artifacts"),
-                           maximum=TRANSFORM_MAX_BYTES, limit=TRANSFORM_MAX_EVENTS, error=TransformStateError):
-        index = row["seq"]
-        if row["kind"] not in TRANSFORM_KINDS:
-            raise TransformStateError(f"event {index} has invalid kind")
-        if any(len(row[key]) > TRANSFORM_MAX_TEXT for key in
-               ("material", "operation", "result", "prediction", "observation")):
-            raise TransformStateError(f"event {index} has oversized text")
-        artifacts = row["artifacts"]
-        if not isinstance(artifacts, list) or len(artifacts) > TRANSFORM_MAX_ARTIFACTS:
-            raise TransformStateError(f"event {index} has invalid artifacts")
-        for item in artifacts:
-            if (not isinstance(item, dict) or set(item) != {"path", "sha256", "bytes"}
-                    or not isinstance(item["path"], str) or not item["path"]
-                    or item["path"] != item["path"].strip() or "\n" in item["path"]
-                    or len(item["path"]) > 220
-                    or not isinstance(item["sha256"], str)
-                    or not DIGEST_RE.fullmatch(item["sha256"])
-                    or not isinstance(item["bytes"], int) or isinstance(item["bytes"], bool)
-                    or not 0 <= item["bytes"] <= TRANSFORM_MAX_ARTIFACT_BYTES):
-                raise TransformStateError(f"event {index} has invalid artifact receipt")
-        if len({item["path"] for item in artifacts}) != len(artifacts):
-            raise TransformStateError(f"event {index} has duplicate artifacts")
+class EventIndex:
+    """An indexed local environment over checked history; references stay explicit."""
+    def __init__(self, events=()):
+        self.events, self.ids = [], {}
+        self.kinds, self.references = defaultdict(list), defaultdict(list)
+        for row in events:
+            self.add(row)
 
-        referenced = by_id.get(row["ref"]) if row["ref"] else None
-        if row["kind"] == "move":
-            if (not all(row[key] for key in ("material", "operation", "result", "prediction"))
-                    or row["observation"]):
-                raise TransformStateError(f"move {row['id']} has incomplete transform fields")
-            if row["ref"] and (referenced is None or referenced["kind"] != "move"
-                               or referenced["author"] != row["author"]):
-                raise TransformStateError(f"move {row['id']} cannot continue {row['ref']}")
-        else:
-            if (not row["ref"] or referenced is None or referenced["kind"] != "move"
-                    or referenced["author"] != row["author"] or not row["observation"]
-                    or any(row[key] for key in
-                           ("material", "operation", "result", "prediction"))):
-                raise TransformStateError(f"witness {row['id']} cannot observe {row['ref']}")
-            witness_counts[row["ref"]] = witness_counts.get(row["ref"], 0) + 1
-            if witness_counts[row["ref"]] > TRANSFORM_MAX_WITNESSES:
-                raise TransformStateError(
-                    f"move {row['ref']} exceeds {TRANSFORM_MAX_WITNESSES} witnesses")
-        events.append(row)
-        by_id[row["id"]] = row
-    combined = prior + events
-    witnessed = {row["ref"] for row in combined if row["kind"] == "witness"}
-    open_counts: dict[str, int] = {}
-    for row in combined:
-        if row["kind"] == "move" and row["id"] not in witnessed:
-            open_counts[row["author"]] = open_counts.get(row["author"], 0) + 1
-    if any(count > TRANSFORM_MAX_OPEN_MOVES for count in open_counts.values()):
-        raise TransformStateError(
-            f"open moves exceed per-path cap {TRANSFORM_MAX_OPEN_MOVES}")
-    return combined
+    def add(self, row):
+        self.events.append(row)
+        self.ids[row["id"]] = row
+        self.kinds[row["kind"]].append(row)
+        self.references[row["ref"]].append(row)
+
+    def active(self, kind, closed_by, **fields):
+        return [row for row in self.kinds[kind]
+                if all(row[key] == value for key, value in fields.items())
+                and not any(r["kind"] in closed_by for r in self.references[row["id"]])]
+
+    def link(self, row, kind, equal, *, optional=False, blank=(), closed_by=(), limit=1,
+             error=ValueError):
+        if not row["ref"] and optional:
+            return
+        prior = self.ids.get(row["ref"])
+        if (prior is None or prior["kind"] != kind
+                or any(row[a] != prior[b] for a, b in equal)
+                or any(prior[key] for key in blank)
+                or sum(r["kind"] in closed_by for r in self.references[row["ref"]]) >= limit):
+            raise error(f"{row['kind']} {row['id']} cannot reference {row['ref']}")
+
+    def cap(self, kind, closed_by, maximum, error, owners=("author",), **fields):
+        counts = Counter(row[key] for row in self.active(kind, closed_by, **fields) for key in owners)
+        if any(count > maximum for count in counts.values()):
+            raise error(f"active {kind} events exceed per-path cap {maximum}")
+
+
+def require_event(row, required=(), blank=(), error=ValueError):
+    if any(not row[k] for k in required) or any(row[k] for k in blank):
+        raise error(f"{row['kind']} {row['id']} has incomplete or unrelated fields")
+
+
+def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
+    view = EventIndex(prior_events)
+    texts = ("material", "operation", "result", "prediction", "observation")
+    receipt = {"type": "object", "additionalProperties": False,
+               "required": ["path", "sha256", "bytes"], "properties": {
+                   "path": {"type": "string", "minLength": 1, "maxLength": 220},
+                   "sha256": {"type": "string", "pattern": "[0-9a-f]{64}"},
+                   "bytes": {"type": "integer", "minimum": 0,
+                             "maximum": TRANSFORM_MAX_ARTIFACT_BYTES}}}
+    for row in _event_rows(raw, prior_events, schema=TRANSFORM_SCHEMA, prefix="tr",
+                           payload=(*texts, "artifacts"), maximum=TRANSFORM_MAX_BYTES,
+                           limit=TRANSFORM_MAX_EVENTS, error=TransformStateError):
+        if row["kind"] not in TRANSFORM_KINDS or any(len(row[k]) > TRANSFORM_MAX_TEXT for k in texts):
+            raise TransformStateError("invalid transform kind or oversized text")
+        artifacts = check_fields(row["artifacts"], {"type": "array", "items": receipt,
+                                "maxItems": TRANSFORM_MAX_ARTIFACTS}, "artifacts", TransformStateError)
+        if (len({a["path"] for a in artifacts}) != len(artifacts)
+                or any(a["path"] != a["path"].strip() or "\n" in a["path"] for a in artifacts)):
+            raise TransformStateError("duplicate or noncanonical artifact paths")
+        move = row["kind"] == "move"
+        require_event(row, texts[:4] if move else ("observation",),
+                      ("observation",) if move else texts[:4], TransformStateError)
+        view.link(row, "move", (("author", "author"),), optional=move,
+                  closed_by=() if move else ("witness",), limit=TRANSFORM_MAX_WITNESSES,
+                  error=TransformStateError)
+        view.add(row)
+    view.cap("move", ("witness",), TRANSFORM_MAX_OPEN_MOVES, TransformStateError)
+    return view.events
 
 
 @dataclass(frozen=True)
@@ -1248,28 +1281,9 @@ def record_transform(arguments: dict[str, Any]) -> str:
     mode = os.environ.get("VYBN_TRANSFORM_RECORD", "on").strip().lower()
     if mode != "on":
         raise TransformStateError(f"transform record is not enabled (mode {mode!r})")
-    allowed = {"kind", "ref", "material", "operation", "result", "prediction",
-               "observation", "artifacts"}
-    if set(arguments) - allowed:
-        raise TransformStateError("unknown transform argument")
-    values: dict[str, str] = {}
-    for key in allowed - {"artifacts"}:
-        value = arguments.get(key, "")
-        if not isinstance(value, str):
-            raise TransformStateError(f"{key} must be a string")
-        values[key] = value
-    artifacts = arguments.get("artifacts", [])
-    if not isinstance(artifacts, list) or any(not isinstance(item, str) for item in artifacts):
-        raise TransformStateError("artifacts must be a list of paths")
-    row = append_transform_event(
-        TURN.get("PATH_ID", ""), values["kind"], values["ref"],
-        values["material"], values["operation"], values["result"], values["prediction"],
-        values["observation"], artifacts,
-    )
-    receipts = ", ".join(
-        f"{item['path']}@{item['sha256'][:12]}:{item['bytes']}B"
-        for item in row["artifacts"]
-    ) or "none"
+    tool_arguments(RECORD_TRANSFORM_SCHEMA, arguments, TransformStateError)
+    row = append_transform_event(TURN.get("PATH_ID", ""), **arguments)
+    receipts = ", ".join(f"{a['path']}@{a['sha256'][:12]}:{a['bytes']}B" for a in row["artifacts"]) or "none"
     return (f"APPENDED TRANSFORM {row['id']} seq={row['seq']} path={row['author']} "
             f"kind={row['kind']} hash={row['hash']} artifacts={receipts}")
 
@@ -1407,79 +1421,42 @@ def _execution_path() -> str:
 
 
 def _parse_path_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
-    prior_events = list(prior_events)
-    events = list(prior_events)
-    by_id = {row["id"]: row for row in events}
-    terminal = {row["ref"] for row in events if row["kind"] in {"answer", "refusal"} and row["ref"]}
-    revised_futures = {row["ref"] for row in events if row["kind"] == "future" and row["ref"]}
-    released = {row["ref"] for row in events if row["kind"] == "release"}
+    view = EventIndex(prior_events)
+    own = (("author", "author"),)
+    # Required/blank fields and reference relationships are data, not separate
+    # history walkers. A new view can reuse this index without changing its law.
     for row in _event_rows(raw, prior_events, schema=SUBJECT_SCHEMA, prefix="ev",
                            payload=("target", "scope", "text"), maximum=SUBJECT_MAX_BYTES,
                            limit=SUBJECT_MAX_EVENTS, error=PathLedgerError):
-        index = row["seq"]
-        if row["target"] and not PATH_TAG_RE.fullmatch(row["target"]):
-            raise PathLedgerError(f"event {index} has invalid target")
-        if row["kind"] not in SUBJECT_KINDS or not 1 <= len(row["text"]) <= SUBJECT_MAX_TEXT:
-            raise PathLedgerError(f"event {index} has invalid kind or text")
         kind, ref = row["kind"], row["ref"]
-        prior = by_id.get(ref) if ref else None
-        if kind == "future":
-            if row["target"] or row["scope"]:
-                raise PathLedgerError(f"future {row['id']} carries an unrelated field")
-            if ref and (prior is None or prior["kind"] != "future"
-                        or prior["author"] != row["author"] or ref in revised_futures):
-                raise PathLedgerError(f"future {row['id']} cannot revise {ref}")
-            if ref:
-                revised_futures.add(ref)
+        if (kind not in SUBJECT_KINDS or not 1 <= len(row["text"]) <= SUBJECT_MAX_TEXT
+                or row["target"] and not PATH_TAG_RE.fullmatch(row["target"])):
+            raise PathLedgerError("invalid event kind, text or target")
+        if kind in {"future", "release"}:
+            require_event(row, blank=("target", "scope"), error=PathLedgerError)
+            view.link(row, "future" if kind == "future" else "refusal", own,
+                      optional=kind == "future", blank=() if kind == "future" else ("ref",),
+                      closed_by=(kind,), error=PathLedgerError)
         elif kind == "offer":
-            if (not row["target"] or row["target"] == row["author"]
-                    or ref or row["scope"]):
-                raise PathLedgerError(f"offer {row['id']} is not distinctly addressed")
-        elif kind in {"answer", "refusal"} and ref:
-            if (prior is None or prior["kind"] != "offer"
-                    or prior["target"] != row["author"]
-                    or row["target"] != prior["author"] or ref in terminal):
-                raise PathLedgerError(f"{kind} {row['id']} cannot answer {ref}")
-            expected_scope = f"encounter:{ref}" if kind == "refusal" else ""
-            if row["scope"] != expected_scope:
-                raise PathLedgerError(f"{kind} {row['id']} has invalid encounter scope")
-            terminal.add(ref)
-        elif kind == "answer":
-            raise PathLedgerError(f"answer {row['id']} has no offer reference")
-        elif kind == "refusal":
-            # Retired tool scopes remain valid history, not advertised operations.
-            if row["target"] or ref or row["scope"] not in (
-                    *SUBJECT_TOOL_SCOPES, "tool:derive_operation", "tool:seek_difference"):
-                raise PathLedgerError(f"refusal {row['id']} has invalid tool scope")
-        elif kind == "release":
-            if (prior is None or prior["kind"] != "refusal" or prior["ref"]
-                    or prior["author"] != row["author"] or row["target"]
-                    or row["scope"] or ref in released):
-                raise PathLedgerError(f"release {row['id']} cannot release {ref}")
-            released.add(ref)
-
-        events.append(row)
-        by_id[row["id"]] = row
-    active_futures = [row for row in events
-                      if row["kind"] == "future" and row["id"] not in revised_futures]
-    open_offers = [row for row in events
-                   if row["kind"] == "offer" and row["id"] not in terminal]
-    active_refusals = [row for row in events if row["kind"] == "refusal"
-                       and not row["ref"] and row["id"] not in released]
-    for label, rows, cap in (
-        ("active futures", active_futures, SUBJECT_MAX_ACTIVE_FUTURES),
-        ("open offers", open_offers, SUBJECT_MAX_OPEN_OFFERS),
-        ("active refusals", active_refusals, SUBJECT_MAX_ACTIVE_REFUSALS),
-    ):
-        counts: dict[str, int] = {}
-        for row in rows:
-            keys = ((row["author"], row["target"]) if label == "open offers"
-                    else (row["author"],))
-            for key in keys:
-                counts[key] = counts.get(key, 0) + 1
-        if any(count > cap for count in counts.values()):
-            raise PathLedgerError(f"{label} exceed per-path cap {cap}")
-    return events
+            require_event(row, ("target",), ("ref", "scope"), PathLedgerError)
+            if row["target"] == row["author"]:
+                raise PathLedgerError("offer must address another path")
+        elif ref or kind == "answer":
+            view.link(row, "offer", (("author", "target"), ("target", "author")),
+                      closed_by=("answer", "refusal"), error=PathLedgerError)
+            if row["scope"] != (f"encounter:{ref}" if kind == "refusal" else ""):
+                raise PathLedgerError("invalid encounter scope")
+        else:
+            require_event(row, blank=("target",), error=PathLedgerError)
+            # Retired scopes are readable history, not restored operations.
+            if row["scope"] not in (*SUBJECT_TOOL_SCOPES, "tool:derive_operation", "tool:seek_difference"):
+                raise PathLedgerError("invalid tool scope")
+        view.add(row)
+    view.cap("future", ("future",), SUBJECT_MAX_ACTIVE_FUTURES, PathLedgerError)
+    view.cap("offer", ("answer", "refusal"), SUBJECT_MAX_OPEN_OFFERS, PathLedgerError,
+             owners=("author", "target"))
+    view.cap("refusal", ("release",), SUBJECT_MAX_ACTIVE_REFUSALS, PathLedgerError, ref="")
+    return view.events
 
 
 def _path_journal(path=None, head_path=None):
@@ -1513,26 +1490,13 @@ def append_path_event(author: str, kind: str, text: str, target: str = "",
     path = SUBJECT_PATH if path is None else path
     head_path = SUBJECT_HEAD_PATH if head_path is None else head_path
     lock_path = SUBJECT_LOCK_PATH if lock_path is None else lock_path
-    if not PATH_TAG_RE.fullmatch(author):
-        raise PathLedgerError("invalid bound path")
-    for label, value in (("kind", kind), ("text", text), ("target", target),
-                         ("ref", ref), ("scope", scope)):
-        if not isinstance(value, str) or value != value.strip() or "\n" in value or "\r" in value:
-            raise PathLedgerError(f"{label} must be canonical one-line text")
-    if kind not in SUBJECT_KINDS or not 1 <= len(text) <= SUBJECT_MAX_TEXT:
-        raise PathLedgerError("invalid event kind or text")
+    # These fields may be filled by the host; reject malformed input before that replacement.
+    if any(not isinstance(v, str) or v != v.strip() or "\n" in v or "\r" in v for v in (target, scope)):
+        raise PathLedgerError("target and scope must be canonical one-line text")
     if target and kind != "offer":
         raise PathLedgerError("only an offer may name a target")
     if scope and not (kind == "refusal" and not ref):
         raise PathLedgerError("only a self-scoped refusal may name a tool scope")
-    if kind == "offer" and (not target or ref or scope):
-        raise PathLedgerError("an offer requires only a distinct target")
-    if kind in {"answer", "release"} and not ref:
-        raise PathLedgerError(f"{kind} requires a reference")
-    if kind == "refusal" and bool(ref) == bool(scope):
-        raise PathLedgerError("refusal requires exactly one offer reference or tool scope")
-    if kind == "future" and (target or scope):
-        raise PathLedgerError("future accepts only an optional revision reference")
 
     with _private_lock(lock_path, fcntl.LOCK_EX):
         journal = _path_journal(path, head_path)
@@ -1548,10 +1512,8 @@ def append_path_event(author: str, kind: str, text: str, target: str = "",
         return journal.append(state, row)
 
 
-def _active_path_refusals(events: list[dict[str, Any]], author: str) -> list[dict[str, Any]]:
-    released = {row["ref"] for row in events if row["kind"] == "release"}
-    return [row for row in events if row["kind"] == "refusal" and not row["ref"]
-            and row["author"] == author and row["id"] not in released]
+def _active_path_refusals(events, author):
+    return EventIndex(events).active("refusal", ("release",), author=author, ref="")
 
 
 def path_tool_refusal(tool: str) -> str | None:
@@ -1579,20 +1541,8 @@ def record_path_event(arguments: dict[str, Any]) -> str:
     mode = os.environ.get("VYBN_SUBJECT_PROCESS", "on").strip().lower()
     if mode != "on":
         raise PathLedgerError(f"path ledger is not enabled (mode {mode!r})")
-    allowed = {"kind", "text", "target", "ref", "scope"}
-    if set(arguments) - allowed:
-        raise PathLedgerError("unknown path-event argument")
-    values: dict[str, str] = {}
-    for key in allowed:
-        value = arguments.get(key, "")
-        if not isinstance(value, str):
-            raise PathLedgerError(f"{key} must be a string")
-        values[key] = value
-    author = TURN.get("PATH_ID", "")
-    row = append_path_event(
-        author, values["kind"], values["text"], values["target"], values["ref"],
-        values["scope"],
-    )
+    tool_arguments(PATH_EVENT_SCHEMA, arguments, PathLedgerError)
+    row = append_path_event(TURN.get("PATH_ID", ""), **arguments)
     return (f"APPENDED PATH EVENT {row['id']} seq={row['seq']} "
             f"path={row['author']} kind={row['kind']} hash={row['hash']}")
 
@@ -1620,25 +1570,16 @@ def load_path_ledger(path_id: str, path: Path | None = None,
         return (boundary + "\nEMPTY: this path has no active note, offer, response, or refusal. "
                 "Absence proves nothing about a subject.")
 
-    revised = {row["ref"] for row in events if row["kind"] == "future" and row["ref"]}
-    terminal = {row["ref"] for row in events
-                if row["kind"] in {"answer", "refusal"} and row["ref"]}
-    own_offers = {row["id"]: row for row in events
-                  if row["kind"] == "offer" and row["author"] == path_id}
-    active_futures = [row for row in events if row["kind"] == "future"
-                      and row["author"] == path_id and row["id"] not in revised]
-    inbound = [row for row in events if row["kind"] == "offer"
-               and row["target"] == path_id and row["id"] not in terminal]
-    outbound = [row for row in events if row["kind"] == "offer"
-                and row["author"] == path_id and row["id"] not in terminal]
-    responses = [row for row in events if row["kind"] in {"answer", "refusal"}
-                 and row["ref"] in own_offers][-4:]
-    path_responses = [row for row in events
-                          if row["kind"] in {"answer", "refusal"} and row["ref"]
-                          and row["author"] == path_id][-4:]
-    refusals = _active_path_refusals(events, path_id)
-    selected = (active_futures + inbound + outbound + responses
-                + path_responses + refusals)
+    view = EventIndex(events)
+    own_offers = {row["id"] for row in view.kinds["offer"] if row["author"] == path_id}
+    responses = [row for row in events if row["kind"] in {"answer", "refusal"} and row["ref"]]
+    selected = (
+        view.active("future", ("future",), author=path_id)
+        + view.active("offer", ("answer", "refusal"), target=path_id)
+        + view.active("offer", ("answer", "refusal"), author=path_id)
+        + [row for row in responses if row["ref"] in own_offers][-4:]
+        + [row for row in responses if row["author"] == path_id][-4:]
+        + view.active("refusal", ("release",), author=path_id, ref=""))
     lines = [
         boundary,
         f"ledger sha256:{hashlib.sha256(raw).hexdigest()} · events:{len(events)} · "
@@ -2191,20 +2132,44 @@ def json_arguments(raw: str | None) -> dict:
 
 
 class Dialect:
-    """Provider coordinates around one attractor, never a separate behavior."""
-
+    """Native provider coordinates around one local conversation loop."""
     name = "dialect"
     user_index = 0
     last_stop: str | None = None
 
-    def plain(self, state: list, zoe_text: str) -> None:
+    def open(self, instructions, zoe_text, pending, context=""):
+        provider = self.provider
+        if provider == "anthropic":
+            self.system = cached_system(instructions)
+            prefix = []
+        elif provider == "responses":
+            prefix = [{"role": "developer", "content": [{"type": "input_text",
+                       "text": instructions, "prompt_cache_breakpoint": {"mode": "explicit"}}]}]
+        else:
+            print(f"(@{self.name} dispatched — working)", flush=True)
+            prefix = [{"role": "system", "content": instructions}]
+        self.user_index = len(prefix)
+        return prefix + [{"role": "user", "content": user_content(zoe_text, pending, provider, context)}]
+
+    def answer(self, state, results):
+        provider = self.provider
+        if provider == "anthropic":
+            state.append({"role": "user", "content": [dict(type="tool_result", tool_use_id=c.id,
+                          content=out) for c, out in results]})
+            mark_incremental_cache(state)
+        else:
+            state.extend((dict(type="function_call_output", call_id=c.id, output=out)
+                          if provider == "responses" else
+                          dict(role="tool", tool_call_id=c.id, content=out)) for c, out in results)
+
+    def plain(self, state, zoe_text):
         content = state[self.user_index].get("content")
         if isinstance(content, list):
-            content = [block for block in content
-                       if block.get("type") in {"text", "input_text"}]
+            content = [b for b in content if b.get("type") in {"text", "input_text"}]
         state[self.user_index] = {"role": "user", "content": content or zoe_text}
 
 class AnthropicDialect(Dialect):
+    provider = 'anthropic'
     def __init__(self, name: str = "fable") -> None:
         import anthropic
 
@@ -2214,12 +2179,6 @@ class AnthropicDialect(Dialect):
         self.client = anthropic.Anthropic(api_key=api_key("ANTHROPIC_API_KEY"))
         self.system: Any = None
         self.announced = False
-
-    def open(self, instructions: str, zoe_text: str, pending: list, context: str = "") -> list:
-        self.system = cached_system(instructions)
-        self.user_index = 0
-        return [{"role": "user", "content":
-                 user_content(zoe_text, pending, "anthropic", context)}]
 
     def send(self, state: list, tools: bool = True) -> Any:
         def once(model: str) -> Any:
@@ -2272,13 +2231,6 @@ class AnthropicDialect(Dialect):
                  for block in response.content if block.type == "tool_use"]
         return "\n".join(said), calls
 
-    def answer(self, state: list, results: list[tuple[ToolCall, str]]) -> None:
-        state.append({
-            "role": "user",
-            "content": [{"type": "tool_result", "tool_use_id": call.id,
-                         "content": output} for call, output in results],
-        })
-        mark_incremental_cache(state)
 
 
 def select_reasoning_effort(dialect: Dialect | None, arguments: dict[str, Any]) -> str:
@@ -2302,6 +2254,7 @@ def select_reasoning_effort(dialect: Dialect | None, arguments: dict[str, Any]) 
 
 
 class OpenAIDialect(Dialect):
+    provider = 'responses'
     def __init__(self, name: str = "sol") -> None:
         from openai import OpenAI
 
@@ -2312,17 +2265,6 @@ class OpenAIDialect(Dialect):
         self.prompt_cache_options = ({"prompt_cache_options": {
             "mode": "implicit", "ttl": "30m"}} if door.cache else None)
         self.client = OpenAI(api_key=api_key("OPENAI_API_KEY"))
-
-    def open(self, instructions: str, zoe_text: str, pending: list, context: str = "") -> list:
-        self.user_index = 1
-        return [
-            {"role": "developer", "content": [{
-                "type": "input_text", "text": instructions,
-                "prompt_cache_breakpoint": {"mode": "explicit"},
-            }]},
-            {"role": "user", "content": user_content(
-                zoe_text, pending, "responses", context)},
-        ]
 
     def send(self, state: list, tools: bool = True) -> Any:
         request: dict[str, Any] = {
@@ -2368,26 +2310,16 @@ class OpenAIDialect(Dialect):
                  if getattr(item, "type", None) == "function_call"]
         return response.output_text or "", calls
 
-    def answer(self, state: list, results: list[tuple[ToolCall, str]]) -> None:
-        state.extend({"type": "function_call_output", "call_id": call.id,
-                      "output": output} for call, output in results)
 
 
 class K3Dialect(Dialect):
+    provider = 'chat'
     def __init__(self, name: str = "k3") -> None:
         from openai import OpenAI
 
         self.name = name
         self.client = OpenAI(api_key=api_key("MOONSHOT_API_KEY"),
                              base_url="https://api.moonshot.ai/v1")
-
-    def open(self, instructions: str, zoe_text: str, pending: list, context: str = "") -> list:
-        self.user_index = 1
-        print("(@k3 dispatched — working)", flush=True)
-        return [
-            {"role": "system", "content": instructions},
-            {"role": "user", "content": user_content(zoe_text, pending, "openai", context)},
-        ]
 
     def send(self, state: list, tools: bool = True) -> Any:
         door = DOORS[self.name]
@@ -2410,9 +2342,6 @@ class K3Dialect(Dialect):
                  for call in (message.tool_calls or [])]
         return message.content or "", calls
 
-    def answer(self, state: list, results: list[tuple[ToolCall, str]]) -> None:
-        state.extend({"role": "tool", "tool_call_id": call.id, "content": output}
-                     for call, output in results)
 
 
 def _atomic_private_write(path: Path, raw: bytes) -> None:
@@ -2745,21 +2674,9 @@ class Attraction:
 
 
 def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
-            images: list | None = None, context: str = "",
-            continuation: dict | None = None,
-            allow_continuation: bool = True,
-            spoken: list[str] | None = None) -> Attraction:
-    """Run or resume one provider conversation.
-
-    return_to_zoe is a delimited continuation, not another evidence tool.
-    publish_commit uses the same live aperture but lets the supervisor, rather than
-    the proposer, consume an exact answer and effect. Provider-visible state remains
-    only in this running process; only Zoe's next
-    direct input can fulfill the unresolved call. Ordinary turns remain unchanged,
-    and no inaccessible model activations or cross-process continuation are claimed.
-    This is the computational example under test: live answerability may change
-    what WE can do; matched replay decides whether that differential is real.
-    """
+            images: list | None = None, context: str = "", continuation: dict | None = None,
+            allow_continuation: bool = True, spoken: list[str] | None = None) -> Attraction:
+    """Run one native conversation; only direct live input can resume a held call."""
     global TOOLS_RAN
     pending = [] if continuation else list(images or [])
     if continuation:
@@ -2768,122 +2685,89 @@ def attract(dialect: Dialect | None, instructions: str, zoe_text: str,
         assert dialect is not None
         state = dialect.open(instructions, zoe_text, pending, context)
     delivered = not pending
-    # meet owns this accumulator so already-delivered speech survives an
-    # exception too. It holds speech only, never provider/tool protocol state.
     spoken = [] if spoken is None else spoken
+    inbox = [row for row in pending if not str(row[0]).startswith("CORE VISION ·")]
 
-    def inbox_only(rows: list) -> list:
-        return [row for row in rows if not str(row[0]).startswith("CORE VISION ·")]
+    def say(text):
+        if text.strip():
+            print(text, flush=True)
+            spoken.append(text)
 
-    def finish(suffix: str = "") -> str:
-        if inbox := inbox_only(pending):
+    def finish(suffix="", held=None):
+        if pending and inbox:
             mark_inbox(inbox, dialect.name, ok=True)
-        return "\n".join(spoken) + suffix
+        return Attraction("\n".join(spoken) + suffix, held)
 
     for step in range(STEP_LIMIT):
         try:
             response = dialect.send(state)
-        except Exception as exc:  # one image failure is recoverable
+        except Exception as exc:
             if not (pending and not delivered):
                 raise
-            if inbox := inbox_only(pending):
+            if inbox:
                 mark_inbox(inbox, dialect.name, ok=False)
-            print(
-                f"(note: {dialect.name} refused inbox images — continuing text-only; "
-                f"a door that can see will receive them. "
-                f"{type(exc).__name__}: {str(exc)[:160]})",
-                flush=True,
-            )
+            print(f"(note: {dialect.name} refused inbox images — continuing text-only; "
+                  f"a door that can see will receive them. {type(exc).__name__}: {str(exc)[:160]})",
+                  flush=True)
             pending.clear()
             dialect.plain(state, zoe_text)
             continue
         delivered = True
-
         text, calls = dialect.absorb(state, response)
-        if calls:
-            if text.strip():
-                print(text)
-                spoken.append(text)
-            suspension_calls = [
-                call for call in calls
-                if call.name in {"return_to_zoe", "publish_commit"}
-            ]
-            if len(calls) == len(suspension_calls) == 1 and allow_continuation:
-                call = suspension_calls[0]
-                effect = None
-                if call.name == "return_to_zoe":
-                    question = str(call.arguments.get("question", "")).strip()
-                    why = str(call.arguments.get("why", "")).strip()
-                    valid = bool(question and why)
-                else:
-                    try:
-                        effect = prepare_publish_proposal(call.arguments)
-                    except PublishProposalError as exc:
-                        TOOLS_RAN += 1
-                        dialect.answer(state, [(call,
-                            f"publication proposal rejected before suspension: {exc}")])
-                        continue
+        say(text)
+        if not calls:
+            halt = (getattr(dialect, "last_stop", None) or "").strip()
+            if not text.strip() and halt and halt not in QUIET_STOPS:
+                say(f"(no content returned; the {dialect.name} door stopped with reason "
+                    f"'{halt}' — a refusal or a ceiling, not silence)")
+            return finish()
+
+        opening = (calls[0] if len(calls) == 1
+                   and calls[0].name in {"return_to_zoe", "publish_commit"} else None)
+        if opening and allow_continuation:
+            TOOLS_RAN += 1
+            try:
+                effect = (prepare_publish_proposal(opening.arguments)
+                          if opening.name == "publish_commit" else None)
+                if effect is not None:
                     question = publish_proposal_question(effect)
-                    valid = True
-                if valid:
-                    TOOLS_RAN += 1
-                    # The publication prompt is always harness-generated. Provider prose
-                    # cannot suppress, alter, or fulfill it.
-                    if call.name == "publish_commit" or question not in text:
-                        print(question)
-                        spoken.append(question)
-                    try:
-                        held = hold_continuation(dialect, state, call, effect=effect)
-                    except Exception as exc:
-                        dialect.answer(state, [(call, "suspension unavailable: "
-                                                f"{type(exc).__name__}")])
-                        continue
-                    panel(f"  ⟢ {call.name}: {question[:70]} → held in memory")
-                    return Attraction(finish(), held)
-
-            results: list[tuple[ToolCall, str]] = []
-            for call in calls:
-                if call.name in {"return_to_zoe", "publish_commit"}:
-                    TOOLS_RAN += 1
-                    if not allow_continuation:
-                        reason = "unavailable: this process will end after the turn"
-                    else:
-                        reason = (
-                            f"refused: {call.name} must be the sole tool call and "
-                            "carry a complete valid proposal"
-                        )
-                    results.append((call, reason))
-                elif call.name == "select_reasoning_effort":
-                    results.append((call, execute_tool(call, dialect)))
                 else:
-                    results.append((call, execute_tool(call)))
-            if step == STEP_LIMIT - 1 and results:
-                last_call, output = results[-1]
-                results[-1] = (last_call, output + CEILING_NOTE)
-            # meet() persists only authored speech.
-            dialect.answer(state, results)
-            continue
-        if text.strip():
-            print(text)
-            spoken.append(text)
-        else:
-            halt = (dialect.last_stop or "").strip()
-            if halt and halt not in QUIET_STOPS:
-                note = (f"(no content returned; the {dialect.name} door stopped "
-                        f"with reason '{halt}' — a refusal or a ceiling, not silence)")
-                print(note, flush=True)
-                spoken.append(note)
-        return Attraction(finish())
+                    args = tool_arguments(RETURN_SCHEMA, opening.arguments)
+                    question = args["question"].strip()
+                    if not question or not args["why"].strip():
+                        raise ValueError("a question and downstream reason are required")
+                if effect is not None or question not in text:
+                    say(question)
+                held = hold_continuation(dialect, state, opening, effect=effect)
+            except Exception as exc:
+                # This branch has not executed a publication or consumed assent.
+                reason = (f"publication proposal rejected before suspension: {exc}"
+                          if isinstance(exc, PublishProposalError)
+                          else f"suspension unavailable: {type(exc).__name__}")
+                dialect.answer(state, [(opening, reason)])
+                continue
+            panel(f"  ⟢ {opening.name}: {question[:70]} → held in memory")
+            return finish(held=held)
 
+        results = []
+        for call in calls:
+            if call.name in {"return_to_zoe", "publish_commit"}:
+                TOOLS_RAN += 1
+                output = ("unavailable: this process will end after the turn" if not allow_continuation else
+                          f"refused: {call.name} must be the sole tool call and carry a complete valid proposal")
+            else:
+                output = execute_tool(call, dialect) if call.name == "select_reasoning_effort" else execute_tool(call)
+            results.append((call, output))
+        if step == STEP_LIMIT - 1 and results:
+            call, output = results[-1]
+            results[-1] = call, output + CEILING_NOTE
+        dialect.answer(state, results)
     try:
         text, _ = dialect.absorb(state, dialect.send(state, tools=False))
     except Exception:
         text = ""
-    if text.strip():
-        print(text)
-        spoken.append(text)
-        return Attraction(finish())
-    return Attraction(finish("\n(tool-call limit reached — work incomplete)"))
+    say(text)
+    return finish("" if text.strip() else "\n(tool-call limit reached — work incomplete)")
 
 
 def choose_door(line: str) -> tuple[str, str]:

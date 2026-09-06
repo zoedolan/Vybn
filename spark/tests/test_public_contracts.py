@@ -2728,3 +2728,78 @@ def test_common_envelope_rejects_resigned_malformed_events(monkeypatch, tmp_path
     row.update(change); row["hash"] = m._event_digest(row)
     with pytest.raises(error):
         parse(m._encoded(row))
+
+
+def test_local_source_views_branch_without_mutating_law_live_contact_or_parent(tmp_path):
+    from dataclasses import replace
+    m = _connection()
+    path = tmp_path / "source.txt"; raw = b"alpha\n\nbeta\n"; path.write_bytes(raw)
+    source = m._inherited_node("reading", "exact source", path, raw)
+    fixed = tuple(m.WakeNode(k, k, "fixed", "test", k) for k in
+                  ("law", "live_contact", "path_intention_ledger", "configuration"))
+    base = m.WakeBundle((source, *fixed), (m.WakeRoute("context", ("reading",)),))
+    branches = [base.derive(m._inherited_node("reading", "selected exact passage", path, raw, text))
+                for text in ("alpha", "beta")]
+    assert "alpha\n\nbeta\n" in base.render("context")
+    assert branches[0].render("context").endswith("alpha")
+    assert branches[1].render("context").endswith("beta")
+    assert len({b.digest() for b in (base, *branches)}) == 3
+    assert {b.nodes[0].source_sha256 for b in (base, *branches)} == {source.source_sha256}
+    assert "alpha" not in json.dumps(branches[0].manifest())
+    assert path.read_bytes() == raw
+    for node in fixed:
+        with pytest.raises(ValueError):
+            base.derive(replace(node, text="replacement"))
+    with pytest.raises(ValueError):
+        base.derive(replace(source, authority="governing_instruction"))
+    with pytest.raises(ValueError):
+        base.derive(source, source)
+    with pytest.raises(KeyError):
+        base.derive(replace(source, id="absent"))
+
+
+@pytest.mark.parametrize("name,args", [
+    ("bash", {}), ("bash", {"command": False}), ("bash", []), ("bash", None),
+    ("read_file", {"path": "x", "offset": True}),
+    ("read_file", {"path": "x", "length": 32001}),
+    ("path_event", {"kind": "future", "text": "note", "author": "other/path"}),
+    ("record_transform", {"kind": "move", "artifacts": [False]}),
+])
+def test_declared_tool_fields_are_checked_before_execution(monkeypatch, name, args):
+    m = _connection(); calls = []
+    monkeypatch.setattr(m, "path_tool_refusal", lambda _name: None)
+    for tool in ("run_local", "read_file", "record_path_event", "record_transform"):
+        monkeypatch.setattr(m, tool, lambda *_: calls.append("executed"))
+    result = m.execute_tool(m.ToolCall("bad", name, args, None))
+    assert "ValueError" in result and not calls
+    monkeypatch.setattr(m, "run_local", lambda command: (0, command))
+    assert "exit_code=0\nallowed" in m.execute_tool(m.ToolCall("ok", "bash", {"command": "allowed"}, None))
+
+
+def test_indexed_lifecycles_match_flat_queries_and_keep_path_ownership():
+    m = _connection(); rows = []; latest = {}
+    for i in range(30):
+        author = f"branch/{i % 3}"
+        row = m._new_event(rows, m.SUBJECT_SCHEMA, "ev", author, kind="future", text=f"revision {i}",
+                           target="", scope="", ref=latest.get(author, ""))
+        rows.append(row); latest[author] = row["id"]
+    checked = m._parse_path_events(b"".join(m._encoded(row) for row in rows))
+    index = m.EventIndex(checked)
+    revised = {row["ref"] for row in rows if row["kind"] == "future"}
+    for author in latest:
+        flat = [row for row in rows if row["author"] == author and row["id"] not in revised]
+        assert index.active("future", ("future",), author=author) == flat
+    wrong = dict(rows[-1], author="other/path"); wrong["hash"] = m._event_digest(wrong)
+    with pytest.raises(m.PathLedgerError):
+        m._parse_path_events(m._encoded(wrong), rows[:-1])
+
+
+@pytest.mark.parametrize("adapter", ["AnthropicDialect", "OpenAIDialect", "K3Dialect"])
+def test_common_protocol_answers_preserve_native_call_identity(adapter):
+    m = _connection(); dialect = object.__new__(getattr(m, adapter))
+    state = dialect.open("instructions", "live", [], "inherited")
+    call = m.ToolCall("exact-call-id", "read_file", {}, None)
+    dialect.answer(state, [(call, "literal result")])
+    encoded = json.dumps(state)
+    assert "exact-call-id" in encoded and "literal result" in encoded
+    assert "instructions" in (json.dumps(dialect.system) if adapter == "AnthropicDialect" else encoded)
