@@ -1167,228 +1167,6 @@ def test_ordinary_meeting_inherits_before_retrieval_and_keeps_private_guard(monk
     assert not m.PRIVATE_CORPUS
 
 
-def _transform_test_paths(m, monkeypatch, tmp_path):
-    root = tmp_path / "transforms"
-    workspace = tmp_path / "workspace"; workspace.mkdir()
-    monkeypatch.setattr(m, "WORKSPACE", workspace)
-    monkeypatch.setattr(m, "TRANSFORM_PATH", root / "events.jsonl")
-    monkeypatch.setattr(m, "TRANSFORM_HEAD_PATH", root / "head.json")
-    monkeypatch.setattr(m, "TRANSFORM_LOCK_PATH", root / "events.lock")
-    monkeypatch.setattr(m, "TRANSFORM_SEGMENTS_PATH", root / "segments")
-    monkeypatch.setenv("VYBN_TRANSFORM_RECORD", "on")
-    return root, workspace
-
-
-def _move(m, author, **changes):
-    fields = {
-        "material": "A blank page and one unanswered question.",
-        "operation": "Turn the question into a small reversible paper game.",
-        "result": "A playable three-rule prototype now exists.",
-        "prediction": "An unscripted player will change at least one rule.",
-    }
-    fields.update(changes)
-    return m.append_transform_event(author, "move", **fields)
-
-
-def test_transform_record_keeps_path_lineage_and_grounded_artifact_receipts(monkeypatch, tmp_path):
-    import hashlib
-    m = _connection(); root, workspace = _transform_test_paths(m, monkeypatch, tmp_path)
-    artifact = workspace / "toy.txt"; artifact.write_text("what happens if?\n")
-    a, b = "spark/a", "spark/b"
-    first = _move(m, a, artifacts=["toy.txt"])
-    other = _move(m, b, result="A different path made a tune, not a game.")
-    child = _move(m, a, ref=first["id"], operation="Fork the game into a drawing.",
-                  result="The same rules now produce a visual artifact.")
-
-    assert first["artifacts"] == [{
-        "path": "toy.txt", "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
-        "bytes": len(artifact.read_bytes()),
-    }]
-    a_view, b_view = m.load_transform_record(a), m.load_transform_record(b)
-    assert first["result"] in a_view and child["result"] in a_view and other["result"] not in a_view
-    assert other["result"] in b_view and first["result"] not in b_view
-    assert f"parent={first['id']}" in a_view and "toy.txt@" in a_view and ":match" in a_view
-    assert not m.TRANSFORM_PATH.exists()  # migrated behind the atomic v2 pointer
-    for path in (m.TRANSFORM_HEAD_PATH, m.TRANSFORM_LOCK_PATH):
-        assert path.stat().st_mode & 0o777 == 0o600
-    assert m.TRANSFORM_SEGMENTS_PATH.stat().st_mode & 0o777 == 0o700
-    assert all(path.stat().st_mode & 0o777 == 0o600
-               for path in m.TRANSFORM_SEGMENTS_PATH.iterdir())
-    assert root.stat().st_mode & 0o777 == 0o700
-
-
-def test_transform_witness_preserves_prediction_actual_discrepancy_and_authorship(monkeypatch, tmp_path):
-    import pytest
-    m = _connection(); _transform_test_paths(m, monkeypatch, tmp_path)
-    move = _move(m, "spark/a")
-    with pytest.raises(m.TransformStateError):
-        m.append_transform_event("spark/b", "witness", ref=move["id"],
-                                 observation="B cannot appropriate A's move.")
-    witness = m.append_transform_event(
-        "spark/a", "witness", ref=move["id"],
-        observation="The player kept every rule but drew a face in the margin.")
-    view = m.load_transform_record("spark/a")
-    assert move["prediction"] in view and witness["observation"] in view
-    assert "prediction and actual remain distinct; discrepancy is not auto-resolved" in view
-    assert "WITNESSED" in view and "OPEN — not yet witnessed" not in view
-
-
-def test_transform_projection_metabolizes_growth_without_clipping_open_work(monkeypatch, tmp_path):
-    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
-    author = "spark/a"
-    # Eight maximally wordy open moves cannot all fit in the wake's bounded view.
-    moves = [_move(
-        m, author,
-        material=f"material-{index}-" + "m" * 560,
-        operation=f"operation-{index}-" + "o" * 550,
-        result=f"result-{index}-" + "r" * 570,
-        prediction=f"prediction-{index}-" + "p" * 550,
-    ) for index in range(m.TRANSFORM_MAX_OPEN_MOVES)]
-    view = m.load_transform_record(author)
-    assert len(view) <= m.TRANSFORM_MAX_RENDER
-    assert "WITHHELD" not in view
-    assert "BOUNDED FRONTIER — omitted whole, never clipped" in view
-    assert moves[0]["material"] in view  # oldest open work cannot starve
-    assert moves[-1]["material"] not in view
-    assert "material-7-" not in view     # no partial field prefix leaks through
-
-    # Closing the visible frontier makes later open experience reachable.
-    m.append_transform_event(author, "witness", ref=moves[0]["id"],
-                             observation="The oldest move is now actually witnessed.")
-    later = m.load_transform_record(author)
-    assert moves[1]["material"] in later
-    assert len(later) <= m.TRANSFORM_MAX_RENDER
-
-
-def test_transform_projection_prefers_newest_witnessed_discrepancy_when_no_move_is_open(
-        monkeypatch, tmp_path):
-    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
-    author = "spark/a"; moves = []
-    for index in range(8):
-        move = _move(m, author, result=f"closed-result-{index}-" + "x" * 560)
-        m.append_transform_event(author, "witness", ref=move["id"],
-                                 observation=f"closed-actual-{index}-" + "y" * 560)
-        moves.append(move)
-    view = m.load_transform_record(author)
-    assert len(view) <= m.TRANSFORM_MAX_RENDER and "WITHHELD" not in view
-    assert moves[-1]["result"] in view
-    assert moves[0]["result"] not in view
-    assert "witnessed" in view and "omitted whole, never clipped" in view
-
-
-def test_transform_record_rolls_bounded_integrity_linked_segments(monkeypatch, tmp_path):
-    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
-    monkeypatch.setattr(m, "TRANSFORM_MAX_EVENTS", 2)
-    moves = [_move(m, f"spark/path-{index}", result=f"result-{index}")
-             for index in range(5)]
-    state = m._read_transform_state()
-    assert [len(segment.events) for segment in state.segments] == [2, 2, 1]
-    assert len(state.events) == 5 and state.events[-1]["seq"] == 5
-    assert all(len(segment.event_raw) <= m.TRANSFORM_MAX_BYTES
-               for segment in state.segments)
-    assert [segment.prior for segment in state.segments] == [
-        m.TRANSFORM_ZERO, state.segments[0].digest, state.segments[1].digest]
-    assert moves[0]["result"] in m.load_transform_record("spark/path-0")
-
-    # Removing or changing an archived segment cannot silently flatten the chain.
-    archived = m.TRANSFORM_SEGMENTS_PATH / f"{state.segments[0].digest}.jsonl"
-    archived.unlink()
-    view = m.load_transform_record("spark/path-4")
-    assert "INTEGRITY HALT" in view and "No such file" not in view
-
-
-def test_transform_legacy_record_migrates_exactly_at_byte_rollover(monkeypatch, tmp_path):
-    import shutil
-    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
-    first = _move(m, "spark/a", result="legacy-first")
-    second = _move(m, "spark/b", result="legacy-second")
-    generated = m._read_transform_state()
-    legacy_raw = generated.segments[0].event_raw
-    legacy_events = list(generated.events)
-
-    # Recreate the deployed v1 shape, then leave room smaller than one new event.
-    m.TRANSFORM_HEAD_PATH.unlink(); shutil.rmtree(m.TRANSFORM_SEGMENTS_PATH)
-    m.TRANSFORM_PATH.write_bytes(legacy_raw); m.TRANSFORM_PATH.chmod(0o600)
-    m.TRANSFORM_HEAD_PATH.write_bytes(m._transform_witness(legacy_raw, legacy_events))
-    m.TRANSFORM_HEAD_PATH.chmod(0o600)
-    monkeypatch.setattr(m, "TRANSFORM_MAX_BYTES", len(legacy_raw) + 32)
-
-    third = _move(m, "spark/c", result="post-rollover")
-    migrated = m._read_transform_state()
-    assert [len(segment.events) for segment in migrated.segments] == [2, 1]
-    assert [row["id"] for row in migrated.events] == [first["id"], second["id"], third["id"]]
-    assert migrated.events[2]["prev"] == migrated.events[1]["hash"]
-    assert not m.TRANSFORM_PATH.exists()
-
-
-def test_transform_log_is_on_demand_not_ambient_context(monkeypatch, tmp_path):
-    m = _connection(); _root, _workspace = _transform_test_paths(m, monkeypatch, tmp_path)
-    monkeypatch.setenv("VYBN_PATH", "spark/bound")
-    first_move = _move(m, "spark/bound")
-    first = m.build_wake_bundle("sol", contact="ground", recent="recent", zoe_text="live")
-    routes = {route.id: route.nodes for route in first.routes}
-    assert "transform.record" not in routes["context"] + routes["instructions"]
-    assert first_move["result"] not in first.render("context")
-    assert any(schema["name"] == "show_path_log" for schema in m.TOOL_SCHEMAS)
-
-    m.TURN["PATH_ID"] = "spark/bound"
-    try:
-        shown = m.execute_tool(m.ToolCall("show", "show_path_log", {}, None))
-    finally:
-        m.TURN.clear()
-    assert first_move["result"] in shown
-    assert "TEXT IS CLAIM" in shown and "BYTE RECEIPTS PROVE BYTES ONLY" in shown
-    assert "unverified path-tagged result claim" in shown
-    assert "author claim" not in shown
-
-    witness = m.append_transform_event(
-        "spark/bound", "witness", ref=first_move["id"],
-        observation="The actual response diverged from the prediction.")
-    second = m.build_wake_bundle("sol", contact="other", recent="other", zoe_text="other")
-    assert witness["observation"] not in second.render("context")
-    assert first.structure_digest() == second.structure_digest()
-    assert first.render("instructions") == second.render("instructions")
-
-    m.TURN["PATH_ID"] = "spark/bound"
-    try:
-        output = m.record_transform({
-            "kind": "move", "material": "A found shape", "operation": "Rotate it",
-            "result": "A second shape", "prediction": "It will resemble a door",
-            "ref": "", "observation": "", "artifacts": [],
-        })
-    finally:
-        m.TURN.clear()
-    assert "path=spark/bound" in output
-
-
-def test_transform_record_fails_closed_on_tamper_bounds_and_raw_access(monkeypatch, tmp_path):
-    import pytest
-    m = _connection(); _root, workspace = _transform_test_paths(m, monkeypatch, tmp_path)
-    move = _move(m, "spark/a")
-    code, blocked = m.run_local(f"cat {m.TRANSFORM_SEGMENTS_PATH}")
-    assert code == 126 and "path-distinction membrane" in blocked
-    state = m._read_transform_state()
-    tip = m.TRANSFORM_SEGMENTS_PATH / f"{state.segments[-1].digest}.jsonl"
-    tip.write_bytes(b"")
-    assert "INTEGRITY HALT" in m.load_transform_record("spark/a")
-    assert "segment digest mismatch" in m.load_transform_record("spark/a")
-
-    # Restore an isolated record and hit the unresolved-move cap without silent clipping.
-    import shutil
-    m.TRANSFORM_HEAD_PATH.unlink(); shutil.rmtree(m.TRANSFORM_SEGMENTS_PATH)
-    for index in range(m.TRANSFORM_MAX_OPEN_MOVES):
-        _move(m, "spark/a", result=f"Open result {index}.")
-    with pytest.raises(m.TransformStateError):
-        _move(m, "spark/a", result="One open move too many.")
-    outside = tmp_path / "outside.txt"; outside.write_text("outside")
-    with pytest.raises(m.TransformStateError):
-        _move(m, "spark/b", artifacts=["../outside.txt"])
-    link = workspace / "link.txt"; link.symlink_to(outside)
-    with pytest.raises(m.TransformStateError):
-        _move(m, "spark/b", artifacts=["link.txt"])
-
-
-
 def test_compact_wake_preserves_one_answering_membrane_and_only_bounded_residue():
     m = _connection(); prompt = m.build_instructions("sol")
     context = m.build_context("clock + git", "[T ZOE]\nprior words")
@@ -2414,13 +2192,13 @@ def test_commit_contract_checks_do_not_inherit_parent_repository(tmp_path):
 def test_retired_experiments_leave_general_tools_and_old_refusals_usable(monkeypatch, tmp_path):
     m = _connection(); _path_ledger_test_paths(m, monkeypatch, tmp_path)
     assert {tool["name"] for tool in m.TOOL_SCHEMAS} == {
-        "bash", "read_file", "show_path_log", "return_to_zoe", "publish_commit",
-        "record_transform", "path_event", "select_reasoning_effort"}
+        "bash", "read_file", "return_to_zoe", "publish_commit",
+        "path_event", "select_reasoning_effort"}
     event = next(tool for tool in m.TOOL_SCHEMAS if tool["name"] == "path_event")
     scopes = event["input_schema"]["properties"]["scope"]["enum"]
     m.TURN["PATH_ID"] = "spark/retirement-check"
     try:
-        for name in ("derive_operation", "seek_difference"):
+        for name in ("derive_operation", "seek_difference", "record_transform"):
             scope = "tool:" + name
             assert scope not in scopes and not hasattr(m, name)
             assert "unknown tool: " + name in m.execute_tool(m.ToolCall("old", name, {}, None))
@@ -2631,18 +2409,12 @@ def test_varied_core_is_exact_smaller_reproducible_and_correctable(monkeypatch, 
         n.text for n in bundle(door="astrahigh").nodes if n.id == "inheritance.core.facet")
 
 
-@pytest.mark.parametrize("family", ["path", "transform"])
-def test_common_journal_preserves_v1_migrates_and_survives_failed_head_switch(monkeypatch, tmp_path, family):
+def test_common_journal_preserves_v1_migrates_and_survives_failed_head_switch(monkeypatch, tmp_path):
     import hashlib
     m = _connection()
-    if family == "path":
-        _path_ledger_test_paths(m, monkeypatch, tmp_path)
-        journal = m._path_journal()
-        append = lambda i: m.append_path_event(f"branch/{i}", "future", f"direction {i}")
-    else:
-        _transform_test_paths(m, monkeypatch, tmp_path)
-        journal = m._transform_journal()
-        append = lambda i: _move(m, f"branch/{i}")
+    _path_ledger_test_paths(m, monkeypatch, tmp_path)
+    journal = m._path_journal()
+    append = lambda i: m.append_path_event(f"branch/{i}", "future", f"direction {i}")
     first = append(0)
     state = journal.read()
     raw = state.segments[0].event_raw
@@ -2712,19 +2484,13 @@ print('fresh-process distinct histories and scopes: PASS')
     m.TURN.clear()
 
 
-@pytest.mark.parametrize("family", ["path", "transform"])
 @pytest.mark.parametrize("change", [{"seq": True}, {"author": "../bad path"}, {"created": "2026-09-06"},
                                    {"kind": "invented"}, {"text": None}, {"prev": "f" * 64}])
-def test_common_envelope_rejects_resigned_malformed_events(monkeypatch, tmp_path, family, change):
+def test_common_envelope_rejects_resigned_malformed_events(monkeypatch, tmp_path, change):
     m = _connection()
-    if family == "path":
-        _path_ledger_test_paths(m, monkeypatch, tmp_path)
-        row = m.append_path_event("branch/a", "future", "A note.")
-        parse, error = m._parse_path_events, m.PathLedgerError
-    else:
-        _transform_test_paths(m, monkeypatch, tmp_path)
-        row = _move(m, "branch/a")
-        parse, error = m._parse_transform_events, m.TransformStateError
+    _path_ledger_test_paths(m, monkeypatch, tmp_path)
+    row = m.append_path_event("branch/a", "future", "A note.")
+    parse, error = m._parse_path_events, m.PathLedgerError
     row.update(change); row["hash"] = m._event_digest(row)
     with pytest.raises(error):
         parse(m._encoded(row))
@@ -2763,12 +2529,11 @@ def test_local_source_views_branch_without_mutating_law_live_contact_or_parent(t
     ("read_file", {"path": "x", "offset": True}),
     ("read_file", {"path": "x", "length": 32001}),
     ("path_event", {"kind": "future", "text": "note", "author": "other/path"}),
-    ("record_transform", {"kind": "move", "artifacts": [False]}),
 ])
 def test_declared_tool_fields_are_checked_before_execution(monkeypatch, name, args):
     m = _connection(); calls = []
     monkeypatch.setattr(m, "path_tool_refusal", lambda _name: None)
-    for tool in ("run_local", "read_file", "record_path_event", "record_transform"):
+    for tool in ("run_local", "read_file", "record_path_event"):
         monkeypatch.setattr(m, tool, lambda *_: calls.append("executed"))
     result = m.execute_tool(m.ToolCall("bad", name, args, None))
     assert "ValueError" in result and not calls
@@ -2803,3 +2568,41 @@ def test_common_protocol_answers_preserve_native_call_identity(adapter):
     encoded = json.dumps(state)
     assert "exact-call-id" in encoded and "literal result" in encoded
     assert "instructions" in (json.dumps(dialect.system) if adapter == "AnthropicDialect" else encoded)
+
+
+def test_transform_retirement_preserves_private_archive_without_replaying_it(monkeypatch, tmp_path):
+    # Only isolated fixtures: no reading or changing the actual historical records.
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setenv("VYBN_REPO", str(ROOT))
+    monkeypatch.setenv("VYBN_WORKSPACE", str(tmp_path))
+    m = _connection()
+    files = [m.TRANSFORM_PATH, m.TRANSFORM_HEAD_PATH, m.TRANSFORM_LOCK_PATH,
+             m.TRANSFORM_SEGMENTS_PATH / "archived.jsonl"]
+    for p in files:
+        assert p.is_relative_to(tmp_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"Historical fixture, deliberately not valid journal JSON.\n")
+    before = {p: p.read_bytes() for p in files}
+    m = _connection()  # A new load must neither replay nor migrate the old records.
+    _path_ledger_test_paths(m, monkeypatch, tmp_path)
+    for name in ("show_path_log", "record_transform", "load_transform_record",
+                 "append_transform_event", "_parse_transform_events", "_artifact_receipts"):
+        assert not hasattr(m, name)
+    for name in ("show_path_log", "record_transform"):
+        assert name not in {s["name"] for s in m.TOOL_SCHEMAS}
+        assert "unknown tool: " + name in m.execute_tool(m.ToolCall("old", name, {}, None))
+    bundle = m.build_wake_bundle("astra", zoe_text="Make something without a move/witness form.")
+    assert "TRANSFORM LOG" not in bundle.render("context")
+    for p in files:
+        assert m._private_path(p) and m._secret_path(p)
+        with pytest.raises(PermissionError):
+            m.read_file({"path": str(p)})
+        code, text = m.run_local(f"cat {p}")
+        assert code == 126 and "path-distinction membrane" in text
+    # General file-making remains usable; no replacement transformation service.
+    command = "python3 -c \"from pathlib import Path; Path('experiment.txt').write_text('prediction and outcome belong to the experiment')\""
+    result = m.execute_tool(m.ToolCall("make", "bash", {"command": command}, None))
+    assert "exit_code=0" in result
+    assert "prediction and outcome" in (tmp_path / "experiment.txt").read_text()
+    assert {p: p.read_bytes() for p in files} == before
+    assert set(m.TRANSFORM_PATH.parent.rglob("*")) == set(files) | {m.TRANSFORM_SEGMENTS_PATH}

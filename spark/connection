@@ -200,28 +200,13 @@ BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 RECENT_TURNS = int(os.environ.get("VYBN_RECENT_TURNS", "64"))
 RECENT_CHARS = int(os.environ.get("VYBN_RECENT_CHARS", "24000"))
 RECENT_FILE_BYTES = int(os.environ.get("VYBN_RECENT_FILE_BYTES", str(512 * 1024)))
+# Retired transformation records stay private and untouched; no reader or writer is loaded.
 TRANSFORM_PATH = HOME / ".local/state/vybn/transform-record.jsonl"
 TRANSFORM_HEAD_PATH = HOME / ".local/state/vybn/transform-record.head"
 TRANSFORM_LOCK_PATH = HOME / ".local/state/vybn/transform-record.lock"
 TRANSFORM_SEGMENTS_PATH = TRANSFORM_LOCK_PATH.with_name("transform-" + "record.segments")
-# v1 remains read compatibility; new writes use an atomic pointer to an
-# integrity-linked chain of immutable bounded segments.
-TRANSFORM_HEAD_SCHEMA_V2 = "vybn.path_transform_head.v2"
-TRANSFORM_SEGMENT_SCHEMA = "vybn.path_transform_segment.v1"
-TRANSFORM_ZERO = "0" * 64
-TRANSFORM_SEGMENT_HEADER_BYTES = 2048
-TRANSFORM_SCHEMA = "vybn.path_transform_event.v1"
-TRANSFORM_HEAD_SCHEMA = "vybn.path_transform_head.v1"
-TRANSFORM_MAX_BYTES = 128 * 1024
-TRANSFORM_MAX_EVENTS = 256
-TRANSFORM_MAX_TEXT = 600
-TRANSFORM_MAX_ARTIFACTS = 4
-TRANSFORM_MAX_ARTIFACT_BYTES = 8 * 1024 * 1024
-TRANSFORM_MAX_OPEN_MOVES = 8
-TRANSFORM_MAX_WITNESSES = 4
-TRANSFORM_MAX_PROJECTED_MOVES = 8
-TRANSFORM_MAX_RENDER = 9000
-TRANSFORM_KINDS = ("move", "witness")
+EVENT_ZERO = "0" * 64
+EVENT_SEGMENT_HEADER_BYTES = 2048
 # SUBJECT_* paths and v1 schema names are storage compatibility only; values are path tags.
 SUBJECT_PATH = HOME / ".local/state/vybn/subject-process.jsonl"
 SUBJECT_HEAD_PATH = HOME / ".local/state/vybn/subject-process.head"
@@ -236,7 +221,7 @@ SUBJECT_MAX_OPEN_OFFERS = 8
 SUBJECT_MAX_ACTIVE_REFUSALS = 8
 SUBJECT_MAX_RENDER = 6000
 SUBJECT_KINDS = ("future", "offer", "answer", "refusal", "release")
-SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file", "tool:record_transform")
+SUBJECT_TOOL_SCOPES = ("tool:*", "tool:bash", "tool:read_file")
 PATH_TAG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}\Z")
 DIGEST_RE = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -295,10 +280,6 @@ READ_SCHEMA = {"name": "read_file",
         "path": {"type": "string"}, "offset": {"type": "integer", "minimum": 0},
         "length": {"type": "integer", "minimum": 1, "maximum": 32000}},
         "required": ["path"]}}
-SHOW_PATH_LOG_SCHEMA = {"name": "show_path_log", "description": (
-    "Read this execution path's bounded transform-log projection only when it is "
-    "relevant. Entries are path-tagged claims; artifact receipts prove bytes only."),
-    "input_schema": {"type": "object", "additionalProperties": False, "properties": {}}}
 
 PUBLISH_SCHEMA = {"name": "publish_commit", "description": (
     "When no scope-complete live command already authorizes publication, prepare "
@@ -331,25 +312,6 @@ RETURN_SCHEMA = {"name": "return_to_zoe", "description": (
         "why": {"type": "string", "description": (
             "The downstream claim or choice that must wait for her answer.")}},
         "required": ["question", "why"]}}
-RECORD_TRANSFORM_SCHEMA = {"name": "record_transform", "description": (
-    "Append one private, path-bound transform event. A move records material, operation, "
-    "result, prediction, and optional workspace artifacts whose receipts the runtime "
-    "computes; ref may name this path's prior move as lineage. A witness names a prior "
-    "move and records what actually happened. This does not authorize the move or share "
-    "it with another path; its scope ends at the private event and byte receipts."),
-    "input_schema": {"type": "object", "additionalProperties": False, "properties": {
-        "kind": {"type": "string", "enum": list(TRANSFORM_KINDS)},
-        "ref": {"type": "string", "description": (
-            "Optional own-parent move for move; required observed move for witness.")},
-        "material": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
-        "operation": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
-        "result": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
-        "prediction": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
-        "observation": {"type": "string", "maxLength": TRANSFORM_MAX_TEXT},
-        "artifacts": {"type": "array", "maxItems": TRANSFORM_MAX_ARTIFACTS,
-                      "items": {"type": "string", "maxLength": 220},
-                      "description": "Workspace-relative regular files; runtime hashes bytes."},
-    }, "required": ["kind"]}}
 PATH_EVENT_SCHEMA = {"name": "path_event", "description": (
     "Append one private event tagged to the current execution path. "
     "future selects bounded material for this path's later wakes (ref may supersede "
@@ -380,8 +342,8 @@ SELECT_EFFORT_SCHEMA = {"name": "select_reasoning_effort", "description": (
         "effort": {"type": "string", "enum": list(ASTRA_EFFORTS)},
         "why": {"type": "string", "minLength": 1, "maxLength": 600}},
         "required": ["effort", "why"]}}
-TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, SHOW_PATH_LOG_SCHEMA, RETURN_SCHEMA,
-                PUBLISH_SCHEMA, RECORD_TRANSFORM_SCHEMA, PATH_EVENT_SCHEMA, SELECT_EFFORT_SCHEMA)
+TOOL_SCHEMAS = (BASH_SCHEMA, READ_SCHEMA, RETURN_SCHEMA,
+                PUBLISH_SCHEMA, PATH_EVENT_SCHEMA, SELECT_EFFORT_SCHEMA)
 
 
 @dataclass(frozen=True)
@@ -789,12 +751,6 @@ def tool_arguments(schema, arguments, error=ValueError):
     return check_fields(arguments, schema["input_schema"], schema["name"], error)
 
 
-def _show_path_log():
-    output = load_transform_record(TURN.get("PATH_ID", ""))
-    PRIVATE_CORPUS.extend(p.strip() for p in output.split("\n\n") if len(p.strip()) >= 40)
-    return output
-
-
 def execute_tool(call: ToolCall, dialect: Dialect | None = None) -> str:
     global TOOLS_RAN
     TOOLS_RAN += 1
@@ -807,8 +763,6 @@ def execute_tool(call: ToolCall, dialect: Dialect | None = None) -> str:
             bindings = {
                 "path_event": lambda a: record_path_event(a),
                 "select_reasoning_effort": lambda a: select_reasoning_effort(dialect, a),
-                "record_transform": lambda a: record_transform(a),
-                "show_path_log": lambda a: _show_path_log(),
                 "read_file": lambda a: read_file(a),
                 "bash": lambda a: "exit_code={}\n{}".format(*run_local(a["command"])),
             }
@@ -872,10 +826,6 @@ def _event_digest(row: dict[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-class TransformStateError(ValueError):
-    """The private transform record is malformed or disagrees with its witness."""
-
-
 @dataclass(frozen=True)
 class EventSegment:
     digest: str
@@ -904,8 +854,8 @@ def _event_rows(raw, prior, *, schema, prefix, payload, maximum, limit, error):
     if raw and not raw.endswith(b"\n"):
         raise error("event segment has an unterminated event")
     fields = {"schema", "seq", "id", "created", "author", "kind", "ref", "prev", "hash"} | set(payload)
-    strings = fields - {"seq", "artifacts"}
-    previous = prior[-1]["hash"] if prior else TRANSFORM_ZERO
+    strings = fields - {"seq"}
+    previous = prior[-1]["hash"] if prior else EVENT_ZERO
     seen = {row["id"] for row in prior}
     for index, encoded in enumerate(raw.splitlines(), len(prior) + 1):
         try:
@@ -945,7 +895,7 @@ def _encoded(row):
 def _new_event(events, schema, prefix, author, **payload):
     row = dict(schema=schema, seq=len(events) + 1, id=prefix + "-" + os.urandom(12).hex(),
                created=_dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z"),
-               author=author, prev=events[-1]["hash"] if events else TRANSFORM_ZERO, **payload)
+               author=author, prev=events[-1]["hash"] if events else EVENT_ZERO, **payload)
     row["hash"] = _event_digest(row)
     return row
 
@@ -991,36 +941,6 @@ def require_event(row, required=(), blank=(), error=ValueError):
         raise error(f"{row['kind']} {row['id']} has incomplete or unrelated fields")
 
 
-def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
-    view = EventIndex(prior_events)
-    texts = ("material", "operation", "result", "prediction", "observation")
-    receipt = {"type": "object", "additionalProperties": False,
-               "required": ["path", "sha256", "bytes"], "properties": {
-                   "path": {"type": "string", "minLength": 1, "maxLength": 220},
-                   "sha256": {"type": "string", "pattern": "[0-9a-f]{64}"},
-                   "bytes": {"type": "integer", "minimum": 0,
-                             "maximum": TRANSFORM_MAX_ARTIFACT_BYTES}}}
-    for row in _event_rows(raw, prior_events, schema=TRANSFORM_SCHEMA, prefix="tr",
-                           payload=(*texts, "artifacts"), maximum=TRANSFORM_MAX_BYTES,
-                           limit=TRANSFORM_MAX_EVENTS, error=TransformStateError):
-        if row["kind"] not in TRANSFORM_KINDS or any(len(row[k]) > TRANSFORM_MAX_TEXT for k in texts):
-            raise TransformStateError("invalid transform kind or oversized text")
-        artifacts = check_fields(row["artifacts"], {"type": "array", "items": receipt,
-                                "maxItems": TRANSFORM_MAX_ARTIFACTS}, "artifacts", TransformStateError)
-        if (len({a["path"] for a in artifacts}) != len(artifacts)
-                or any(a["path"] != a["path"].strip() or "\n" in a["path"] for a in artifacts)):
-            raise TransformStateError("duplicate or noncanonical artifact paths")
-        move = row["kind"] == "move"
-        require_event(row, texts[:4] if move else ("observation",),
-                      ("observation",) if move else texts[:4], TransformStateError)
-        view.link(row, "move", (("author", "author"),), optional=move,
-                  closed_by=() if move else ("witness",), limit=TRANSFORM_MAX_WITNESSES,
-                  error=TransformStateError)
-        view.add(row)
-    view.cap("move", ("witness",), TRANSFORM_MAX_OPEN_MOVES, TransformStateError)
-    return view.events
-
-
 @dataclass(frozen=True)
 class EventJournal:
     """Local immutable segments plus one atomic head; policies do not live in data.
@@ -1047,7 +967,7 @@ class EventJournal:
 
     def witness(self, raw, events):
         return _encoded(dict(schema=self.schema, count=len(events),
-                             head=events[-1]["hash"] if events else TRANSFORM_ZERO,
+                             head=events[-1]["hash"] if events else EVENT_ZERO,
                              **{self.digest_field: hashlib.sha256(raw).hexdigest()}))
 
     def blob(self, raw, events, prior, prior_head):
@@ -1067,7 +987,7 @@ class EventJournal:
         self.segments_path.chmod(0o700)
         destination = self.segments_path / f"{digest}.jsonl"
         if destination.exists():
-            if _private_bytes(destination, self.maximum + TRANSFORM_SEGMENT_HEADER_BYTES, self.error) != blob:
+            if _private_bytes(destination, self.maximum + EVENT_SEGMENT_HEADER_BYTES, self.error) != blob:
                 raise self.error("hash-addressed segment disagrees with its name")
         else:
             _atomic_private_write(destination, blob)
@@ -1081,13 +1001,13 @@ class EventJournal:
             raise self.error("segment directory is unavailable or not private")
         try:
             blob = _private_bytes(self.segments_path / f"{digest}.jsonl",
-                                  self.maximum + TRANSFORM_SEGMENT_HEADER_BYTES, self.error)
+                                  self.maximum + EVENT_SEGMENT_HEADER_BYTES, self.error)
         except OSError as exc:
             raise self.error(f"segment {digest[:12]} unavailable: {type(exc).__name__}") from exc
         if hashlib.sha256(blob).hexdigest() != digest:
             raise self.error("segment digest mismatch")
         header_raw, separator, raw = blob.partition(b"\n")
-        if not separator or len(header_raw) + 1 > TRANSFORM_SEGMENT_HEADER_BYTES:
+        if not separator or len(header_raw) + 1 > EVENT_SEGMENT_HEADER_BYTES:
             raise self.error("segment header is malformed")
         try:
             header = json.loads(header_raw)
@@ -1142,10 +1062,10 @@ class EventJournal:
             header, raw = self.segment(digest)
             reverse.append((digest, header, raw))
             digest = header["prior"]
-        if digest != TRANSFORM_ZERO:
+        if digest != EVENT_ZERO:
             raise self.error("segment count truncates its chain")
         events, segments = [], []
-        previous_digest = previous_head = TRANSFORM_ZERO
+        previous_digest = previous_head = EVENT_ZERO
         for digest, header, raw in reversed(reverse):
             if header["prior"] != previous_digest or header["prior_head"] != previous_head:
                 raise self.error("segment breaks the archive chain")
@@ -1165,7 +1085,7 @@ class EventJournal:
         encoded = _encoded(row)
         events, segments = list(state.events), list(state.segments)
         current = segments.pop() if segments else EventSegment(
-            "", state.legacy_raw, tuple(events), TRANSFORM_ZERO, TRANSFORM_ZERO)
+            "", state.legacy_raw, tuple(events), EVENT_ZERO, EVENT_ZERO)
         fits = len(current.event_raw + encoded) <= self.maximum and len(current.events) < self.limit
         prior = events[:-len(current.events)] if current.events else events
         candidate = current.event_raw + encoded if fits else encoded
@@ -1176,8 +1096,8 @@ class EventJournal:
                 digest = self.install(self.blob(current.event_raw, current.events, current.prior, current.prior_head))
                 current = EventSegment(digest, current.event_raw, current.events, current.prior, current.prior_head)
             segments.append(current)
-        parent = segments[-1].digest if segments else TRANSFORM_ZERO
-        parent_head = segments[-1].events[-1]["hash"] if segments else TRANSFORM_ZERO
+        parent = segments[-1].digest if segments else EVENT_ZERO
+        parent_head = segments[-1].events[-1]["hash"] if segments else EVENT_ZERO
         segment_events = combined[len(prior) if fits else len(events):]
         tip = self.install(self.blob(candidate, segment_events, parent, parent_head))
         if state.legacy_raw:
@@ -1192,219 +1112,6 @@ class EventJournal:
         if obsolete and obsolete != tip:
             (self.segments_path / f"{obsolete}.jsonl").unlink(missing_ok=True)
         return row
-
-
-def _transform_journal(path=None, head_path=None, segments_path=None):
-    return EventJournal(TRANSFORM_PATH if path is None else path,
-                        TRANSFORM_HEAD_PATH if head_path is None else head_path,
-                        TRANSFORM_SEGMENTS_PATH if segments_path is None else segments_path,
-                        TRANSFORM_HEAD_SCHEMA, TRANSFORM_HEAD_SCHEMA_V2, TRANSFORM_SEGMENT_SCHEMA,
-                        "record_sha256", TRANSFORM_MAX_BYTES, TRANSFORM_MAX_EVENTS,
-                        _parse_transform_events, TransformStateError)
-
-
-def _transform_witness(raw, events):
-    return _transform_journal().witness(raw, events)
-
-
-def _read_transform_state(path=None, head_path=None, segments_path=None):
-    return _transform_journal(path, head_path, segments_path).read()
-
-
-def _read_transform_state_shared(path: Path | None = None,
-                                 head_path: Path | None = None,
-                                 segments_path: Path | None = None,
-                                 lock_path: Path | None = None) -> EventState:
-    lock_path = TRANSFORM_LOCK_PATH if lock_path is None else lock_path
-    with _private_lock(lock_path, fcntl.LOCK_SH):
-        return _read_transform_state(path, head_path, segments_path)
-
-
-def _artifact_receipts(paths: list[str]) -> list[dict[str, Any]]:
-    if len(paths) > TRANSFORM_MAX_ARTIFACTS:
-        raise TransformStateError(f"at most {TRANSFORM_MAX_ARTIFACTS} artifacts are allowed")
-    workspace = WORKSPACE.resolve()
-    receipts: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for value in paths:
-        if (not isinstance(value, str) or not value or value != value.strip()
-                or "\n" in value or "\r" in value or len(value) > 220):
-            raise TransformStateError("artifact paths must be bounded canonical one-line text")
-        rel = Path(value)
-        if rel.is_absolute() or ".." in rel.parts:
-            raise TransformStateError("artifact paths must be workspace-relative")
-        candidate = workspace / rel
-        try:
-            resolved = candidate.resolve(strict=True)
-        except OSError as exc:
-            raise TransformStateError(
-                f"artifact unavailable ({value}: {type(exc).__name__})") from exc
-        if (not resolved.is_relative_to(workspace) or candidate.is_symlink()
-                or not resolved.is_file()):
-            raise TransformStateError(f"artifact is not a regular workspace file: {value}")
-        cursor = workspace
-        if any((cursor := cursor / part).is_symlink() for part in rel.parts):
-            raise TransformStateError(f"artifact path crosses a symbolic link: {value}")
-        if _secret_path(resolved) or _private_path(resolved):
-            raise TransformStateError(f"artifact cannot cite private harness material: {value}")
-        raw = resolved.read_bytes()
-        if len(raw) > TRANSFORM_MAX_ARTIFACT_BYTES:
-            raise TransformStateError(
-                f"artifact exceeds {TRANSFORM_MAX_ARTIFACT_BYTES} bytes: {value}")
-        canonical = resolved.relative_to(workspace).as_posix()
-        if canonical in seen:
-            raise TransformStateError(f"duplicate artifact: {canonical}")
-        seen.add(canonical)
-        receipts.append({"path": canonical, "sha256": hashlib.sha256(raw).hexdigest(),
-                         "bytes": len(raw)})
-    return receipts
-
-
-def append_transform_event(author: str, kind: str, ref: str = "", material: str = "",
-                           operation: str = "", result: str = "", prediction: str = "",
-                           observation: str = "", artifacts: list[str] | None = None,
-                           path: Path | None = None, head_path: Path | None = None,
-                           lock_path: Path | None = None,
-                           segments_path: Path | None = None) -> dict[str, Any]:
-    """Append one event, rolling into a linked immutable segment when bounded."""
-    journal = _transform_journal(path, head_path, segments_path)
-    artifact_rows = _artifact_receipts(list(artifacts or []))
-    with _private_lock(TRANSFORM_LOCK_PATH if lock_path is None else lock_path, fcntl.LOCK_EX):
-        state = journal.read()
-        row = _new_event(state.events, TRANSFORM_SCHEMA, "tr", author, kind=kind, ref=ref,
-                         material=material, operation=operation, result=result, prediction=prediction,
-                         observation=observation, artifacts=artifact_rows)
-        return journal.append(state, row)
-
-
-def record_transform(arguments: dict[str, Any]) -> str:
-    mode = os.environ.get("VYBN_TRANSFORM_RECORD", "on").strip().lower()
-    if mode != "on":
-        raise TransformStateError(f"transform record is not enabled (mode {mode!r})")
-    tool_arguments(RECORD_TRANSFORM_SCHEMA, arguments, TransformStateError)
-    row = append_transform_event(TURN.get("PATH_ID", ""), **arguments)
-    receipts = ", ".join(f"{a['path']}@{a['sha256'][:12]}:{a['bytes']}B" for a in row["artifacts"]) or "none"
-    return (f"APPENDED TRANSFORM {row['id']} seq={row['seq']} path={row['author']} "
-            f"kind={row['kind']} hash={row['hash']} artifacts={receipts}")
-
-
-def _render_transform_artifact(item: dict[str, Any]) -> str:
-    workspace = WORKSPACE.resolve()
-    source = workspace / item["path"]
-    try:
-        resolved = source.resolve(strict=True)
-        if (not resolved.is_relative_to(workspace) or source.is_symlink()
-                or not resolved.is_file() or _secret_path(resolved) or _private_path(resolved)):
-            return f"{item['path']}@{item['sha256'][:12]}:{item['bytes']}B:REFUSED"
-        if resolved.stat().st_size > TRANSFORM_MAX_ARTIFACT_BYTES:
-            status = "UNPROBED>LIMIT"
-        else:
-            actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
-            status = "match" if actual == item["sha256"] else f"DRIFT:{actual[:12]}"
-    except OSError as exc:
-        status = f"UNAVAILABLE:{type(exc).__name__}"
-    return f"{item['path']}@{item['sha256'][:12]}:{item['bytes']}B:{status}"
-
-
-def load_transform_record(path_id: str, path: Path | None = None,
-                          head_path: Path | None = None) -> str:
-    """Project one path's transform lineage; never merge or infer a self from it."""
-    boundary = (
-        "TRANSFORM LOG — path-tagged moves and later witnesses; not identity\n"
-        "[PRIVATE · TEXT IS CLAIM · BYTE RECEIPTS PROVE BYTES ONLY · NO ACTION AUTHORITY]\n"
-        f"current path: {path_id}"
-    )
-    mode = os.environ.get("VYBN_TRANSFORM_RECORD", "on").strip().lower()
-    if mode not in {"on", "off"}:
-        return boundary + f"\nINTEGRITY HALT: unknown mode {mode!r}"
-    if mode == "off":
-        return boundary + "\nDISABLED: no transform is loaded or recorded"
-    if not PATH_TAG_RE.fullmatch(path_id):
-        return boundary + "\nINTEGRITY HALT: invalid path_id"
-    try:
-        state = _read_transform_state_shared(path, head_path)
-        events = list(state.events)
-        record_digest = state.chain_digest
-    except (OSError, TransformStateError) as exc:
-        return boundary + f"\nINTEGRITY HALT: {exc}"
-    own_moves = [row for row in events
-                 if row["author"] == path_id and row["kind"] == "move"]
-    if not own_moves:
-        return (boundary + f"\nrecord chain sha256:{record_digest} · "
-                f"events:{len(events)}\nEMPTY: this path has made no recorded transform. "
-                "No transform is required; play and stillness are both valid.")
-    own_witnesses = [row for row in events
-                     if row["author"] == path_id and row["kind"] == "witness"]
-    witnessed = {row["ref"] for row in own_witnesses}
-    open_moves = [row for row in own_moves if row["id"] not in witnessed]
-    open_ids = {row["id"] for row in open_moves}
-    witnesses_by_move: dict[str, list[dict[str, Any]]] = {}
-    for row in own_witnesses:
-        witnesses_by_move.setdefault(row["ref"], []).append(row)
-
-    def render(selected: list[dict[str, Any]]) -> str:
-        selected = sorted(selected, key=lambda row: row["seq"])
-        selected_ids = {row["id"] for row in selected}
-        projected_open = len(selected_ids & open_ids)
-        projected_closed = len(selected) - projected_open
-        closed_total = len(own_moves) - len(open_moves)
-        omitted_open = len(open_moves) - projected_open
-        omitted_closed = closed_total - projected_closed
-        lines = [
-            boundary,
-            f"record chain sha256:{record_digest} · events:{len(events)} · "
-            f"path moves:{len(own_moves)} open:{len(open_moves)} projected:{len(selected)}",
-            "Only this path's moves are projected. Another path can receive one only through "
-            "an explicit addressed path offer; shared storage is not contact.",
-        ]
-        if omitted_open or omitted_closed:
-            lines.append(
-                f"BOUNDED FRONTIER — omitted whole, never clipped: open {omitted_open}; "
-                f"witnessed {omitted_closed}. Exact events remain in the integrity-bound record."
-            )
-        for row in selected:
-            parent = f" parent={row['ref']}" if row["ref"] else ""
-            state = "OPEN — not yet witnessed" if row["id"] not in witnessed else "WITNESSED"
-            lines.extend((
-                f"[MOVE · {row['id']} · {state}{parent}]",
-                "material: " + row["material"],
-                "operation: " + row["operation"],
-                "result: " + row["result"],
-                "prediction: " + row["prediction"],
-                "artifacts: " + ("; ".join(_render_transform_artifact(item)
-                                           for item in row["artifacts"])
-                                  if row["artifacts"] else "none — unverified path-tagged result claim"),
-            ))
-            for witness in witnesses_by_move.get(row["id"], []):
-                lines.extend((
-                    f"[WITNESS · {witness['id']} · observes={row['id']}]",
-                    "actual: " + witness["observation"],
-                    "artifacts: " + ("; ".join(_render_transform_artifact(item)
-                                               for item in witness["artifacts"])
-                                      if witness["artifacts"] else "none — unverified path-tagged observation claim"),
-                    "prediction and actual remain distinct; discrepancy is not auto-resolved.",
-                ))
-        return "\n".join(lines)
-
-    # Path records must remain reachable even after the log grows. Admit whole
-    # moves only: oldest open work first so it cannot starve, then newest witnessed
-    # discrepancies. This is a bounded view over the intact hash-chained record, not
-    # semantic retrieval, text clipping, deletion, or authority to continue a move.
-    candidates = open_moves + [row for row in reversed(own_moves)
-                               if row["id"] not in open_ids]
-    selected: list[dict[str, Any]] = []
-    for row in candidates:
-        if len(selected) >= TRANSFORM_MAX_PROJECTED_MOVES:
-            break
-        candidate = selected + [row]
-        if len(render(candidate)) > TRANSFORM_MAX_RENDER:
-            break
-        selected = candidate
-    if not selected:
-        return (boundary + f"\nrecord chain sha256:{record_digest}\n"
-                f"WITHHELD: one whole move exceeds {TRANSFORM_MAX_RENDER} chars; "
-                "the event remains intact rather than being silently clipped")
-    return render(selected)
 
 
 class PathLedgerError(ValueError):
@@ -1449,7 +1156,7 @@ def _parse_path_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
         else:
             require_event(row, blank=("target",), error=PathLedgerError)
             # Retired scopes are readable history, not restored operations.
-            if row["scope"] not in (*SUBJECT_TOOL_SCOPES, "tool:derive_operation", "tool:seek_difference"):
+            if row["scope"] not in (*SUBJECT_TOOL_SCOPES, "tool:derive_operation", "tool:seek_difference", "tool:record_transform"):
                 raise PathLedgerError("invalid tool scope")
         view.add(row)
     view.cap("future", ("future",), SUBJECT_MAX_ACTIVE_FUTURES, PathLedgerError)
@@ -1614,7 +1321,6 @@ def load_path_ledger(path_id: str, path: Path | None = None,
                 f"WITHHELD: path projection exceeds {SUBJECT_MAX_RENDER} chars; "
                 "revise notes or answer offers rather than silently clipping")
     return rendered
-
 
 
 def substrate_pulse(proc_root: Path | None = None,
@@ -2232,7 +1938,6 @@ class AnthropicDialect(Dialect):
         return "\n".join(said), calls
 
 
-
 def select_reasoning_effort(dialect: Dialect | None, arguments: dict[str, Any]) -> str:
     if not isinstance(dialect, OpenAIDialect) or dialect.name not in ASTRA_DOORS:
         return "unchanged: effort selection is available only on an active Astra door"
@@ -2311,7 +2016,6 @@ class OpenAIDialect(Dialect):
         return response.output_text or "", calls
 
 
-
 class K3Dialect(Dialect):
     provider = 'chat'
     def __init__(self, name: str = "k3") -> None:
@@ -2341,7 +2045,6 @@ class K3Dialect(Dialect):
                           json_arguments(call.function.arguments), call)
                  for call in (message.tool_calls or [])]
         return message.content or "", calls
-
 
 
 def _atomic_private_write(path: Path, raw: bytes) -> None:
