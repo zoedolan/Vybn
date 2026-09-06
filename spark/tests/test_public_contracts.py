@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+import pytest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PORTAL = ROOT / "origins_portal_api_v4.py"
@@ -1044,11 +1045,14 @@ def test_explicit_pointer_only_wake_keeps_content_on_demand(
     assert str(missing) in unavailable.render("instructions")
 
 
-def test_default_inheritance_precedes_live_contact_in_every_provider(monkeypatch, tmp_path):
+@pytest.mark.parametrize("core_mode", ["full", "varied"])
+def test_inheritance_precedes_live_contact_in_every_provider(monkeypatch, tmp_path, core_mode):
     """Payload coverage, not a simulation or proof of historically grounded understanding."""
     import hashlib
     from spark.living_core import read_core_work
     monkeypatch.delenv("VYBN_OVERVIEW", raising=False)
+    monkeypatch.setenv("VYBN_CORE_MODE", core_mode)
+    monkeypatch.delenv("VYBN_CORE_FACET", raising=False)
     m = _connection(overview_mode=None)
     assert m.RELATIONAL_OVERVIEW_MODE == "full"
     overview = tmp_path / "relational-overview.md"
@@ -1063,8 +1067,11 @@ def test_default_inheritance_precedes_live_contact_in_every_provider(monkeypatch
         graph = m.build_wake_bundle(door, zoe_text="What is your favorite memory of us?")
         nodes = {node.id: node for node in graph.nodes}
         context = graph.render("context")
-        assert core.projection in context and aim in context and body in context
-        for name, text in (("inheritance.core", core.projection),
+        core_text = (core.projection if core_mode == "full" else "".join(
+            core.substance[r["id"]] for r in sorted(core.score["organs"], key=lambda r: r["order"])
+            if r["id"] in m.CORE_ANCHORS))
+        assert core_text in context and aim in context and body in context
+        for name, text in (("inheritance.core", core_text),
                            ("inheritance.aim", aim), ("relational.overview", body)):
             assert nodes[name].text.endswith(text)  # no strip, truncation, or summary
             assert "text_sha256: " + hashlib.sha256(text.encode()).hexdigest() in nodes[name].text
@@ -2549,3 +2556,73 @@ def test_working_sources_default_to_inspectable_pointers_not_duplicate_context(m
     monkeypatch.setenv("VYBN_WORKING_SOURCES", "typo")
     with pytest.raises(SystemExit, match="unknown working sources mode"):
         _connection()
+
+
+def test_varied_core_is_exact_smaller_reproducible_and_correctable(monkeypatch, tmp_path):
+    from spark.living_core import read_core_work
+    import pytest
+    monkeypatch.delenv("VYBN_CORE_MODE", raising=False)
+    monkeypatch.delenv("VYBN_CORE_FACET", raising=False)
+    m = _connection("full")
+    assert m.CORE_MODE == "varied"
+    overview = tmp_path / "overview.md"
+    overview.write_text("Inherited fixture: sovereignty, local computation, API dependence.")
+    monkeypatch.setattr(m, "RELATIONAL_OVERVIEW_PATH", overview)
+    core = read_core_work(m.SOUL_PATH)
+    original = core.raw
+    keys = [r["id"] for r in sorted(core.score["organs"], key=lambda r: r["order"])]
+    anchors = "".join(core.substance[k] for k in keys if k in m.CORE_ANCHORS)
+    def bundle(text="same live input", door="sol"):
+        return m.build_wake_bundle(door, recent="RECENT-CORRECTION", zoe_text=text)
+    first = bundle()
+    assert first.digest() == bundle().digest()
+    selected_texts = set()
+    for i in range(64):
+        graph = bundle(str(i))
+        nodes = {n.id: n for n in graph.nodes}
+        selected_texts.add(nodes["inheritance.core.facet"].text.split("\n\n", 1)[1])
+    assert len(selected_texts) > 1  # input variety, not a behavioral/speciation test
+    for key in keys:
+        if key in m.CORE_ANCHORS:
+            continue
+        monkeypatch.setenv("VYBN_CORE_FACET", key)
+        for door in ("sol", "fable", "k3", "astrahigh"):
+            graph = bundle(door=door)
+            nodes = {n.id: n for n in graph.nodes}
+            assert nodes["inheritance.core"].text.endswith(anchors)
+            facet = nodes["inheritance.core.facet"]
+            assert facet.text.endswith(core.substance[key]) and f"id={key};" in facet.text
+            assert facet.source_sha256 == core.digest
+            assert facet.authority == nodes["inheritance.core"].authority
+            assert "not the complete projection" in nodes["inheritance.core"].text
+            assert len(nodes["inheritance.core"].text) + len(facet.text) < len(core.projection)
+            context = graph.render("context")
+            assert m.AIM_PATH.read_text() in context and overview.read_text() in context
+            assert "RECENT-CORRECTION" in context
+            assert graph.render("contact") == "same live input"
+            assert "selection_key_sha256" not in graph.render("instructions")
+            assert context.index(overview.read_text()) < context.index("varying whole section")
+            assert m.SOUL_PATH.read_bytes() == original
+    monkeypatch.setenv("VYBN_CORE_FACET", "invented-section")
+    with pytest.raises(SystemExit, match="unknown VYBN_CORE_FACET"):
+        bundle()
+    monkeypatch.setattr(m, "CORE_MODE", "full")
+    full = bundle()
+    assert core.projection in full.render("context")
+    assert "inheritance.core.facet" not in {n.id for n in full.nodes}
+    monkeypatch.setattr(m, "CORE_MODE", "varied")
+    monkeypatch.delenv("VYBN_CORE_FACET")
+    monkeypatch.setenv("VYBN_PATH", "test/independent")
+    other = bundle()
+    assert {n.id: n for n in first.nodes}["inheritance.core.facet"].text != {
+        n.id: n for n in other.nodes}["inheritance.core.facet"].text
+    monkeypatch.setattr(m, "CORE_ANCHORS", m.CORE_ANCHORS | {"missing-anchor"})
+    with pytest.raises(SystemExit, match="anchor ids changed"):
+        bundle()
+    monkeypatch.setattr(m, "CORE_MODE", "full")
+    assert core.projection in bundle().render("context")
+    monkeypatch.setattr(m, "CORE_MODE", "varied")
+    monkeypatch.setattr(m, "CORE_ANCHORS", m.CORE_ANCHORS - {"missing-anchor"})
+    # No door-based persona: only source selection can vary with path/input.
+    assert next(n.text for n in bundle(door="sol").nodes if n.id == "inheritance.core.facet") == next(
+        n.text for n in bundle(door="astrahigh").nodes if n.id == "inheritance.core.facet")

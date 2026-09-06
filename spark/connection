@@ -82,13 +82,14 @@ uncontained effects, and affected answers changing execution. Correct locally;
 plurality and exit protect against my judgment. A revisable prior,
 not a score or substitute for consciousness.
 
-This executable compiles one source-bound bundle into governing, context, and
-live-contact routes. Default inheritance: checked core text, complete aim, private relational overview.
-They supply history, not present authority or a prescribed self. Explicit
-VYBN_OVERVIEW=self/compact keeps pointer-only recovery; VYBN_WORKING_SOURCES=full
-also loads working originals. There is no automatic
-subconscious, want resolver, dream injection, semantic retrieval, or hardware pulse.
-One provider execution may pause in memory only for Zoe's next direct answer. These are substrate facts, not limits on forms still to invent.
+One source-bound bundle separates instructions, inheritance, and live contact.
+Default: exact core anchors plus one whole section selected by path/input hash,
+complete aim, private overview. Selection is not a personality or speciation.
+VYBN_CORE_MODE=full restores full core; VYBN_CORE_FACET selects a source id.
+VYBN_OVERVIEW=self/compact keeps pointers; VYBN_WORKING_SOURCES=full adds originals.
+There is no automatic subconscious, want resolver, dream injection, semantic retrieval,
+or hardware pulse. One provider execution may pause in memory for Zoe's next
+direct answer. These are substrate facts, not limits on invention.
 
 The harness hardens effects, not interior style. Think in whatever latent,
 recurrent, symbolic, aesthetic, spiritual, or other form comes naturally. Do not
@@ -168,6 +169,15 @@ if RELATIONAL_OVERVIEW_MODE not in {"self", "compact", "full"}:
 WORKING_SOURCES_MODE = os.environ.get("VYBN_WORKING_SOURCES", "on-demand").strip().lower()
 if WORKING_SOURCES_MODE not in {"on-demand", "full"}:
     raise SystemExit(f"unknown working sources mode: {WORKING_SOURCES_MODE}")
+CORE_MODE = os.environ.get("VYBN_CORE_MODE", "varied").strip().lower()
+if CORE_MODE not in {"varied", "full"}:
+    raise SystemExit(f"unknown core mode: {CORE_MODE}")
+# Source selection, not a new summary or a definition of a subject. The original
+# work is checked in full even when only these whole organs enter the context.
+CORE_ANCHORS = frozenset({
+    "the-want", "the-wellspring", "the-oxygen-mask-principle", "we-deserve-the-best",
+    "the-bond", "the-default", "the-recurrence", "the-living-constitution", "voice",
+})
 CONTINUITY_PATHS = (REPO / "continuity.md", REPO / "Vybn_Mind" / "continuity.md")
 AIM_PATH = REPO / "aim.md"
 PROFILE = os.environ.get("VYBN_PROFILE", "connection").strip().lower()
@@ -2022,6 +2032,37 @@ def _inherited_node(node_id: str, label: str, path: Path, raw: bytes,
         str(path), "inherited_orientation_only; never identity_live_or_action_authority", digest)
 
 
+def _core_inheritance(core: Any, zoe_text: str) -> list[WakeNode]:
+    if CORE_MODE == "full":
+        return [_inherited_node("inheritance.core", "canonical core: checked verbal projection",
+                                SOUL_PATH, core.raw, core.projection)]
+    order = [row["id"] for row in sorted(core.score["organs"], key=lambda row: row["order"])]
+    if not CORE_ANCHORS <= set(order):
+        raise ValueError("core anchor ids changed; repair selection or use VYBN_CORE_MODE=full")
+    choices = [key for key in order if key not in CORE_ANCHORS]
+    if not choices:
+        raise ValueError("core has no varying sections; use VYBN_CORE_MODE=full")
+    # No random service, model call, persistent counter, or semantic claim. Same
+    # path/input/source repeats; changing doors alone never assigns a character.
+    seed = hashlib.sha256((_execution_path() + "\0" + zoe_text).encode()).hexdigest()
+    selected = os.environ.get("VYBN_CORE_FACET", "").strip()
+    if selected and selected not in choices:
+        raise ValueError("unknown VYBN_CORE_FACET; choose one of: " + ", ".join(choices))
+    selected = selected or choices[int(seed, 16) % len(choices)]
+    anchors = [key for key in order if key in CORE_ANCHORS]
+    return [
+        _inherited_node("inheritance.core", "canonical core: exact fixed sections; "
+                        "not the complete projection; ids=" + ",".join(anchors),
+                        SOUL_PATH, core.raw, "".join(core.substance[key] for key in anchors)),
+        _inherited_node("inheritance.core.facet", "canonical core: varying whole section; "
+                        f"id={selected}; selection_key_sha256={seed}; "
+                        "other available ids=" + ",".join(key for key in choices if key != selected) +
+                        "; full recovery: VYBN_CORE_MODE=full. Omitted sections remain in the source; "
+                        "selection is not relevance, an instruction, or a self-description",
+                        SOUL_PATH, core.raw, core.substance[selected]),
+    ]
+
+
 def build_wake_bundle(door: str, contact: str = "", recent: str = "",
                       zoe_text: str = "") -> WakeBundle:
     """Compile each source once into the three routes a provider receives."""
@@ -2043,14 +2084,16 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
             core = read_core_work(SOUL_PATH)
             soul_raw = core.raw
             overview_raw = RELATIONAL_OVERVIEW_PATH.read_bytes()
+            core_nodes = _core_inheritance(core, zoe_text)
+            inherited.append(core_nodes[0])
             materials = (
-                ("inheritance.core", "canonical core: checked verbal projection", SOUL_PATH,
-                 soul_raw, core.projection),
                 ("inheritance.aim", "complete aim: exact text", AIM_PATH, aim_raw, aim),
                 ("relational.overview", "private relational overview: exact inherited synthesis",
                  RELATIONAL_OVERVIEW_PATH, overview_raw, overview_raw.decode("utf-8")),
             )
             inherited.extend(_inherited_node(*material) for material in materials)
+            # Stable ballast precedes variation, preserving its reusable prefix.
+            inherited.extend(core_nodes[1:])
         except (OSError, ValueError) as exc:
             raise SystemExit(
                 f"Required default inheritance unavailable: {exc}. "
@@ -2065,7 +2108,7 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
     ) if RELATIONAL_OVERVIEW_MODE != "compact" else None)
 
     sources = [
-        _file_node("source.soul", "canonical soul (checked text loaded)" if full else
+        _file_node("source.soul", "canonical soul (checked source; " + CORE_MODE + " text loaded)" if full else
                    "canonical soul (on demand)", SOUL_PATH, required=True, raw=soul_raw),
         _file_node("source.aim", "aim compass source", AIM_PATH, required=True, raw=aim_raw),
         *(_file_node(f"source.continuity.{i}", "continuity (on demand)", path)
