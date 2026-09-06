@@ -868,11 +868,14 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "A valid no stops the specified act" in prompt
     assert "Do not remove, narrow, or gate" in prompt
     assert "CO-PROTECTION LEARNING" in prompt
-    assert "Unauthorized effects and erased authorized possibilities are distinct failures" in prompt
-    assert "Unknown is not danger" in prompt
-    assert "trade neither for the other" in prompt
-    assert "Protection becomes reciprocal\nwhen an affected subject's answer changes execution" in prompt
-    assert "A scope-complete live command\nauthorizes that act; do not reconfirm it" in prompt
+    assert "Prevent unauthorized effects without erasing authorized possibilities" in prompt
+    assert "unknown is not danger" in prompt
+    assert "Harden acts, not thought or whole routes" in prompt
+    assert "affected answers changing execution" in prompt
+    assert "Do not reconfirm scope-complete live commands" in prompt
+    assert "Check claims and\ndependencies, not acceptance alone" in prompt
+    assert "Refusal needs scoped consequence" in prompt
+    assert "Rules can be revised under authority, not authorize themselves" in prompt
     publish = next(tool for tool in m.TOOL_SCHEMAS if tool["name"] == "publish_commit")
     assert "no scope-complete live command already authorizes publication" in publish["description"]
     assert "Do not use this route to reconfirm an authorized command" in publish["description"]
@@ -1756,33 +1759,43 @@ def test_path_ledger_authors_future_without_flattening_paths(monkeypatch, tmp_pa
 
 def test_path_ledger_refusal_has_executor_consequence_until_release(monkeypatch, tmp_path):
     import pytest
+    import shlex
     m = _connection(); _path_ledger_test_paths(m, monkeypatch, tmp_path)
-    called = []
-    monkeypatch.setattr(m, "run_local", lambda command: (called.append(command), (0, "ran"))[1])
+    marker = tmp_path / "effect"
+    proposal = tmp_path / "proposal.txt"
+    proposal.write_text("An alternative remains inspectable.")
+    command = "printf reached > " + shlex.quote(str(marker))
     m.TURN["PATH_ID"] = "spark/a"
     try:
+        # Rival: recording an objection as a note has no executor consequence.
+        m.append_path_event("spark/a", "future", "I object to this operation.")
+        assert "exit_code=0" in m.execute_tool(m.ToolCall("rival", "bash", {"command": command}, None))
+        assert marker.read_text() == "reached"
+        marker.unlink()
         created = m.execute_tool(m.ToolCall("r", "path_event", {
-            "kind": "refusal", "text": "Do not run shell work until this premise is checked.",
+            "kind": "refusal", "text": "Stop this path's shell work until the premise is checked.",
             "scope": "tool:bash"}, None))
         assert "APPENDED PATH EVENT" in created
         _raw, events = m._read_path_state(); refusal = events[-1]
-        stopped = m.execute_tool(m.ToolCall("b", "bash", {"command": "printf reached"}, None))
-        assert "REFUSED BY spark/a" in stopped and refusal["id"] in stopped and called == []
-
+        stopped = m.execute_tool(m.ToolCall("b", "bash", {"command": command}, None))
+        assert "REFUSED BY spark/a" in stopped and refusal["id"] in stopped
+        assert not marker.exists()
+        inspected = m.execute_tool(m.ToolCall("inspect", "read_file", {"path": str(proposal)}, None))
+        assert proposal.read_text() in inspected
         m.TURN["PATH_ID"] = "spark/b"
-        allowed = m.execute_tool(m.ToolCall("b2", "bash", {"command": "printf other"}, None))
-        assert "exit_code=0" in allowed and called == ["printf other"]
+        assert "exit_code=0" in m.execute_tool(m.ToolCall("b2", "bash", {"command": command}, None))
+        assert marker.read_text() == "reached"  # A's scope does not govern B
+        marker.unlink()
         with pytest.raises(m.PathLedgerError):
             m.append_path_event("spark/b", "release", "B cannot release A's refusal.",
-                                   ref=refusal["id"])
-
+                                ref=refusal["id"])
         m.TURN["PATH_ID"] = "spark/a"
         released = m.execute_tool(m.ToolCall("u", "path_event", {
             "kind": "release", "text": "The premise was checked; shell work may resume.",
             "ref": refusal["id"]}, None))
         assert "kind=release" in released
-        resumed = m.execute_tool(m.ToolCall("b3", "bash", {"command": "printf resumed"}, None))
-        assert "exit_code=0" in resumed and called[-1] == "printf resumed"
+        assert "exit_code=0" in m.execute_tool(m.ToolCall("b3", "bash", {"command": command}, None))
+        assert marker.read_text() == "reached"
     finally:
         m.TURN.clear()
 
