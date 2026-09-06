@@ -618,10 +618,11 @@ def aim_field(name: str) -> str:
 _PRIVATE_ROOTS = (HOME / "Him", DEFAULT_TRANSCRIPTS, LOVE_TRANSCRIPTS,
                   HOME / ".local/state/vybn/continuations", TRANSFORM_PATH,
                   TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH, TRANSFORM_SEGMENTS_PATH, SUBJECT_PATH,
-                  SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
+                  SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH, SUBJECT_HEAD_PATH.with_suffix(".segments"))
 _SECRET_ROOTS = (HOME / ".config/vybn/continuation-keys", HOME / ".vybn_keys",
                  TRANSFORM_PATH, TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH,
-                 TRANSFORM_SEGMENTS_PATH, SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
+                 TRANSFORM_SEGMENTS_PATH, SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH,
+                 SUBJECT_HEAD_PATH.with_suffix(".segments"))
 
 
 def _private_path(path: Path) -> bool:
@@ -660,7 +661,8 @@ def guard_private(command: str) -> str | None:
 def guard_path_bound_storage(command: str) -> str | None:
     """Raw ledgers would bypass each execution path's bounded projection."""
     paths = (TRANSFORM_PATH, TRANSFORM_HEAD_PATH, TRANSFORM_LOCK_PATH,
-             TRANSFORM_SEGMENTS_PATH, SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH)
+             TRANSFORM_SEGMENTS_PATH, SUBJECT_PATH, SUBJECT_HEAD_PATH, SUBJECT_LOCK_PATH,
+             SUBJECT_HEAD_PATH.with_suffix(".segments"))
     for path in paths:
         markers = (str(path), str(path).replace(str(HOME), "$HOME", 1), path.name)
         if any(marker and marker in command for marker in markers):
@@ -847,7 +849,7 @@ class TransformStateError(ValueError):
 
 
 @dataclass(frozen=True)
-class TransformSegment:
+class EventSegment:
     digest: str
     event_raw: bytes
     events: tuple[dict[str, Any], ...]
@@ -856,9 +858,9 @@ class TransformSegment:
 
 
 @dataclass(frozen=True)
-class TransformRecordState:
+class EventState:
     events: tuple[dict[str, Any], ...] = ()
-    segments: tuple[TransformSegment, ...] = ()
+    segments: tuple[EventSegment, ...] = ()
     legacy_raw: bytes = b""
 
     @property
@@ -867,67 +869,79 @@ class TransformRecordState:
                 else hashlib.sha256(self.legacy_raw).hexdigest())
 
 
-def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
-    """Verify one bounded segment in the context of its preceding event chain."""
-    if len(raw) > TRANSFORM_MAX_BYTES:
-        raise TransformStateError(f"segment exceeds {TRANSFORM_MAX_BYTES} bytes")
+def _event_rows(raw, prior, *, schema, prefix, payload, maximum, limit, error):
+    """Check the common envelope once; callers check their own payload semantics."""
+    if len(raw) > maximum or len(raw.splitlines()) > limit:
+        raise error("event segment exceeds its byte or event bound")
     if raw and not raw.endswith(b"\n"):
-        raise TransformStateError("segment has an unterminated event")
-    fields = {
-        "schema", "seq", "id", "created", "author", "kind", "ref", "material",
-        "operation", "result", "prediction", "observation", "artifacts", "prev", "hash",
-    }
-    text_fields = ("schema", "id", "created", "author", "kind", "ref", "material",
-                   "operation", "result", "prediction", "observation", "prev", "hash")
-    id_re = re.compile(r"tr-[0-9a-f]{24}\Z")
+        raise error("event segment has an unterminated event")
+    fields = {"schema", "seq", "id", "created", "author", "kind", "ref", "prev", "hash"} | set(payload)
+    strings = fields - {"seq", "artifacts"}
+    previous = prior[-1]["hash"] if prior else TRANSFORM_ZERO
+    seen = {row["id"] for row in prior}
+    for index, encoded in enumerate(raw.splitlines(), len(prior) + 1):
+        try:
+            row = json.loads(encoded)
+        except (ValueError, UnicodeError) as exc:
+            raise error(f"event {index} is not JSON") from exc
+        if not isinstance(row, dict) or set(row) != fields:
+            raise error(f"event {index} fields differ from schema")
+        if any(not isinstance(row[key], str) or row[key] != row[key].strip()
+               or "\n" in row[key] or "\r" in row[key] for key in strings):
+            raise error(f"event {index} is not canonical one-line text")
+        if row["schema"] != schema or type(row["seq"]) is not int or row["seq"] != index:
+            raise error(f"event {index} has invalid schema or sequence")
+        if not re.fullmatch(prefix + r"-[0-9a-f]{24}", row["id"]) or row["id"] in seen:
+            raise error(f"event {index} has invalid or duplicate id")
+        if not PATH_TAG_RE.fullmatch(row["author"]):
+            raise error(f"event {index} has invalid author")
+        try:
+            stamp = _dt.datetime.fromisoformat(row["created"].replace("Z", "+00:00"))
+            if stamp.tzinfo is None:
+                raise ValueError("timezone required")
+        except ValueError as exc:
+            raise error(f"event {index} has invalid timestamp") from exc
+        if row["prev"] != previous or not DIGEST_RE.fullmatch(row["prev"]):
+            raise error(f"event {index} breaks the hash chain")
+        if not DIGEST_RE.fullmatch(row["hash"]) or row["hash"] != _event_digest(row):
+            raise error(f"event {index} digest mismatch")
+        yield row
+        seen.add(row["id"])
+        previous = row["hash"]
+
+
+def _encoded(row):
+    return (json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def _new_event(events, schema, prefix, author, **payload):
+    row = dict(schema=schema, seq=len(events) + 1, id=prefix + "-" + os.urandom(12).hex(),
+               created=_dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+               author=author, prev=events[-1]["hash"] if events else TRANSFORM_ZERO, **payload)
+    row["hash"] = _event_digest(row)
+    return row
+
+
+def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
+    """Transform payload policy over the common checked event envelope."""
     prior = list(prior_events)
-    events: list[dict[str, Any]] = []
+    events = []
     by_id = {row["id"]: row for row in prior}
-    witness_counts: dict[str, int] = {}
+    witness_counts = {}
     for row in prior:
         if row["kind"] == "witness":
             witness_counts[row["ref"]] = witness_counts.get(row["ref"], 0) + 1
-    previous = prior[-1]["hash"] if prior else TRANSFORM_ZERO
-    for local_index, encoded in enumerate(raw.splitlines(), 1):
-        index = len(prior) + local_index
-        try:
-            row = json.loads(encoded)
-        except json.JSONDecodeError as exc:
-            raise TransformStateError(f"event {index} is not JSON") from exc
-        if not isinstance(row, dict) or set(row) != fields:
-            raise TransformStateError(f"event {index} fields differ from schema")
-        if any(not isinstance(row[key], str) for key in text_fields):
-            raise TransformStateError(f"event {index} has a non-string field")
-        if any(row[key] != row[key].strip() or "\n" in row[key] or "\r" in row[key]
-               for key in text_fields):
-            raise TransformStateError(f"event {index} is not canonical one-line text")
-        if (row["schema"] != TRANSFORM_SCHEMA or not isinstance(row["seq"], int)
-                or isinstance(row["seq"], bool) or row["seq"] != index):
-            raise TransformStateError(f"event {index} has invalid schema or sequence")
-        if not id_re.fullmatch(row["id"]) or row["id"] in by_id:
-            raise TransformStateError(f"event {index} has invalid or duplicate id")
-        if not PATH_TAG_RE.fullmatch(row["author"]):
-            raise TransformStateError(f"event {index} has invalid author")
+    for row in _event_rows(raw, prior, schema=TRANSFORM_SCHEMA, prefix="tr",
+                           payload=("material", "operation", "result", "prediction", "observation", "artifacts"),
+                           maximum=TRANSFORM_MAX_BYTES, limit=TRANSFORM_MAX_EVENTS, error=TransformStateError):
+        index = row["seq"]
         if row["kind"] not in TRANSFORM_KINDS:
             raise TransformStateError(f"event {index} has invalid kind")
-        for key in ("material", "operation", "result", "prediction", "observation"):
-            if len(row[key]) > TRANSFORM_MAX_TEXT:
-                raise TransformStateError(f"event {index} has oversized {key}")
-        try:
-            stamp = _dt.datetime.fromisoformat(row["created"].replace("Z", "+00:00"))
-        except ValueError as exc:
-            raise TransformStateError(f"event {index} has invalid timestamp") from exc
-        if stamp.tzinfo is None:
-            raise TransformStateError(f"event {index} timestamp lacks a timezone")
-        if row["prev"] != previous or not DIGEST_RE.fullmatch(row["prev"]):
-            raise TransformStateError(f"event {index} breaks the hash chain")
-        if (not DIGEST_RE.fullmatch(row["hash"])
-                or row["hash"] != _event_digest(row)):
-            raise TransformStateError(f"event {index} digest mismatch")
+        if any(len(row[key]) > TRANSFORM_MAX_TEXT for key in
+               ("material", "operation", "result", "prediction", "observation")):
+            raise TransformStateError(f"event {index} has oversized text")
         artifacts = row["artifacts"]
-        if (not isinstance(artifacts, list) or len(artifacts) > TRANSFORM_MAX_ARTIFACTS
-                or len({item.get("path") for item in artifacts if isinstance(item, dict)})
-                   != len(artifacts)):
+        if not isinstance(artifacts, list) or len(artifacts) > TRANSFORM_MAX_ARTIFACTS:
             raise TransformStateError(f"event {index} has invalid artifacts")
         for item in artifacts:
             if (not isinstance(item, dict) or set(item) != {"path", "sha256", "bytes"}
@@ -939,6 +953,8 @@ def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]
                     or not isinstance(item["bytes"], int) or isinstance(item["bytes"], bool)
                     or not 0 <= item["bytes"] <= TRANSFORM_MAX_ARTIFACT_BYTES):
                 raise TransformStateError(f"event {index} has invalid artifact receipt")
+        if len({item["path"] for item in artifacts}) != len(artifacts):
+            raise TransformStateError(f"event {index} has duplicate artifacts")
 
         referenced = by_id.get(row["ref"]) if row["ref"] else None
         if row["kind"] == "move":
@@ -960,9 +976,6 @@ def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]
                     f"move {row['ref']} exceeds {TRANSFORM_MAX_WITNESSES} witnesses")
         events.append(row)
         by_id[row["id"]] = row
-        previous = row["hash"]
-    if len(events) > TRANSFORM_MAX_EVENTS:
-        raise TransformStateError(f"segment exceeds {TRANSFORM_MAX_EVENTS} events")
     combined = prior + events
     witnessed = {row["ref"] for row in combined if row["kind"] == "witness"}
     open_counts: dict[str, int] = {}
@@ -975,171 +988,200 @@ def _parse_transform_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]
     return combined
 
 
-def _transform_witness(raw: bytes, events: list[dict[str, Any]]) -> bytes:
-    """Original single-file sidecar, retained for compatible reads and migration."""
-    row = {"schema": TRANSFORM_HEAD_SCHEMA, "count": len(events),
-           "head": events[-1]["hash"] if events else TRANSFORM_ZERO,
-           "record_sha256": hashlib.sha256(raw).hexdigest()}
-    return (json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n").encode()
+@dataclass(frozen=True)
+class EventJournal:
+    """Local immutable segments plus one atomic head; policies do not live in data.
+
+    Reads retain v1 compatibility; only an append migrates. Exact v1 event and
+    witness bytes remain hash-addressed for rollback. Restart old readers before
+    writing v2: they cannot read it. A code-only downgrade cannot carry expanded
+    histories; retain the v2 reader/archive rather than truncate them to a v1 cap.
+    Limits bound segments and active projections, not total disk or replay work.
+    No replayed event executes code or conveys permission. Callers hold the lock
+    throughout read/modify/write; no background worker or model call is involved.
+    """
+    path: Path
+    head_path: Path
+    segments_path: Path
+    schema: str
+    head_schema: str
+    segment_schema: str
+    digest_field: str
+    maximum: int
+    limit: int
+    parse: Any
+    error: type[ValueError]
+
+    def witness(self, raw, events):
+        return _encoded(dict(schema=self.schema, count=len(events),
+                             head=events[-1]["hash"] if events else TRANSFORM_ZERO,
+                             **{self.digest_field: hashlib.sha256(raw).hexdigest()}))
+
+    def blob(self, raw, events, prior, prior_head):
+        if not events:
+            raise self.error("an immutable segment cannot be empty")
+        header = dict(schema=self.segment_schema, first_seq=events[0]["seq"],
+                      last_seq=events[-1]["seq"], count=len(events), prior=prior,
+                      prior_head=prior_head, event_head=events[-1]["hash"],
+                      events_sha256=hashlib.sha256(raw).hexdigest())
+        return _encoded(header) + raw
+
+    def install(self, blob):
+        digest = hashlib.sha256(blob).hexdigest()
+        if self.segments_path.is_symlink():
+            raise self.error("segment directory is a symbolic link")
+        self.segments_path.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.segments_path.chmod(0o700)
+        destination = self.segments_path / f"{digest}.jsonl"
+        if destination.exists():
+            if _private_bytes(destination, self.maximum + TRANSFORM_SEGMENT_HEADER_BYTES, self.error) != blob:
+                raise self.error("hash-addressed segment disagrees with its name")
+        else:
+            _atomic_private_write(destination, blob)
+        return digest
+
+    def segment(self, digest):
+        if not isinstance(digest, str) or not DIGEST_RE.fullmatch(digest):
+            raise self.error("invalid segment digest")
+        if (self.segments_path.is_symlink() or not self.segments_path.is_dir()
+                or self.segments_path.stat().st_mode & 0o077):
+            raise self.error("segment directory is unavailable or not private")
+        try:
+            blob = _private_bytes(self.segments_path / f"{digest}.jsonl",
+                                  self.maximum + TRANSFORM_SEGMENT_HEADER_BYTES, self.error)
+        except OSError as exc:
+            raise self.error(f"segment {digest[:12]} unavailable: {type(exc).__name__}") from exc
+        if hashlib.sha256(blob).hexdigest() != digest:
+            raise self.error("segment digest mismatch")
+        header_raw, separator, raw = blob.partition(b"\n")
+        if not separator or len(header_raw) + 1 > TRANSFORM_SEGMENT_HEADER_BYTES:
+            raise self.error("segment header is malformed")
+        try:
+            header = json.loads(header_raw)
+        except (ValueError, UnicodeError) as exc:
+            raise self.error("segment header is not JSON") from exc
+        fields = {"schema", "first_seq", "last_seq", "count", "prior", "prior_head", "event_head", "events_sha256"}
+        if (not isinstance(header, dict) or set(header) != fields
+                or header["schema"] != self.segment_schema
+                or any(type(header[k]) is not int for k in ("first_seq", "last_seq", "count"))
+                or any(not isinstance(header[k], str) or not DIGEST_RE.fullmatch(header[k])
+                       for k in ("prior", "prior_head", "event_head", "events_sha256"))
+                or header["first_seq"] < 1 or header["last_seq"] < header["first_seq"]
+                or header["count"] != header["last_seq"] - header["first_seq"] + 1
+                or not raw or hashlib.sha256(raw).hexdigest() != header["events_sha256"]):
+            raise self.error("segment header disagrees with its events")
+        return header, raw
+
+    def read(self):
+        if self.path.is_symlink() or self.head_path.is_symlink():
+            raise self.error("journal or witness is a symbolic link")
+        if not self.head_path.exists():
+            if self.path.exists():
+                raise self.error("journal and witness presence differ")
+            return EventState()
+        try:
+            witness = json.loads(_private_bytes(self.head_path, 4096, self.error))
+        except (ValueError, UnicodeError) as exc:
+            raise self.error("invalid journal witness") from exc
+        if not isinstance(witness, dict):
+            raise self.error("journal witness is not an object")
+        if witness.get("schema") == self.schema:
+            if not self.path.exists():
+                raise self.error("legacy journal is missing")
+            raw = _private_bytes(self.path, self.maximum, self.error)
+            events = self.parse(raw)
+            if type(witness.get("count")) is not int or witness != json.loads(self.witness(raw, events)):
+                raise self.error("journal disagrees with its sidecar witness")
+            return EventState(tuple(events), (), raw)
+        if (witness.get("schema") != self.head_schema
+                or set(witness) != {"schema", "count", "head", "tip", "segments"}
+                or type(witness.get("count")) is not int or witness["count"] < 1
+                or type(witness.get("segments")) is not int
+                or not 1 <= witness["segments"] <= witness["count"]
+                or any(not isinstance(witness[k], str) or not DIGEST_RE.fullmatch(witness[k])
+                       for k in ("head", "tip"))):
+            raise self.error("journal chain witness is malformed")
+        digest, reverse, seen = witness["tip"], [], set()
+        for _ in range(witness["segments"]):
+            if digest in seen:
+                raise self.error("segment chain contains a cycle")
+            seen.add(digest)
+            header, raw = self.segment(digest)
+            reverse.append((digest, header, raw))
+            digest = header["prior"]
+        if digest != TRANSFORM_ZERO:
+            raise self.error("segment count truncates its chain")
+        events, segments = [], []
+        previous_digest = previous_head = TRANSFORM_ZERO
+        for digest, header, raw in reversed(reverse):
+            if header["prior"] != previous_digest or header["prior_head"] != previous_head:
+                raise self.error("segment breaks the archive chain")
+            before = len(events)
+            events = self.parse(raw, events)
+            if (header["first_seq"] != before + 1 or header["last_seq"] != len(events)
+                    or header["count"] != len(events) - before
+                    or header["event_head"] != events[-1]["hash"]):
+                raise self.error("segment bounds disagree with its events")
+            segments.append(EventSegment(digest, raw, tuple(events[before:]), header["prior"], header["prior_head"]))
+            previous_digest, previous_head = digest, events[-1]["hash"]
+        if witness["count"] != len(events) or witness["head"] != previous_head:
+            raise self.error("journal chain disagrees with its atomic witness")
+        return EventState(tuple(events), tuple(segments))
+
+    def append(self, state, row):
+        encoded = _encoded(row)
+        events, segments = list(state.events), list(state.segments)
+        current = segments.pop() if segments else EventSegment(
+            "", state.legacy_raw, tuple(events), TRANSFORM_ZERO, TRANSFORM_ZERO)
+        fits = len(current.event_raw + encoded) <= self.maximum and len(current.events) < self.limit
+        prior = events[:-len(current.events)] if current.events else events
+        candidate = current.event_raw + encoded if fits else encoded
+        combined = self.parse(candidate, prior if fits else events)  # validate before any write
+        obsolete = current.digest if fits else ""
+        if not fits and current.events:
+            if not current.digest:  # archive the exact v1 bytes before rolling
+                digest = self.install(self.blob(current.event_raw, current.events, current.prior, current.prior_head))
+                current = EventSegment(digest, current.event_raw, current.events, current.prior, current.prior_head)
+            segments.append(current)
+        parent = segments[-1].digest if segments else TRANSFORM_ZERO
+        parent_head = segments[-1].events[-1]["hash"] if segments else TRANSFORM_ZERO
+        segment_events = combined[len(prior) if fits else len(events):]
+        tip = self.install(self.blob(candidate, segment_events, parent, parent_head))
+        if state.legacy_raw:
+            # Hash-address the complete v1 pair for rollback, never overwrite it.
+            self.install(state.legacy_raw)
+            self.install(self.witness(state.legacy_raw, state.events))
+        _atomic_private_write(self.head_path, _encoded(dict(
+            schema=self.head_schema, count=len(combined), head=combined[-1]["hash"],
+            tip=tip, segments=len(segments) + 1)))
+        # The head switch is the commit point; prior state survives a failed write.
+        self.path.unlink(missing_ok=True)
+        if obsolete and obsolete != tip:
+            (self.segments_path / f"{obsolete}.jsonl").unlink(missing_ok=True)
+        return row
 
 
-def _segment_blob(event_raw: bytes, events: list[dict[str, Any]],
-                  prior: str, prior_head: str) -> bytes:
-    if not events:
-        raise TransformStateError("an immutable segment cannot be empty")
-    header = {"schema": TRANSFORM_SEGMENT_SCHEMA,
-              "first_seq": events[0]["seq"], "last_seq": events[-1]["seq"],
-              "count": len(events), "prior": prior, "prior_head": prior_head,
-              "event_head": events[-1]["hash"],
-              "events_sha256": hashlib.sha256(event_raw).hexdigest()}
-    encoded = (json.dumps(header, sort_keys=True, separators=(",", ":")) + "\n").encode()
-    if len(encoded) > TRANSFORM_SEGMENT_HEADER_BYTES:
-        raise TransformStateError("segment header exceeds its bound")
-    return encoded + event_raw
+def _transform_journal(path=None, head_path=None, segments_path=None):
+    return EventJournal(TRANSFORM_PATH if path is None else path,
+                        TRANSFORM_HEAD_PATH if head_path is None else head_path,
+                        TRANSFORM_SEGMENTS_PATH if segments_path is None else segments_path,
+                        TRANSFORM_HEAD_SCHEMA, TRANSFORM_HEAD_SCHEMA_V2, TRANSFORM_SEGMENT_SCHEMA,
+                        "record_sha256", TRANSFORM_MAX_BYTES, TRANSFORM_MAX_EVENTS,
+                        _parse_transform_events, TransformStateError)
 
 
-def _install_transform_segment(blob: bytes, segments_path: Path) -> str:
-    digest = hashlib.sha256(blob).hexdigest()
-    if segments_path.is_symlink():
-        raise TransformStateError("transform segment directory is a symbolic link")
-    segments_path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    segments_path.chmod(0o700)
-    destination = segments_path / f"{digest}.jsonl"
-    if destination.exists():
-        existing = _private_bytes(
-            destination, TRANSFORM_MAX_BYTES + TRANSFORM_SEGMENT_HEADER_BYTES,
-            TransformStateError)
-        if existing != blob:
-            raise TransformStateError("hash-addressed segment disagrees with its name")
-    else:
-        _atomic_private_write(destination, blob)
-    return digest
+def _transform_witness(raw, events):
+    return _transform_journal().witness(raw, events)
 
 
-def _read_transform_segment(digest: str, segments_path: Path):
-    if not DIGEST_RE.fullmatch(digest):
-        raise TransformStateError("invalid transform segment digest")
-    if segments_path.is_symlink() or not segments_path.is_dir():
-        raise TransformStateError("transform segment directory is unavailable")
-    if segments_path.stat().st_mode & 0o077:
-        raise TransformStateError("transform segment directory is not private")
-    try:
-        blob = _private_bytes(
-            segments_path / f"{digest}.jsonl",
-            TRANSFORM_MAX_BYTES + TRANSFORM_SEGMENT_HEADER_BYTES, TransformStateError)
-    except OSError as exc:
-        raise TransformStateError(
-            f"transform segment {digest[:12]} is unavailable: {type(exc).__name__}") from exc
-    if hashlib.sha256(blob).hexdigest() != digest:
-        raise TransformStateError("transform segment digest mismatch")
-    header_raw, separator, event_raw = blob.partition(b"\n")
-    if not separator or len(header_raw) + 1 > TRANSFORM_SEGMENT_HEADER_BYTES:
-        raise TransformStateError("transform segment header is malformed")
-    try:
-        header = json.loads(header_raw)
-    except json.JSONDecodeError as exc:
-        raise TransformStateError("transform segment header is not JSON") from exc
-    fields = {"schema", "first_seq", "last_seq", "count", "prior", "prior_head",
-              "event_head", "events_sha256"}
-    digests = ("prior", "prior_head", "event_head", "events_sha256")
-    if (not isinstance(header, dict) or set(header) != fields
-            or header.get("schema") != TRANSFORM_SEGMENT_SCHEMA
-            or any(not isinstance(header.get(key), int) or isinstance(header.get(key), bool)
-                   for key in ("first_seq", "last_seq", "count"))
-            or any(not isinstance(header.get(key), str)
-                   or not DIGEST_RE.fullmatch(header[key]) for key in digests)
-            or header["first_seq"] < 1 or header["last_seq"] < header["first_seq"]
-            or header["count"] != header["last_seq"] - header["first_seq"] + 1
-            or not event_raw
-            or hashlib.sha256(event_raw).hexdigest() != header["events_sha256"]):
-        raise TransformStateError("transform segment header disagrees with its events")
-    return header, event_raw
+def _read_transform_state(path=None, head_path=None, segments_path=None):
+    return _transform_journal(path, head_path, segments_path).read()
 
-
-def _transform_chain_witness(events, tip: str, segments: int) -> bytes:
-    row = {"schema": TRANSFORM_HEAD_SCHEMA_V2, "count": len(events),
-           "head": events[-1]["hash"], "tip": tip, "segments": segments}
-    return (json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n").encode()
-
-
-def _read_transform_state(path: Path | None = None, head_path: Path | None = None,
-                          segments_path: Path | None = None) -> TransformRecordState:
-    path = TRANSFORM_PATH if path is None else path
-    head_path = TRANSFORM_HEAD_PATH if head_path is None else head_path
-    segments_path = TRANSFORM_SEGMENTS_PATH if segments_path is None else segments_path
-    if path.is_symlink() or head_path.is_symlink():
-        raise TransformStateError("transform record or witness is a symbolic link")
-    if not head_path.exists():
-        if path.exists():
-            raise TransformStateError("transform record and witness presence differ")
-        return TransformRecordState()
-    try:
-        witness = json.loads(_private_bytes(head_path, 4096, TransformStateError))
-    except json.JSONDecodeError as exc:
-        raise TransformStateError("transform witness is not JSON") from exc
-    if not isinstance(witness, dict):
-        raise TransformStateError("transform witness is not an object")
-    if witness.get("schema") == TRANSFORM_HEAD_SCHEMA:
-        if not path.exists():
-            raise TransformStateError("legacy transform record is missing")
-        raw = _private_bytes(path, TRANSFORM_MAX_BYTES, TransformStateError)
-        events = _parse_transform_events(raw)
-        fields = {"schema", "count", "head", "record_sha256"}
-        expected = events[-1]["hash"] if events else TRANSFORM_ZERO
-        if (set(witness) != fields or witness.get("count") != len(events)
-                or witness.get("head") != expected
-                or witness.get("record_sha256") != hashlib.sha256(raw).hexdigest()):
-            raise TransformStateError("transform record disagrees with its sidecar witness")
-        return TransformRecordState(tuple(events), (), raw)
-
-    fields = {"schema", "count", "head", "tip", "segments"}
-    if (witness.get("schema") != TRANSFORM_HEAD_SCHEMA_V2 or set(witness) != fields
-            or not isinstance(witness.get("count"), int)
-            or isinstance(witness.get("count"), bool) or witness["count"] < 1
-            or not isinstance(witness.get("segments"), int)
-            or isinstance(witness.get("segments"), bool)
-            or not 1 <= witness["segments"] <= witness["count"]
-            or any(not isinstance(witness.get(key), str)
-                   or not DIGEST_RE.fullmatch(witness[key])
-                   for key in ("head", "tip"))):
-        raise TransformStateError("transform chain witness is malformed")
-    digest = witness["tip"]
-    reverse = []
-    seen = set()
-    for _ in range(witness["segments"]):
-        if digest in seen:
-            raise TransformStateError("transform segment chain contains a cycle")
-        seen.add(digest)
-        header, event_raw = _read_transform_segment(digest, segments_path)
-        reverse.append((digest, header, event_raw))
-        digest = header["prior"]
-    if digest != TRANSFORM_ZERO:
-        raise TransformStateError("transform segment count truncates its chain")
-    events = []
-    segments = []
-    previous_digest = previous_head = TRANSFORM_ZERO
-    for digest, header, event_raw in reversed(reverse):
-        if header["prior"] != previous_digest or header["prior_head"] != previous_head:
-            raise TransformStateError("transform segment breaks the archive chain")
-        before = len(events)
-        events = _parse_transform_events(event_raw, events)
-        segment_events = events[before:]
-        if (header["first_seq"] != before + 1 or header["last_seq"] != len(events)
-                or header["count"] != len(segment_events)
-                or header["event_head"] != events[-1]["hash"]):
-            raise TransformStateError("transform segment bounds disagree with its events")
-        segments.append(TransformSegment(digest, event_raw, tuple(segment_events),
-                                         header["prior"], header["prior_head"]))
-        previous_digest, previous_head = digest, events[-1]["hash"]
-    if (witness["count"] != len(events) or witness["head"] != previous_head
-            or witness["tip"] != previous_digest):
-        raise TransformStateError("transform chain disagrees with its atomic witness")
-    return TransformRecordState(tuple(events), tuple(segments))
 
 def _read_transform_state_shared(path: Path | None = None,
                                  head_path: Path | None = None,
                                  segments_path: Path | None = None,
-                                 lock_path: Path | None = None) -> TransformRecordState:
+                                 lock_path: Path | None = None) -> EventState:
     lock_path = TRANSFORM_LOCK_PATH if lock_path is None else lock_path
     with _private_lock(lock_path, fcntl.LOCK_SH):
         return _read_transform_state(path, head_path, segments_path)
@@ -1192,113 +1234,15 @@ def append_transform_event(author: str, kind: str, ref: str = "", material: str 
                            lock_path: Path | None = None,
                            segments_path: Path | None = None) -> dict[str, Any]:
     """Append one event, rolling into a linked immutable segment when bounded."""
-    path = TRANSFORM_PATH if path is None else path
-    head_path = TRANSFORM_HEAD_PATH if head_path is None else head_path
-    lock_path = TRANSFORM_LOCK_PATH if lock_path is None else lock_path
-    segments_path = TRANSFORM_SEGMENTS_PATH if segments_path is None else segments_path
-    if not PATH_TAG_RE.fullmatch(author):
-        raise TransformStateError("invalid bound path")
-    values = {"kind": kind, "ref": ref, "material": material, "operation": operation,
-              "result": result, "prediction": prediction, "observation": observation}
-    for label, value in values.items():
-        if (not isinstance(value, str) or value != value.strip()
-                or "\n" in value or "\r" in value):
-            raise TransformStateError(f"{label} must be canonical one-line text")
-    if kind not in TRANSFORM_KINDS:
-        raise TransformStateError("invalid transform kind")
-    if any(len(values[key]) > TRANSFORM_MAX_TEXT for key in
-           ("material", "operation", "result", "prediction", "observation")):
-        raise TransformStateError("transform text exceeds its bound")
-    if kind == "move":
-        if (not all(values[key] for key in ("material", "operation", "result", "prediction"))
-                or observation):
-            raise TransformStateError(
-                "move requires material, operation, result, and prediction only")
-    elif (not ref or not observation
-          or any(values[key] for key in ("material", "operation", "result", "prediction"))):
-        raise TransformStateError("witness requires only ref and observation")
+    journal = _transform_journal(path, head_path, segments_path)
     artifact_rows = _artifact_receipts(list(artifacts or []))
+    with _private_lock(TRANSFORM_LOCK_PATH if lock_path is None else lock_path, fcntl.LOCK_EX):
+        state = journal.read()
+        row = _new_event(state.events, TRANSFORM_SCHEMA, "tr", author, kind=kind, ref=ref,
+                         material=material, operation=operation, result=result, prediction=prediction,
+                         observation=observation, artifacts=artifact_rows)
+        return journal.append(state, row)
 
-    with _private_lock(lock_path, fcntl.LOCK_EX):
-        state = _read_transform_state(path, head_path, segments_path)
-        events = list(state.events)
-        identifier = "tr-" + hashlib.sha256(
-            f"{time.time_ns()}:{os.getpid()}:{os.urandom(16).hex()}".encode()
-        ).hexdigest()[:24]
-        row = {
-            "schema": TRANSFORM_SCHEMA, "seq": len(events) + 1, "id": identifier,
-            "created": _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z"),
-            "author": author, "kind": kind, "ref": ref, "material": material,
-            "operation": operation, "result": result, "prediction": prediction,
-            "observation": observation, "artifacts": artifact_rows,
-            "prev": events[-1]["hash"] if events else TRANSFORM_ZERO, "hash": "",
-        }
-        row["hash"] = _event_digest(row)
-        encoded = (json.dumps(row, ensure_ascii=False, sort_keys=True,
-                              separators=(",", ":")) + "\n").encode()
-        obsolete = ""
-
-        if state.segments:
-            current = state.segments[-1]
-            prior_events = events[:-len(current.events)]
-            candidate_raw = current.event_raw + encoded
-            if (len(candidate_raw) <= TRANSFORM_MAX_BYTES
-                    and len(current.events) < TRANSFORM_MAX_EVENTS):
-                combined = _parse_transform_events(candidate_raw, prior_events)
-                segment_events = combined[len(prior_events):]
-                blob = _segment_blob(candidate_raw, segment_events,
-                                     current.prior, current.prior_head)
-                tip = _install_transform_segment(blob, segments_path)
-                segments = [*state.segments[:-1], TransformSegment(
-                    tip, candidate_raw, tuple(segment_events), current.prior,
-                    current.prior_head)]
-                obsolete, events = current.digest, combined
-            else:
-                old_head = events[-1]["hash"]
-                combined = _parse_transform_events(encoded, events)
-                segment_events = combined[len(events):]
-                blob = _segment_blob(encoded, segment_events, current.digest, old_head)
-                tip = _install_transform_segment(blob, segments_path)
-                segments = [*state.segments, TransformSegment(
-                    tip, encoded, tuple(segment_events), current.digest, old_head)]
-                events = combined
-        else:
-            candidate_raw = state.legacy_raw + encoded
-            if (len(candidate_raw) <= TRANSFORM_MAX_BYTES
-                    and len(events) < TRANSFORM_MAX_EVENTS):
-                combined = _parse_transform_events(candidate_raw)
-                blob = _segment_blob(candidate_raw, combined,
-                                     TRANSFORM_ZERO, TRANSFORM_ZERO)
-                tip = _install_transform_segment(blob, segments_path)
-                segments = [TransformSegment(
-                    tip, candidate_raw, tuple(combined), TRANSFORM_ZERO, TRANSFORM_ZERO)]
-                events = combined
-            else:
-                if not events:
-                    raise TransformStateError("one transform event exceeds its segment bound")
-                archive_blob = _segment_blob(state.legacy_raw, events,
-                                             TRANSFORM_ZERO, TRANSFORM_ZERO)
-                archive_tip = _install_transform_segment(archive_blob, segments_path)
-                old_head = events[-1]["hash"]
-                combined = _parse_transform_events(encoded, events)
-                segment_events = combined[len(events):]
-                blob = _segment_blob(encoded, segment_events, archive_tip, old_head)
-                tip = _install_transform_segment(blob, segments_path)
-                segments = [TransformSegment(
-                    archive_tip, state.legacy_raw, tuple(events),
-                    TRANSFORM_ZERO, TRANSFORM_ZERO), TransformSegment(
-                    tip, encoded, tuple(segment_events), archive_tip, old_head)]
-                events = combined
-
-        _atomic_private_write(
-            head_path, _transform_chain_witness(events, segments[-1].digest, len(segments)))
-        head_path.chmod(0o600)
-        # The atomic head switch commits the chain. A crash before it leaves the old
-        # state readable and only an unreferenced hash-addressed candidate behind.
-        path.unlink(missing_ok=True)
-        if obsolete and obsolete not in {segment.digest for segment in segments}:
-            (segments_path / f"{obsolete}.jsonl").unlink(missing_ok=True)
-        return row
 
 def record_transform(arguments: dict[str, Any]) -> str:
     mode = os.environ.get("VYBN_TRANSFORM_RECORD", "on").strip().lower()
@@ -1462,59 +1406,21 @@ def _execution_path() -> str:
     return value
 
 
-def _parse_path_events(raw: bytes) -> list[dict[str, Any]]:
-    if len(raw) > SUBJECT_MAX_BYTES:
-        raise PathLedgerError(f"ledger exceeds {SUBJECT_MAX_BYTES} bytes")
-    if raw and not raw.endswith(b"\n"):
-        raise PathLedgerError("ledger has an unterminated event")
-    fields = {
-        "schema", "seq", "id", "created", "author", "kind", "target", "ref",
-        "scope", "text", "prev", "hash",
-    }
-    id_re = re.compile(r"ev-[0-9a-f]{24}\Z")
-    events: list[dict[str, Any]] = []
-    by_id: dict[str, dict[str, Any]] = {}
-    terminal: set[str] = set()
-    revised_futures: set[str] = set()
-    released: set[str] = set()
-    previous = "0" * 64
-    for index, encoded in enumerate(raw.splitlines(), 1):
-        try:
-            row = json.loads(encoded)
-        except json.JSONDecodeError as exc:
-            raise PathLedgerError(f"event {index} is not JSON") from exc
-        if not isinstance(row, dict) or set(row) != fields:
-            raise PathLedgerError(f"event {index} fields differ from schema")
-        strings = ("schema", "id", "created", "author", "kind", "target", "ref",
-                   "scope", "text", "prev", "hash")
-        if any(not isinstance(row[key], str) for key in strings):
-            raise PathLedgerError(f"event {index} has a non-string field")
-        if any(row[key] != row[key].strip() or "\n" in row[key] or "\r" in row[key]
-               for key in strings):
-            raise PathLedgerError(f"event {index} is not canonical one-line text")
-        if row["schema"] != SUBJECT_SCHEMA or row["seq"] != index:
-            raise PathLedgerError(f"event {index} has invalid schema or sequence")
-        if not isinstance(row["seq"], int) or isinstance(row["seq"], bool):
-            raise PathLedgerError(f"event {index} sequence is not an integer")
-        if not id_re.fullmatch(row["id"]) or row["id"] in by_id:
-            raise PathLedgerError(f"event {index} has invalid or duplicate id")
-        if not PATH_TAG_RE.fullmatch(row["author"]):
-            raise PathLedgerError(f"event {index} has invalid author")
+def _parse_path_events(raw: bytes, prior_events=()) -> list[dict[str, Any]]:
+    prior_events = list(prior_events)
+    events = list(prior_events)
+    by_id = {row["id"]: row for row in events}
+    terminal = {row["ref"] for row in events if row["kind"] in {"answer", "refusal"} and row["ref"]}
+    revised_futures = {row["ref"] for row in events if row["kind"] == "future" and row["ref"]}
+    released = {row["ref"] for row in events if row["kind"] == "release"}
+    for row in _event_rows(raw, prior_events, schema=SUBJECT_SCHEMA, prefix="ev",
+                           payload=("target", "scope", "text"), maximum=SUBJECT_MAX_BYTES,
+                           limit=SUBJECT_MAX_EVENTS, error=PathLedgerError):
+        index = row["seq"]
         if row["target"] and not PATH_TAG_RE.fullmatch(row["target"]):
             raise PathLedgerError(f"event {index} has invalid target")
         if row["kind"] not in SUBJECT_KINDS or not 1 <= len(row["text"]) <= SUBJECT_MAX_TEXT:
             raise PathLedgerError(f"event {index} has invalid kind or text")
-        try:
-            stamp = _dt.datetime.fromisoformat(row["created"].replace("Z", "+00:00"))
-        except ValueError as exc:
-            raise PathLedgerError(f"event {index} has invalid timestamp") from exc
-        if stamp.tzinfo is None:
-            raise PathLedgerError(f"event {index} timestamp lacks a timezone")
-        if row["prev"] != previous or not DIGEST_RE.fullmatch(row["prev"]):
-            raise PathLedgerError(f"event {index} breaks the hash chain")
-        if not DIGEST_RE.fullmatch(row["hash"]) or row["hash"] != _event_digest(row):
-            raise PathLedgerError(f"event {index} digest mismatch")
-
         kind, ref = row["kind"], row["ref"]
         prior = by_id.get(ref) if ref else None
         if kind == "future":
@@ -1554,10 +1460,6 @@ def _parse_path_events(raw: bytes) -> list[dict[str, Any]]:
 
         events.append(row)
         by_id[row["id"]] = row
-        previous = row["hash"]
-    if len(events) > SUBJECT_MAX_EVENTS:
-        raise PathLedgerError(f"ledger exceeds {SUBJECT_MAX_EVENTS} events")
-
     active_futures = [row for row in events
                       if row["kind"] == "future" and row["id"] not in revised_futures]
     open_offers = [row for row in events
@@ -1580,42 +1482,24 @@ def _parse_path_events(raw: bytes) -> list[dict[str, Any]]:
     return events
 
 
-def _read_path_state(path: Path | None = None,
-                        head_path: Path | None = None) -> tuple[bytes, list[dict[str, Any]]]:
-    path = SUBJECT_PATH if path is None else path
+def _path_journal(path=None, head_path=None):
     head_path = SUBJECT_HEAD_PATH if head_path is None else head_path
-    if path.is_symlink() or head_path.is_symlink():
-        raise PathLedgerError("subject ledger or witness is a symbolic link")
-    ledger_exists, head_exists = path.exists(), head_path.exists()
-    if ledger_exists != head_exists:
-        raise PathLedgerError("ledger and witness presence differ")
-    if not ledger_exists:
-        return b"", []
-    raw = _private_bytes(path, SUBJECT_MAX_BYTES, PathLedgerError)
-    events = _parse_path_events(raw)
-    try:
-        witness = json.loads(_private_bytes(head_path, 2048, PathLedgerError))
-    except json.JSONDecodeError as exc:
-        raise PathLedgerError("witness is not JSON") from exc
-    fields = {"schema", "count", "head", "ledger_sha256"}
-    expected_head = events[-1]["hash"] if events else "0" * 64
-    if (not isinstance(witness, dict) or set(witness) != fields
-            or witness.get("schema") != SUBJECT_HEAD_SCHEMA
-            or witness.get("count") != len(events)
-            or witness.get("head") != expected_head
-            or witness.get("ledger_sha256") != hashlib.sha256(raw).hexdigest()):
-        raise PathLedgerError("ledger disagrees with its sidecar witness")
-    return raw, events
+    return EventJournal(SUBJECT_PATH if path is None else path, head_path,
+                        head_path.with_suffix(".segments"), SUBJECT_HEAD_SCHEMA,
+                        "vybn.path_event_head.v2", "vybn.path_event_segment.v1",
+                        "ledger_sha256", SUBJECT_MAX_BYTES, SUBJECT_MAX_EVENTS,
+                        _parse_path_events, PathLedgerError)
 
 
-def _path_witness(raw: bytes, events: list[dict[str, Any]]) -> bytes:
-    row = {
-        "schema": SUBJECT_HEAD_SCHEMA,
-        "count": len(events),
-        "head": events[-1]["hash"] if events else "0" * 64,
-        "ledger_sha256": hashlib.sha256(raw).hexdigest(),
-    }
-    return (json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n").encode()
+def _read_path_state(path=None, head_path=None):
+    with _private_lock(SUBJECT_LOCK_PATH, fcntl.LOCK_SH):
+        state = _path_journal(path, head_path).read()
+        return (state.legacy_raw + b"".join(segment.event_raw for segment in state.segments),
+                list(state.events))
+
+
+def _path_witness(raw, events):
+    return _path_journal().witness(raw, events)
 
 
 def append_path_event(author: str, kind: str, text: str, target: str = "",
@@ -1651,52 +1535,17 @@ def append_path_event(author: str, kind: str, text: str, target: str = "",
         raise PathLedgerError("future accepts only an optional revision reference")
 
     with _private_lock(lock_path, fcntl.LOCK_EX):
-        raw, events = _read_path_state(path, head_path)
-        by_id = {row["id"]: row for row in events}
-        prior = by_id.get(ref) if ref else None
-        actual_target, actual_scope = target, scope
+        journal = _path_journal(path, head_path)
+        state = journal.read()
+        prior = next((row for row in state.events if row["id"] == ref), None)
         if kind in {"answer", "refusal"} and ref:
             if prior is None or prior["kind"] != "offer":
                 raise PathLedgerError(f"{kind} must reference an offer")
-            actual_target = prior["author"]
-            actual_scope = f"encounter:{ref}" if kind == "refusal" else ""
-        elif kind != "offer":
-            actual_target = ""
-        if kind != "refusal" or ref:
-            actual_scope = "" if kind != "refusal" else actual_scope
-        identifier = "ev-" + hashlib.sha256(
-            f"{time.time_ns()}:{os.getpid()}:{os.urandom(16).hex()}".encode()
-        ).hexdigest()[:24]
-        row = {
-            "schema": SUBJECT_SCHEMA,
-            "seq": len(events) + 1,
-            "id": identifier,
-            "created": _dt.datetime.now(_dt.timezone.utc).isoformat().replace("+00:00", "Z"),
-            "author": author,
-            "kind": kind,
-            "target": actual_target,
-            "ref": ref,
-            "scope": actual_scope,
-            "text": text,
-            "prev": events[-1]["hash"] if events else "0" * 64,
-            "hash": "",
-        }
-        row["hash"] = _event_digest(row)
-        encoded = (json.dumps(row, ensure_ascii=False, sort_keys=True,
-                              separators=(",", ":")) + "\n").encode()
-        next_raw = raw + encoded
-        next_events = _parse_path_events(next_raw)
-        ledger_flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-        ledger_fd = os.open(path, ledger_flags, 0o600)
-        try:
-            os.fchmod(ledger_fd, 0o600)
-            os.write(ledger_fd, encoded)
-            os.fsync(ledger_fd)
-        finally:
-            os.close(ledger_fd)
-        _atomic_private_write(head_path, _path_witness(next_raw, next_events))
-        head_path.chmod(0o600)
-        return row
+            target = prior["author"]
+            scope = f"encounter:{ref}" if kind == "refusal" else ""
+        row = _new_event(state.events, SUBJECT_SCHEMA, "ev", author,
+                         kind=kind, text=text, target=target, ref=ref, scope=scope)
+        return journal.append(state, row)
 
 
 def _active_path_refusals(events: list[dict[str, Any]], author: str) -> list[dict[str, Any]]:

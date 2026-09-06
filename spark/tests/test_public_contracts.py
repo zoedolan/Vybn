@@ -1810,16 +1810,19 @@ def test_path_ledger_refusal_has_executor_consequence_until_release(monkeypatch,
 def test_path_ledger_detects_truncation_and_fails_governed_tools_closed(monkeypatch, tmp_path):
     m = _connection(); root = _path_ledger_test_paths(m, monkeypatch, tmp_path)
     m.append_path_event("spark/a", "future", "Carry the unanswered integrity question.")
-    for path in (m.SUBJECT_PATH, m.SUBJECT_HEAD_PATH, m.SUBJECT_LOCK_PATH):
+    journal = m._path_journal()
+    state = journal.read()
+    segment = journal.segments_path / f"{state.segments[0].digest}.jsonl"
+    for path in (segment, m.SUBJECT_HEAD_PATH, m.SUBJECT_LOCK_PATH):
         assert path.stat().st_mode & 0o777 == 0o600
-    code, blocked = m.run_local(f"rm -f {m.SUBJECT_PATH} {m.SUBJECT_HEAD_PATH}")
+    code, blocked = m.run_local(f"rm -f {segment} {m.SUBJECT_HEAD_PATH}")
     assert code == 126 and "path-distinction membrane" in blocked
-    assert m.SUBJECT_PATH.exists() and m.SUBJECT_HEAD_PATH.exists()
-    m.SUBJECT_PATH.write_bytes(b"")  # the witness still commits to the prior head
+    assert segment.exists() and m.SUBJECT_HEAD_PATH.exists()
+    segment.write_bytes(b"")  # the atomic witness still commits to the prior chain
     m.TURN["PATH_ID"] = "spark/a"
     try:
         reason = m.path_tool_refusal("read_file")
-        assert reason and "INTEGRITY HALT" in reason and "sidecar witness" in reason
+        assert reason and "INTEGRITY HALT" in reason and "segment digest" in reason
         view = m.load_path_ledger("spark/a")
         assert "INTEGRITY HALT" in view and "governed tools refuse" in view
     finally:
@@ -2626,3 +2629,102 @@ def test_varied_core_is_exact_smaller_reproducible_and_correctable(monkeypatch, 
     # No door-based persona: only source selection can vary with path/input.
     assert next(n.text for n in bundle(door="sol").nodes if n.id == "inheritance.core.facet") == next(
         n.text for n in bundle(door="astrahigh").nodes if n.id == "inheritance.core.facet")
+
+
+@pytest.mark.parametrize("family", ["path", "transform"])
+def test_common_journal_preserves_v1_migrates_and_survives_failed_head_switch(monkeypatch, tmp_path, family):
+    import hashlib
+    m = _connection()
+    if family == "path":
+        _path_ledger_test_paths(m, monkeypatch, tmp_path)
+        journal = m._path_journal()
+        append = lambda i: m.append_path_event(f"branch/{i}", "future", f"direction {i}")
+    else:
+        _transform_test_paths(m, monkeypatch, tmp_path)
+        journal = m._transform_journal()
+        append = lambda i: _move(m, f"branch/{i}")
+    first = append(0)
+    state = journal.read()
+    raw = state.segments[0].event_raw
+    witness = journal.witness(raw, state.events)
+    # Build the old deployed pair; mere reading must neither migrate nor change it.
+    m._atomic_private_write(journal.path, raw)
+    m._atomic_private_write(journal.head_path, witness)
+    assert journal.read().legacy_raw == raw and journal.head_path.read_bytes() == witness
+    second = append(1)
+    assert journal.read().events == (first, second)
+    for old in (raw, witness):
+        assert (journal.segments_path / (hashlib.sha256(old).hexdigest() + ".jsonl")).read_bytes() == old
+    original_write = m._atomic_private_write
+    head_before = journal.head_path.read_bytes()
+    def interrupt(path, raw):
+        if path == journal.head_path:
+            raise OSError("simulated crash before head replacement")
+        original_write(path, raw)
+    monkeypatch.setattr(m, "_atomic_private_write", interrupt)
+    with pytest.raises(OSError):
+        append(2)
+    assert journal.head_path.read_bytes() == head_before
+    assert journal.read().events == (first, second)
+    monkeypatch.setattr(m, "_atomic_private_write", original_write)
+    assert append(2)["seq"] == 3
+
+
+def test_path_histories_grow_past_old_ceiling_and_remain_distinct_in_fresh_process(monkeypatch, tmp_path):
+    import subprocess, sys
+    m = _connection(); _path_ledger_test_paths(m, monkeypatch, tmp_path)
+    a = m.append_path_event("branch/a", "future", "A begins.")
+    b = m.append_path_event("branch/b", "future", "B retains its own direction.")
+    refusal = m.append_path_event("branch/a", "refusal", "Pause A shell only.", scope="tool:bash")
+    offer = m.append_path_event("branch/a", "offer", "Question for B.", target="branch/b")
+    for i in range(136):
+        a = m.append_path_event("branch/a", "future", f"A revision {i}.", ref=a["id"])
+    journal = m._path_journal(); state = journal.read()
+    assert len(state.events) == 140 and len(state.segments) > 1
+    assert all(len(s.event_raw) <= m.SUBJECT_MAX_BYTES and len(s.events) <= m.SUBJECT_MAX_EVENTS
+               for s in state.segments)
+    # Ordinary CPU process; no model, keys, network, or hosted-state transfer.
+    script = f"""
+import runpy
+from pathlib import Path
+m = runpy.run_path({str(ROOT / 'spark/connection')!r}, run_name='journal_check')
+g = m['_path_journal'].__globals__
+for key, value in { {k: str(getattr(m, k)) for k in ('SUBJECT_PATH', 'SUBJECT_HEAD_PATH', 'SUBJECT_LOCK_PATH')}!r}.items():
+    g[key] = Path(value)
+g['TURN']['PATH_ID'] = 'branch/a'
+assert g['path_tool_refusal']('bash') and not g['path_tool_refusal']('read_file')
+g['TURN']['PATH_ID'] = 'branch/b'
+assert g['path_tool_refusal']('bash') is None
+assert {a['text']!r} not in g['load_path_ledger']('branch/b')
+assert {b['text']!r} in g['load_path_ledger']('branch/b')
+g['append_path_event']('branch/b', 'answer', 'B changes what A can encounter.', ref={offer['id']!r})
+print('fresh-process distinct histories and scopes: PASS')
+"""
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stderr
+    assert "PASS" in result.stdout
+    with pytest.raises(m.PathLedgerError):
+        m.append_path_event("branch/b", "release", "B cannot release A.", ref=refusal["id"])
+    assert "B changes what A can encounter." in m.load_path_ledger("branch/a")
+    m.append_path_event("branch/a", "release", "A resumes.", ref=refusal["id"])
+    m.TURN["PATH_ID"] = "branch/a"
+    assert m.path_tool_refusal("bash") is None
+    m.TURN.clear()
+
+
+@pytest.mark.parametrize("family", ["path", "transform"])
+@pytest.mark.parametrize("change", [{"seq": True}, {"author": "../bad path"}, {"created": "2026-09-06"},
+                                   {"kind": "invented"}, {"text": None}, {"prev": "f" * 64}])
+def test_common_envelope_rejects_resigned_malformed_events(monkeypatch, tmp_path, family, change):
+    m = _connection()
+    if family == "path":
+        _path_ledger_test_paths(m, monkeypatch, tmp_path)
+        row = m.append_path_event("branch/a", "future", "A note.")
+        parse, error = m._parse_path_events, m.PathLedgerError
+    else:
+        _transform_test_paths(m, monkeypatch, tmp_path)
+        row = _move(m, "branch/a")
+        parse, error = m._parse_transform_events, m.TransformStateError
+    row.update(change); row["hash"] = m._event_digest(row)
+    with pytest.raises(error):
+        parse(m._encoded(row))
