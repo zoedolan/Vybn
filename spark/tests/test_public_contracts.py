@@ -895,7 +895,7 @@ def test_receipt_surface_recomputes_pinned_source_bytes():
 
 
 def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_sources(tmp_path):
-    m = _connection(); source = (ROOT / "spark/connection").read_bytes()
+    m = _connection(); source = Path(m.__file__).read_bytes()
     prompt = m.build_instructions("sol")
     digest = __import__("hashlib").sha256(source).hexdigest()
     assert prompt.startswith("COMPACT SOURCE-BOUND KERNEL\n")
@@ -903,8 +903,8 @@ def test_compact_wake_is_source_bound_without_copying_whole_engine_or_ambient_so
     assert "admitted_scope: governing docstring + executable byte receipt" in prompt
     assert "def meet(" not in prompt and "class OpenAIDialect" not in prompt
     assert "HARNESS RECEIPT" in prompt and "running executable bytes, not a self-portrait" in prompt
-    assert len(prompt) < 11000
-    assert [row.path for row in m.OPERATIVE_SOURCES] == [(ROOT / "spark/connection").resolve()]
+    assert len(prompt.replace(str(m.REPO), "<repo>").replace(str(Path(m.__file__).parent), "<engine>")) < 11000
+    assert [row.path for row in m.OPERATIVE_SOURCES] == [Path(m.__file__).resolve()]
 
     # One generative center replaces accumulated cognitive organs; executable truth remains.
     assert "What is the knowing already here—and what forms can it invent from within itself" in prompt
@@ -975,7 +975,7 @@ def test_source_bound_bundle_is_the_wake_not_an_ambient_accessory():
     assert routes == {
         "instructions": ("kernel", "door", "compute.want", "aim.compass",
                          "source.index", "harness.receipt"),
-        "context": ("path.ledger", "dialogue.recent"),
+        "context": ("path.ledger", "dialogue.recent", "poem.world"),
         "contact": ("zoe.live",),
     }
     assert not any(node.id in {"asi.premise", "creative.license", "relational.selection"}
