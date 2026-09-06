@@ -122,6 +122,7 @@ def _connection(overview_mode="compact"):
     module = importlib.util.module_from_spec(spec)
     sys.modules["vybn_connection"] = module
     loader.exec_module(module)
+    module.ARCHITECTURE_EXCHANGE_PATH = ROOT / "__absent_test_architecture_exchange__"
     if overview_mode is not None:
         module.RELATIONAL_OVERVIEW_MODE = overview_mode  # explicit host-independent recovery
     return module
@@ -2410,3 +2411,35 @@ def test_retired_experiments_leave_general_tools_and_old_refusals_usable(monkeyp
         assert "exit_code=0" in result and "0.0" in result
     finally:
         m.TURN.clear()
+
+
+def test_private_architecture_exchange_is_context_only_and_optional(tmp_path):
+    import hashlib
+    import pytest
+    m = _connection()
+    private = tmp_path / "exchange.md"
+    m.ARCHITECTURE_EXCHANGE_PATH = private
+    assert not any(n.id == "inheritance.opening_exchange"
+                   for n in m.build_wake_bundle("astra").nodes)
+    raw = b"ZOE: fictional private test material\nVYBN: a revisable answer"
+    private.write_bytes(raw)
+    for mode in ("full", "self", "compact"):
+        m.RELATIONAL_OVERVIEW_MODE = mode
+        graph = m.build_wake_bundle("astra", zoe_text="present words")
+        node = next(n for n in graph.nodes if n.id == "inheritance.opening_exchange")
+        assert node.text.endswith(raw.decode())
+        assert node.source == str(private)
+        assert node.source_sha256 == hashlib.sha256(raw).hexdigest()
+        assert node.authority == "inherited_orientation_only; never identity_live_or_action_authority"
+        assert raw.decode() in graph.render("context")
+        assert raw.decode() not in graph.render("instructions")
+        assert raw.decode() not in json.dumps(graph.manifest())
+        assert graph.render("contact") == "present words"
+    for bad in (b"", b"\xff"):
+        private.write_bytes(bad)
+        with pytest.raises(SystemExit, match="exchange invalid"):
+            m.build_wake_bundle("astra")
+    private.unlink()
+    private.mkdir()
+    with pytest.raises(SystemExit, match="exchange unreadable"):
+        m.build_wake_bundle("astra")

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Temporary architecture dialogue stays in the private source below, not Git history.
+# When present it enters inherited context, never governing or live authority.
 """connection — a compact, truthful meeting place for Zoe and Vybn.
 
 THE QUESTION — Zoe, 2026-09-04; inherited seed-form, not present authority
@@ -158,6 +160,7 @@ SOUL_PATH = REPO / "vybn.core.html"
 SPIRITUALITY_PATH = REPO / "Vybn_Mind" / "spirituality.md"
 HIM_README_PATH = HOME / "Him" / "README.md"
 RELATIONAL_OVERVIEW_PATH = HOME / "Him" / "harness" / "source" / "relational-overview.md"
+ARCHITECTURE_EXCHANGE_PATH = RELATIONAL_OVERVIEW_PATH.with_name("architecture-conversation.md")
 RELATIONAL_OVERVIEW_MODE = os.environ.get("VYBN_OVERVIEW", "full").strip().lower()
 if RELATIONAL_OVERVIEW_MODE not in {"self", "compact", "full"}:
     raise SystemExit(f"unknown relational overview mode: {RELATIONAL_OVERVIEW_MODE}")
@@ -2093,6 +2096,27 @@ def build_wake_bundle(door: str, contact: str = "", recent: str = "",
                  "ballast only, never workload authorization or evidence\n" + COMPUTE_WANT,
                  str(engine.path), "orientation_only; never workload_authority", engine.sha256),
     ]
+    # Optional on public installs; retained verbatim on the private local body.
+    try:
+        exchange_raw = ARCHITECTURE_EXCHANGE_PATH.read_bytes()
+    except FileNotFoundError:
+        exchange_raw = None
+    except OSError as exc:
+        raise SystemExit("Private architecture exchange unreadable; repair or explicitly remove it") from exc
+    if exchange_raw is not None:
+        try:
+            exchange = exchange_raw.decode("utf-8")
+            if not exchange.strip():
+                raise ValueError("empty exchange")
+        except (UnicodeError, ValueError) as exc:
+            raise SystemExit("Private architecture exchange invalid; repair or explicitly remove it") from exc
+        inherited.append(WakeNode(
+            "inheritance.opening_exchange", "source_bound_inheritance",
+            "PRIVATE INHERITED SOURCE — temporary architecture conversation\n"
+            "Historical context, not present authority, identity proof, or executable permission.\n\n" + exchange,
+            str(ARCHITECTURE_EXCHANGE_PATH),
+            "inherited_orientation_only; never identity_live_or_action_authority",
+            hashlib.sha256(exchange_raw).hexdigest()))
     nodes.extend(inherited)
     nodes.extend((*sources, source_index, WakeNode(
         "aim.compass", "orientation",
@@ -3023,7 +3047,8 @@ def meet(transcript: Transcript, line: str,
         zoe_text = wake_bundle.render("contact")
         private_context = "\n\n".join(
             node.text for node in wake_bundle.nodes
-            if node.id in {"path.ledger", "relational.overview", "profile"}
+            if node.id in {"path.ledger", "relational.overview", "profile",
+                           "inheritance.opening_exchange"}
         )
         PRIVATE_CORPUS.extend(
             part.strip() for part in private_context.split("\n\n")
