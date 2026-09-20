@@ -1,0 +1,176 @@
+{
+  "schema": "polar-time-cauchy-check-1",
+  "source_sha256": "9858432527197d2da4bb50b8be7608ccc97568f872dce5f7f2584170f34b6e8f",
+  "examined_theory_sha256": "acab3dc33424adb9ba6082fbf2f43f33230c9fd9243173fd83c7bf18de176bf4",
+  "libraries": {
+    "sympy": "1.14.0",
+    "mpmath": "1.3.0"
+  },
+  "units": "c=hbar=1; r0=1,r1=2; angular norm uses dtheta/(2*pi)",
+  "exact_family": "u_n(r,theta)=(r/2)^n exp(i*n*theta); integer n>0",
+  "conclusion": "unrestricted radial Cauchy evolution is not continuous in fixed finite-order Sobolev norms",
+  "initial_norm_definition": "squared H1(field) x L2(log-radial derivative) norm = (1+2*n^2)*4^(-n)",
+  "mode_rows": [
+    {
+      "n": 4,
+      "initial_amplitude": 0.0625,
+      "initial_H1_times_L2_norm": 0.3590351654086268,
+      "radial_final_amplitude": 1,
+      "one_time_final_amplitude": -0.03575003038418064,
+      "one_time_final_bound": 0.08838834764831845
+    },
+    {
+      "n": 8,
+      "initial_amplitude": 0.00390625,
+      "initial_H1_times_L2_norm": 0.04436647145156464,
+      "radial_final_amplitude": 1,
+      "one_time_final_amplitude": 0.0002616989169777707,
+      "one_time_final_bound": 0.005524271728019903
+    },
+    {
+      "n": 16,
+      "initial_amplitude": 1.52587890625e-05,
+      "initial_H1_times_L2_norm": 0.00034560399331378554,
+      "radial_final_amplitude": 1,
+      "one_time_final_amplitude": -1.3746229908542303e-05,
+      "one_time_final_bound": 2.1579186437577746e-05
+    },
+    {
+      "n": 32,
+      "initial_amplitude": 2.3283064365386963e-10,
+      "initial_H1_times_L2_norm": 1.0539284253265965e-08,
+      "radial_final_amplitude": 1,
+      "one_time_final_amplitude": -2.7253175792786704e-10,
+      "one_time_final_bound": 3.2927225399135965e-10
+    },
+    {
+      "n": 64,
+      "initial_amplitude": 5.421010862427522e-20,
+      "initial_H1_times_L2_norm": 4.9068383956186596e-18,
+      "radial_final_amplitude": 1,
+      "one_time_final_amplitude": 7.04240881881956e-20,
+      "one_time_final_bound": 7.666467083416871e-20
+    },
+    {
+      "n": 128,
+      "initial_amplitude": 2.938735877055719e-39,
+      "initial_H1_times_L2_norm": 5.319761342221001e-37,
+      "radial_final_amplitude": 1,
+      "one_time_final_amplitude": 4.154468108820013e-39,
+      "one_time_final_bound": 4.15600013356459e-39
+    }
+  ],
+  "nonzero_spatial_frequency_rows": [
+    {
+      "n": 8,
+      "initial_amplitude": 0.004248212069516765,
+      "initial_derivative": 0.033749025855492006,
+      "final_amplitude": 1.0,
+      "relative_equation_residual": 0.0
+    },
+    {
+      "n": 16,
+      "initial_amplitude": 1.5948484649604944e-05,
+      "initial_derivative": 0.0002547062974917711,
+      "final_amplitude": 1.0,
+      "relative_equation_residual": 8.336102555703753e-82
+    },
+    {
+      "n": 32,
+      "initial_amplitude": 2.381858582974467e-10,
+      "initial_derivative": 7.618337784412239e-09,
+      "final_amplitude": 1.0,
+      "relative_equation_residual": 1.6221944651343931e-81
+    },
+    {
+      "n": 64,
+      "initial_amplitude": 5.483932467339881e-20,
+      "initial_derivative": 3.509294913552868e-18,
+      "final_amplitude": 1.0,
+      "relative_equation_residual": 0.0
+    }
+  ],
+  "mode_generator": {
+    "two_time": "[[0,1],[n^2,0]]",
+    "one_time": "[[0,1],[-n^2,0]]",
+    "all_two_time_conserved_forms": "diag(-n^2*c,c); determinant=-n^2*c^2; never positive definite for n>0"
+  },
+  "filter_failure": {
+    "input_wavevectors": [
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        -10,
+        6
+      ]
+    ],
+    "input_squared_frequencies": [
+      16,
+      16,
+      64
+    ],
+    "generated_wavevector": [
+      0,
+      12
+    ],
+    "generated_squared_frequency": -144,
+    "local_interaction": "a cubic field term, as in a quartic potential",
+    "unit_forcing_response": "(cosh(12*t)-cos(16*t))/400; zero initial data",
+    "scope": "Fourier-support nonclosure and first-order forced response, not a full nonlinear evolution"
+  },
+  "checks_passed": 39,
+  "checks": [
+    "exact_polar_field_residual_zero",
+    "angular_periodicity",
+    "unit_final_mode_amplitude",
+    "initial_value_2_to_minus_n",
+    "initial_radial_derivative",
+    "log_radial_laplace_equation",
+    "one_time_sign_control_wave_equation",
+    "same_initial_value",
+    "same_initial_velocity",
+    "cartesian_regular_harmonic_1",
+    "cartesian_regular_harmonic_2",
+    "cartesian_regular_harmonic_3",
+    "cartesian_regular_harmonic_7",
+    "cartesian_regular_harmonic_16",
+    "all_conserved_quadratic_forms_solved",
+    "conserved_form_not_positive_definite",
+    "one_time_positive_energy_conserved",
+    "cartesian_massive_dispersion",
+    "exact_integer_mode_residual_4",
+    "one_time_bound_4",
+    "exact_integer_mode_residual_8",
+    "one_time_bound_8",
+    "exact_integer_mode_residual_16",
+    "one_time_bound_16",
+    "exact_integer_mode_residual_32",
+    "one_time_bound_32",
+    "exact_integer_mode_residual_64",
+    "one_time_bound_64",
+    "exact_integer_mode_residual_128",
+    "one_time_bound_128",
+    "nonzero_spatial_frequency_residual_8",
+    "nonzero_spatial_frequency_residual_16",
+    "nonzero_spatial_frequency_residual_32",
+    "nonzero_spatial_frequency_residual_64",
+    "three_input_modes_strictly_stable",
+    "cubic_product_outside_stable_support",
+    "forced_response_equation",
+    "forced_response_zero_initial_data",
+    "one_time_generated_mode_stable"
+  ],
+  "limits": [
+    "standard ultrahyperbolic obstruction, not a new theorem",
+    "metric alone does not specify admissible data, constraints, or interactions",
+    "a constrained/gauge or boundary-value two-time theory is not ruled out",
+    "does not test consciousness or prove which time geometry is physical",
+    "no empirical observation or quantum/provider/model call"
+  ]
+}

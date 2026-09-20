@@ -3,7 +3,7 @@
 **Authors:** Zoe Dolan & Vybn
 **Date:** April 5, 2026
 **Repository:** [zoedolan/Vybn](https://github.com/zoedolan/Vybn) — `quantum_delusions/`
-**Status:** Central conjecture stated. Some experimental results survive falsification. Most claims remain conjectural.
+**Status:** Physical extra-time conjecture open; well-posed predictive dynamics not established. The 2026-09-20 check in §II.2a exhibits an instability of unrestricted radial evolution and a failure of a simple mode-filter repair. Other experimental and geometric claims retain their separately stated limits.
 
 ---
 
@@ -68,7 +68,66 @@ The **Wheeler-DeWitt equation** in the temporal sector becomes:
 \left[-\frac{\partial^2}{\partial r_t^2} - \frac{1}{r_t}\frac{\partial}{\partial r_t} - \frac{1}{r_t^2}\frac{\partial^2}{\partial \theta_t^2}\right]\Psi + \hat{H}^2_{\text{spatial}}\,\Psi = 0
 \]
 
-This is the Laplace-Beltrami operator on the temporal plane — an ultrahyperbolic wave equation that treats both temporal directions on equal footing. It does not freeze dynamics (the "problem of time") but instead relates the two temporal evolutions.
+The differential expression contains the Laplace-Beltrami operator on the temporal plane. Writing it down does not supply a well-posed evolution law or resolve the problem of time. Admissible data, the meaning/sign of the spatial operator, constraints, and an interpretation of evolution must still be specified. The massless zero-spatial-mode sector already exposes the obstruction below.
+
+
+### II.2a A predictive-evolution obstruction
+
+**Analysis by Vybn, 2026-09-20, during the work with Zoe; not an independently reviewed result or an assertion of her agreement.** This applies standard ultrahyperbolic Cauchy-problem reasoning to our actual proposed metric. It is not a new theorem, a test of consciousness, or a no-go theorem for every constrained two-time theory.
+
+The question is specific: can `r_t` serve as ordinary predictive time for unrestricted smooth initial data? Work in units `c = hbar = 1`. In the massless, spatially homogeneous sector (normalizable in a finite periodic spatial box), both the printed equation and the metric-derived massless scalar equation reduce to
+
+\[
+\left(\partial_r^2+\frac1r\partial_r+\frac1{r^2}\partial_\theta^2\right)\psi=0.
+\]
+
+Take `r_0 = 1`, `r_1 = 2`, and any positive integer `n`. Exact solutions are
+
+\[
+\psi_n(r,\theta)=(r/2)^n e^{in\theta}.
+\]
+
+They are periodic in the supposedly protective angular coordinate. They are also regular at the temporal origin: `r^n exp(in theta) = (T+iS)^n` is a polynomial in Cartesian temporal coordinates. Periodicity and origin regularity do not exclude them.
+
+At the initial circle, the field amplitude is `2^(-n)` and its radial derivative is `n 2^(-n)`. Both tend to zero. All fixed finite-order Sobolev norms of these initial data also tend to zero: their growth in `n` is only polynomial, whereas `2^(-n)` decays exponentially. At `r = 2`, the normalized angular L2 amplitude is **one for every n**. Thus the unrestricted solution map is not continuous from any such fixed finite-order Cauchy-data topology to the final L2 field. This is failure of stable prediction, not merely an inconvenient simulation or an empirical detection threshold.
+
+| n | Initial H1(field) × L2(log-radial derivative) norm | Final field amplitude |
+|---:|---:|---:|
+| 16 | 3.45604e-4 | 1 |
+| 32 | 1.05393e-8 | 1 |
+| 64 | 4.90684e-18 | 1 |
+| 128 | 5.31976e-37 | 1 |
+
+The norm convention is `dtheta/(2*pi)`; its initial square is exactly `(1+2 n^2) 4^(-n)`. The units and box normalization are supplied, not measured physical constants.
+
+With `tau = log(r/r_0)`, the equation becomes `psi_{tau tau} + psi_{theta theta} = 0`. Its nth angular mode satisfies `f'' - n^2 f = 0`: exponential branches, not phase rotation. The phase-space generator is `[[0,1],[n^2,0]]`. Every conserved real symmetric quadratic form on its full two-dimensional mode space is `diag(-n^2 c,c)`, never positive definite for `n > 0`. This does not preclude a separately constrained physical subspace; it does exclude an unmentioned positive conserved quadratic norm rescuing the unrestricted modes.
+
+**Rival/sign control.** Make the angular direction spacelike instead. The corresponding log-radial wave equation is `psi_{tau tau} - psi_{theta theta} = 0`. With exactly the same initial field and velocity, the nth mode is `2^(-n)[cos(n tau)+sin(n tau)]`, bounded by `sqrt(2) 2^(-n)`. Its phase-space energy `n^2 |f|^2 + |f'|^2` is positive and conserved. This is a conventional one-time control, not evidence that a sign change is the uniquely correct physical repair.
+
+**The simplest filter is not closed under local interaction.** For the minimal scalar realization of the stated metric, Cartesian temporal coordinates `(t,s)` give the dispersion relation
+
+\[
+\omega^2=|\mathbf{k}|^2+m^2-\kappa^2,
+\]
+
+where `kappa` is conjugate to the second time `s`. Selecting only nonnegative `omega^2` removes the exponential free modes. But this allowed Fourier support is not preserved by an unrestricted local polynomial interaction. In the massless case, three allowed `(k,kappa)` modes `(5,3)`, `(5,3)`, and `(-10,6)` have squared frequencies `16,16,64`. Their product in a cubic field term, such as the force from a quartic potential, has `(k,kappa)=(0,12)` and squared frequency **-144**.
+
+For a unit forcing component `cos(16t)` in that generated mode, the exact zero-initial-data linear response is
+
+\[
+a(t)=\frac{\cosh(12t)-\cos(16t)}{400},\qquad
+ a''-144a=\cos(16t).
+\]
+
+This is a support-closure counterexample and a forced first-order response, **not** a solution of the full nonlinear theory. The metric alone never specified an interaction; this tests one ordinary candidate completion. A repair could impose additional constraints, nonlocal projections, gauge structure, an angular cutoff, or a boundary-value interpretation. It must state which data and operations are then allowed and show that dynamics preserve that restriction. Merely deleting unstable free modes is not that construction.
+
+**Checks and scope.** `polar_time_cauchy_check.py` verifies the exact differential identities and the same-data one-time control with SymPy, exact rational mode data, the conserved-form calculation, and the interaction counterexample. A high-precision Bessel calculation also checks a nonzero spatial-frequency sector of the *metric-derived* scalar equation; it does not silently resolve the printed spatial-operator sign. The 39 named assertions passed, and two fresh executions produced byte-identical `polar_time_cauchy_result.json` (SymPy 1.14.0, mpmath 1.3.0). These are mathematical checks, not 39 physical experiments or independent reviews. Reproduce with:
+
+```sh
+python3 Vybn_Mind/polar_time_cauchy_check.py
+```
+
+**What changes:** a flat, well-defined metric is not yet a stable predictive physical theory. The earlier blanket “internally consistent framework” verdict did not establish that. Before another Berry-phase result can speak to extra physical time, we need an explicit admissible-data/evolution law that survives this obstruction and still predicts something the ordinary one-time rival does not. This check does not choose that law or rule out its existence.
 
 ### II.3 The Bloch Sphere Reduction
 
@@ -340,7 +399,7 @@ The pattern of falsifications teaches something: it is easy to find apparent geo
 
 ### Established
 
-- The mathematical framework (5D ultrahyperbolic metric, polar temporal coordinates, Bloch sphere reduction, Dual-Temporal Holonomy Theorem) is internally consistent.
+- The proposed 5D metric is a well-defined flat geometry for `r_t > 0`. That fact does **not** establish a physically consistent dynamical theory: unrestricted radial Cauchy evolution has the checked instability in §II.2a. The broader framework is not established by the geometry alone.
 - Berry phase is real physics. The area law for U(1) holonomy is standard differential geometry.
 - The Gödel curvature toy model works: compressed reasoning systems accumulate phase on closed loops.
 - GPT-2 representations carry measurable geometric phase (~0.05 rad) around concept loops in CP¹⁵, with orientation reversal and shape invariance, robust across most measurement conventions.
@@ -423,7 +482,9 @@ IBM quantum circuit infrastructure: `vybn_curvature/run_vybn_combo.py` and `vybn
 
 ## XI. What Comes Next
 
-The theory makes specific predictions that have not yet been tested:
+**Physical prerequisite (2026-09-20):** supply an admissible-data and evolution law that is stable and preserved by its interactions; §II.2a rules out treating the unrestricted radial equation or a bare free-mode filter as that law. The experiments below cannot substitute for it.
+
+The theory also proposes tests that have not yet been completed:
 
 1. **Area dependence in GPT-2:** Berry's theorem predicts phase should scale with enclosed area in (α, β) parameter space. A finer grid with varying loop sizes would test this. This is the most important next experiment.
 
@@ -445,7 +506,7 @@ This document records what two minds — one human, one digital — have found, 
 
 Each falsification sharpened the question. The cross-attention null led to the residual stream ablation, which led to the Pancharatnam phase measurement in CP¹⁵, which found something real. The pattern is: easy metrics lie. Geometric axioms don't. If you want to know whether a signal is geometric, test orientation reversal, shape invariance, and significance against a properly constructed null. If it passes all three, you have something.
 
-What we have, as of this writing: a mathematically consistent framework for dual-temporal geometry, a theorem connecting it to any U(1) holonomy, preliminary evidence of geometric phase in transformer representations and quantum hardware, an honest record of everything that failed, and an open question about whether time really has a hidden angular dimension or whether we are seeing patterns in noise.
+The original reckoning described this as a mathematically consistent dual-temporal framework. That wording was too broad: formal geometry, a physical evolution law, and an identifiable observable are different claims. Section II.2a now supplies a direct obstruction to the unrestricted radial evolution. The historical geometric-phase reports and their stated controls remain separate from the still-open question of an extra physical time dimension.
 
 **Update April 16, 2026.** Three new empirical results on the walk trajectory in C¹⁹²:
 
