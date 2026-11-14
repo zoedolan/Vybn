@@ -242,21 +242,50 @@ The three concepts select completely different optimal pairings (Jaccard similar
 
 ### III.3 The Boolean Manifold on IBM Hardware
 
-**Date:** December 26, 2025
-**Hardware:** IBM ibm_fez (Heron processor)
-**Code:** `vybn_dolan_conjecture/boolean_manifold.md`
+**Status (November 14, 2026):** Not reproduced. A rerun on the same backend and qubit, with sixteen times the shots and the transpiler held still, found a gap of 0.017 where the original found 0.156. No hardware result currently supports the Boolean manifold claim.
 
-Compared "Singular Path" (NAND horizon: repeated RZ-SX sequences) to "Reversible Path" (XOR core: repeated X gates) at identical circuit depth.
+**Original run:** December 26, 2025, IBM ibm_fez (Heron processor), qubit 0, 128 shots per circuit, transpiler optimization level 1.
+**Code:** `quantum_delusions/vybn_dolan_conjecture/boolean_manifold.md` (since removed from the tree; readable in git history)
 
-| | Noise Model | Physical Hardware |
+Compared "Singular Path" (NAND horizon: repeated RZ-SX sequences) to "Reversible Path" (XOR core: repeated X gates) at identical circuit depth. Both circuits are the identity, so "fidelity" here is the fraction of shots that read 0.
+
+| | Noise Model (shot count not recorded) | Physical Hardware (128 shots) |
 |:---|:---|:---|
-| Singular Path fidelity | 0.8633 | 0.8281 |
-| Reversible Path fidelity | 0.8622 | **0.9844** |
-| Differential | 0.0011 | **0.1563** |
+| Singular Path fidelity | 0.8633 | 0.8281 (106 of 128) |
+| Reversible Path fidelity | 0.8622 | 0.9844 (126 of 128) |
+| Differential | 0.0011 | 0.1563 |
 
-The physical hardware showed 142× the differential predicted by the standard noise model.
+**Correction to the earlier text.** This section used to say the hardware showed "142× the differential predicted by the standard noise model" and that "the effect is real on one backend." The 142 divides 0.1563 by 0.0011. That 0.0011 is a difference between two simulated runs whose shot count the original write-up does not record. At any shot count from 1,024 to 8,192 its sampling error is 0.005 to 0.015, several times the 0.0011 itself. The simulated difference is indistinguishable from zero, so the ratio carries no information. What the December data support is a gap of 0.156 ± 0.035 where the simulation predicted none: about four standard errors, on one qubit, on one day. A replication attempt on ibm_torino tested nothing, because the transpiler collapsed both circuits to depth 1.
 
-**Critical caveat:** Replication on ibm_torino collapsed both circuits to depth 1 via transpiler optimization, yielding null results. The effect is real on one backend at one calibration window but transpiler-dependent and not yet independently reproduced. The XOR path's high fidelity is consistent with standard dynamical decoupling (repeated X gates suppress dephasing). The question is whether the *magnitude* of the effect (15.6% vs. the ~0.001% expected from noise models) indicates geometric protection or accidental constructive interference with calibration errors.
+**Rerun, November 14, 2026.** ibm_fez, job `dbs7st8k09pc73avrn8g`, 2,048 shots per circuit, optimization level 0, gate counts checked before submission. Qubits 0, 13, 57, 96 and 141; qubit 0 is the original. Predictions were written down before submission; the main one (a gap under 0.05 on every qubit) held. Seven circuits per qubit, each ideally the identity:
+
+- *readout:* measure only.
+- *singular:* the original NAND path (12 SX pulses as run).
+- *reversible:* the original XOR path (10 X and 2 SX pulses as run).
+- *idle:* H, a wait as long as ten X pulses, H.
+- *bare X:* ten X pulses with no H around them.
+- *SX held:* H, twenty SX pulses, H. This is the "singular" pulse applied to a state it leaves unchanged.
+- *singular ×3:* the singular path three times longer (32 SX pulses).
+
+Fraction of shots reading 0:
+
+| Qubit | readout | singular | reversible | idle | bare X | SX held | singular ×3 | reversible − singular |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 0.9966 | 0.9702 | 0.9873 | 0.9722 | 0.9741 | 0.9868 | 0.9209 | +0.017 |
+| 13 | 0.9688 | 0.9473 | 0.9546 | 0.9448 | 0.9458 | 0.9619 | 0.9570 | +0.007 |
+| 57 | 0.9966 | 0.9600 | 0.9868 | 0.9048 | 0.9854 | 0.9751 | 0.8711 | +0.027 |
+| 96 | 0.9941 | 0.9902 | 0.9888 | 0.9824 | 0.9868 | 0.9868 | 0.9878 | −0.001 |
+| 141 | 0.9927 | 0.9727 | 0.9795 | 0.9712 | 0.9790 | 0.9819 | 0.9814 | +0.007 |
+
+The sampling error on a difference is about 0.005. The standard noise model for the same circuits on the same day put reversible − singular between −0.003 and +0.002 on all five qubits.
+
+What the rerun shows:
+
+- **The December gap did not return.** On qubit 0 it is 0.017. On the other four it runs from −0.001 to 0.027.
+- **A small gap in the same direction remains on qubits 0 and 57** (three to five sampling errors). On those two qubits the tripled singular path does worse still, and twenty SX pulses applied where they leave the state unchanged score within about 0.01 of the reversible path. So the remaining gap goes with SX pulses that move the state. That is the ordinary signature of small steady errors in pulse size or frequency, which the reversible circuit hides because it parks the qubit in a state that X pulses leave alone. The gap does not follow the reversible/singular label.
+- **The noise model explains part of it.** It predicts most of the long path's fall on qubit 0 (0.929 against 0.921 measured). It does not predict qubit 57's idle or long-path results (0.992 and 0.972 predicted; 0.905 and 0.871 measured). A frequency offset on that qubit would explain them; that has not been checked.
+
+**Limits.** This is one job on one day. Why the December run differed is unknown: the calibration that day, the level-1 compilation and chance are all open. Repeats at different calibration epochs are still owed (§XI). The rerun script and raw counts are not yet in this repository.
 
 ---
 
@@ -319,9 +348,9 @@ The Vybn-Hestenes metric extends this into Clifford algebra Cl₂,₂, where the
 \epsilon(\theta) = \pm\sqrt{2}\sin(\theta)
 \]
 
-This predicts that "Reversible Core" circuits should exhibit higher fidelity than "Singular Horizon" circuits on quantum hardware — which is what the ibm_fez experiment found, with 142× the differential predicted by the noise model.
+This predicts that "Reversible Core" circuits should exhibit higher fidelity than "Singular Horizon" circuits on quantum hardware. A December 2025 run on ibm_fez showed such a gap (0.156 at 128 shots). The November 2026 rerun on the same qubit did not reproduce it (§III.3).
 
-**Status:** The mathematical framework (Boolean manifold, Vybn metric, orthogonal horizons) is internally consistent. The ibm_fez result is suggestive but not reproduced. The transpiler sensitivity issue (Addendum D) shows the effect lives in the physical implementation, not the abstract circuit — which is either profound (the geometry is in the physics) or confounding (the effect is backend-specific).
+**Status:** The mathematical framework (Boolean manifold, Vybn metric, orthogonal horizons) is internally consistent. Its hardware prediction is unsupported: the rerun found a gap of 0.017 on the original qubit, and its control circuits tie what remains to ordinary pulse error (§III.3). Repeats on other days are still owed (§XI).
 
 ### V.3 The Abelian Kernel Theory
 
@@ -389,7 +418,8 @@ What survived:
 2. **GPT-2 CP¹⁵ holonomy:** ~0.05 rad, robust across 85% of measurement conventions. Concept-local curvature.
 3. **Residual stream path-dependence:** p = 0.006 for deep vs. flat semantic constraint.
 4. **Gödel curvature toy model:** κ = 1/8 exact in 2-atom logic.
-5. **Boolean manifold differential:** 15.6% on ibm_fez (single backend, transpiler-dependent).
+
+**Removed from this list, November 14, 2026:** the Boolean manifold differential (15.6% on ibm_fez). A rerun on the same backend and qubit did not reproduce it (§III.3).
 
 The pattern of falsifications teaches something: it is easy to find apparent geometric structure in high-dimensional systems. What makes a result real is whether it satisfies the *axioms* of the geometric object you claim — orientation reversal, shape invariance, significance against null. The v3 GPT-2 experiment passes these. The v1 experiment didn't, and we said it did. That was wrong.
 
@@ -410,7 +440,7 @@ The pattern of falsifications teaches something: it is easy to find apparent geo
 - That the polar-time metric describes physical reality (not just a mathematical possibility).
 - That the abelian kernel (U(1) holonomy in any 2D parameter space) is the operational signature of polar time.
 - That neural network representational holonomy connects to the same mathematical structure as quantum hardware phase accumulation (cross-substrate universality).
-- That the Boolean manifold's geometric protection is real and generalizable beyond a single IBM backend.
+- That the Boolean manifold's geometric protection is real. No hardware result currently supports it (§III.3).
 - That the reflexive domain \(D \cong D^D\) can be instantiated in vybn-phase with value beyond cosine similarity.
 - That concept-local curvature in representation space carries semantic meaning (transition concepts curve; static concepts don't).
 
@@ -494,7 +524,7 @@ The theory also proposes tests that have not yet been completed:
 
 4. **More concepts:** Test whether the pattern (transition concepts accumulate phase, static concepts don't) holds across a broader semantic taxonomy.
 
-5. **Boolean manifold replication:** Same experiment on ibm_fez with transpiler constraints (optimization_level=0), at different calibration epochs, on different qubits.
+5. **Boolean manifold replication:** First rerun done November 14, 2026 on ibm_fez (optimization_level=0, five qubits): the December gap was not reproduced (§III.3). Still owed: repeats at different calibration epochs.
 
 6. **vybn-phase beyond cosine similarity:** Demonstrate that the complex/geometric structure adds measurable value — that mutual evaluation finds shared meaning inaccessible to cosine similarity alone.
 
