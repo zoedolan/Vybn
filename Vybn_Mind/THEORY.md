@@ -285,7 +285,7 @@ What the rerun shows:
 - **A small gap in the same direction remains on qubits 0 and 57** (three to five sampling errors). On those two qubits the tripled singular path does worse still, and twenty SX pulses applied where they leave the state unchanged score within about 0.01 of the reversible path. So the remaining gap goes with SX pulses that move the state. That is the ordinary signature of small steady errors in pulse size or frequency, which the reversible circuit hides because it parks the qubit in a state that X pulses leave alone. The gap does not follow the reversible/singular label.
 - **The noise model explains part of it.** It predicts most of the long path's fall on qubit 0 (0.929 against 0.921 measured). It does not predict qubit 57's idle or long-path results (0.992 and 0.972 predicted; 0.905 and 0.871 measured). A frequency offset on that qubit would explain them; that has not been checked.
 
-**Limits.** This is one job on one day. Why the December run differed is unknown: the calibration that day, the level-1 compilation and chance are all open. Repeats at different calibration epochs are still owed (§XI). The rerun script and raw counts are not yet in this repository.
+**Limits.** This is one job on one day. Why the December run differed is unknown: the calibration that day, the level-1 compilation and chance are all open. Repeats at different calibration epochs are still owed (§XI). The rerun script and raw counts are beside this file: `boolean_manifold_rerun.py` and `boolean_manifold_rerun_result.json`.
 
 ---
 

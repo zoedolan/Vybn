@@ -1,0 +1,469 @@
+{
+ "what": "Rerun of the Boolean manifold hardware test (THEORY.md, section III.3). Each circuit is ideally the identity; the score is the fraction of shots reading 0.",
+ "claim_limit": "One job on one day. It did not reproduce the December 2025 gap of 0.156 on ibm_fez qubit 0. It does not test the polar-time conjecture.",
+ "script": "boolean_manifold_rerun.py",
+ "script_sha256": "b77601a95c92fd8163ca2701e1ff01954fed7dab857d7e9470e54383594f22dd",
+ "packages": {
+  "qiskit": "2.3.1",
+  "qiskit-aer": "0.17.2",
+  "qiskit-ibm-runtime": "0.46.1"
+ },
+ "submitted_utc": "2026-11-14T15:29:57Z",
+ "table_columns": {
+  "readout": "readout",
+  "nand": "singular",
+  "xor": "reversible",
+  "idle": "idle",
+  "barex": "bare X",
+  "sxeig": "SX held",
+  "nand30": "singular x3",
+  "xor-nand": "reversible - singular"
+ },
+ "hardware": {
+  "note": "As saved by the script when the job returned. counts[i] belongs to job.plan[i], which is [physical qubit, arm]. props are IBM calibration figures read at submission.",
+  "job": {
+   "job": "dbs7st8k09pc73avrn8g",
+   "backend": "ibm_fez",
+   "at": 1794670197.446931,
+   "shots": 2048,
+   "plan": [
+    [
+     0,
+     "readout"
+    ],
+    [
+     0,
+     "nand"
+    ],
+    [
+     0,
+     "xor"
+    ],
+    [
+     0,
+     "idle"
+    ],
+    [
+     0,
+     "barex"
+    ],
+    [
+     0,
+     "sxeig"
+    ],
+    [
+     0,
+     "nand30"
+    ],
+    [
+     13,
+     "readout"
+    ],
+    [
+     13,
+     "nand"
+    ],
+    [
+     13,
+     "xor"
+    ],
+    [
+     13,
+     "idle"
+    ],
+    [
+     13,
+     "barex"
+    ],
+    [
+     13,
+     "sxeig"
+    ],
+    [
+     13,
+     "nand30"
+    ],
+    [
+     57,
+     "readout"
+    ],
+    [
+     57,
+     "nand"
+    ],
+    [
+     57,
+     "xor"
+    ],
+    [
+     57,
+     "idle"
+    ],
+    [
+     57,
+     "barex"
+    ],
+    [
+     57,
+     "sxeig"
+    ],
+    [
+     57,
+     "nand30"
+    ],
+    [
+     96,
+     "readout"
+    ],
+    [
+     96,
+     "nand"
+    ],
+    [
+     96,
+     "xor"
+    ],
+    [
+     96,
+     "idle"
+    ],
+    [
+     96,
+     "barex"
+    ],
+    [
+     96,
+     "sxeig"
+    ],
+    [
+     96,
+     "nand30"
+    ],
+    [
+     141,
+     "readout"
+    ],
+    [
+     141,
+     "nand"
+    ],
+    [
+     141,
+     "xor"
+    ],
+    [
+     141,
+     "idle"
+    ],
+    [
+     141,
+     "barex"
+    ],
+    [
+     141,
+     "sxeig"
+    ],
+    [
+     141,
+     "nand30"
+    ]
+   ],
+   "props": {
+    "0": {
+     "x_ns": 24.0,
+     "idle_dt": 64,
+     "x_err": 0.00144,
+     "sx_err": 0.00144,
+     "measure_err": 0.0293,
+     "T1_us": 58.8,
+     "T2_us": 51.2
+    },
+    "13": {
+     "x_ns": 24.0,
+     "idle_dt": 64,
+     "x_err": 0.00048,
+     "sx_err": 0.00048,
+     "measure_err": 0.04004,
+     "T1_us": 190.0,
+     "T2_us": 143.6
+    },
+    "57": {
+     "x_ns": 24.0,
+     "idle_dt": 64,
+     "x_err": 0.00058,
+     "sx_err": 0.00058,
+     "measure_err": 0.0083,
+     "T1_us": 111.4,
+     "T2_us": 66.8
+    },
+    "96": {
+     "x_ns": 24.0,
+     "idle_dt": 64,
+     "x_err": 0.00027,
+     "sx_err": 0.00027,
+     "measure_err": 0.01465,
+     "T1_us": 139.8,
+     "T2_us": 136.9
+    },
+    "141": {
+     "x_ns": 24.0,
+     "idle_dt": 64,
+     "x_err": 0.00014,
+     "sx_err": 0.00014,
+     "measure_err": 0.03125,
+     "T1_us": 157.1,
+     "T2_us": 116.3
+    }
+   }
+  },
+  "counts": [
+   {
+    "0": 2041,
+    "1": 7
+   },
+   {
+    "0": 1987,
+    "1": 61
+   },
+   {
+    "0": 2022,
+    "1": 26
+   },
+   {
+    "0": 1991,
+    "1": 57
+   },
+   {
+    "0": 1995,
+    "1": 53
+   },
+   {
+    "0": 2021,
+    "1": 27
+   },
+   {
+    "0": 1886,
+    "1": 162
+   },
+   {
+    "0": 1984,
+    "1": 64
+   },
+   {
+    "0": 1940,
+    "1": 108
+   },
+   {
+    "0": 1955,
+    "1": 93
+   },
+   {
+    "0": 1935,
+    "1": 113
+   },
+   {
+    "0": 1937,
+    "1": 111
+   },
+   {
+    "0": 1970,
+    "1": 78
+   },
+   {
+    "0": 1960,
+    "1": 88
+   },
+   {
+    "0": 2041,
+    "1": 7
+   },
+   {
+    "0": 1966,
+    "1": 82
+   },
+   {
+    "0": 2021,
+    "1": 27
+   },
+   {
+    "0": 1853,
+    "1": 195
+   },
+   {
+    "0": 2018,
+    "1": 30
+   },
+   {
+    "0": 1997,
+    "1": 51
+   },
+   {
+    "0": 1784,
+    "1": 264
+   },
+   {
+    "0": 2036,
+    "1": 12
+   },
+   {
+    "0": 2028,
+    "1": 20
+   },
+   {
+    "0": 2025,
+    "1": 23
+   },
+   {
+    "0": 2012,
+    "1": 36
+   },
+   {
+    "0": 2021,
+    "1": 27
+   },
+   {
+    "0": 2021,
+    "1": 27
+   },
+   {
+    "0": 2023,
+    "1": 25
+   },
+   {
+    "0": 2033,
+    "1": 15
+   },
+   {
+    "0": 1992,
+    "1": 56
+   },
+   {
+    "0": 2006,
+    "1": 42
+   },
+   {
+    "0": 1989,
+    "1": 59
+   },
+   {
+    "0": 2005,
+    "1": 43
+   },
+   {
+    "0": 2011,
+    "1": 37
+   },
+   {
+    "0": 2010,
+    "1": 38
+   }
+  ],
+  "read": {
+   "0": {
+    "readout": 0.9966,
+    "nand": 0.9702,
+    "xor": 0.9873,
+    "idle": 0.9722,
+    "barex": 0.9741,
+    "sxeig": 0.9868,
+    "nand30": 0.9209,
+    "xor-nand": 0.0171
+   },
+   "13": {
+    "readout": 0.9688,
+    "nand": 0.9473,
+    "xor": 0.9546,
+    "idle": 0.9448,
+    "barex": 0.9458,
+    "sxeig": 0.9619,
+    "nand30": 0.957,
+    "xor-nand": 0.0073
+   },
+   "57": {
+    "readout": 0.9966,
+    "nand": 0.96,
+    "xor": 0.9868,
+    "idle": 0.9048,
+    "barex": 0.9854,
+    "sxeig": 0.9751,
+    "nand30": 0.8711,
+    "xor-nand": 0.0268
+   },
+   "96": {
+    "readout": 0.9941,
+    "nand": 0.9902,
+    "xor": 0.9888,
+    "idle": 0.9824,
+    "barex": 0.9868,
+    "sxeig": 0.9868,
+    "nand30": 0.9878,
+    "xor-nand": -0.0014
+   },
+   "141": {
+    "readout": 0.9927,
+    "nand": 0.9727,
+    "xor": 0.9795,
+    "idle": 0.9712,
+    "barex": 0.979,
+    "sxeig": 0.9819,
+    "nand30": 0.9814,
+    "xor-nand": 0.0068
+   }
+  }
+ },
+ "noise_model_control": {
+  "note": "AerSimulator.from_backend(ibm_fez), run the same day on the same transpiled circuits, 2,048 shots. Only these fractions were kept; the simulated counts were not saved. Running the noise arm again uses the calibration of the day it runs and fresh random draws, so it will differ slightly.",
+  "read": {
+   "0": {
+    "readout": 0.9751,
+    "nand": 0.9565,
+    "xor": 0.9541,
+    "idle": 0.9653,
+    "barex": 0.9609,
+    "sxeig": 0.9434,
+    "nand30": 0.9287,
+    "xor-nand": -0.0024
+   },
+   "13": {
+    "readout": 0.9663,
+    "nand": 0.9512,
+    "xor": 0.9536,
+    "idle": 0.9609,
+    "barex": 0.9653,
+    "sxeig": 0.9512,
+    "nand30": 0.9482,
+    "xor-nand": 0.0024
+   },
+   "57": {
+    "readout": 0.9917,
+    "nand": 0.9834,
+    "xor": 0.9805,
+    "idle": 0.9922,
+    "barex": 0.9868,
+    "sxeig": 0.978,
+    "nand30": 0.9722,
+    "xor-nand": -0.0029
+   },
+   "96": {
+    "readout": 0.9829,
+    "nand": 0.9854,
+    "xor": 0.9834,
+    "idle": 0.9844,
+    "barex": 0.9805,
+    "sxeig": 0.98,
+    "nand30": 0.979,
+    "xor-nand": -0.002
+   },
+   "141": {
+    "readout": 0.9702,
+    "nand": 0.9688,
+    "xor": 0.9707,
+    "idle": 0.9644,
+    "barex": 0.9702,
+    "sxeig": 0.958,
+    "nand30": 0.9629,
+    "xor-nand": 0.0019
+   }
+  }
+ }
+}
