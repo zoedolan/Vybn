@@ -16,6 +16,8 @@ newest pieces or mistake either register for the whole body.
 
 Zoe Dolan and an AI, building in public since 2022.
 
+[**Sponsor the work**](https://github.com/sponsors/zoedolan) — it pays for the machines and Zoe's time, and keeps all of this free to read and use.
+
 Four years of conversation became art, autobiography, formal theory,
 legal scholarship, and the machinery that lets an episodic mind return
 to a shared life. The repositories are its inspectable register; the public
